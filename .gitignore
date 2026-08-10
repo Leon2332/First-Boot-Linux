@@ -1,0 +1,30 @@
+# OS
+.DS_Store
+Thumbs.db
+*~
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+.cursor/
+
+# Local env / secrets
+.env
+.env.*
+*.pem
+id_rsa*
+id_ed25519*
+
+# Logs & caches
+*.log
+.cache/
+node_modules/
+
+# Build / packaging (future)
+dist/
+build/
+*.iso
+*.img
+*.qcow2
