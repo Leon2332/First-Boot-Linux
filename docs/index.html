@@ -13,9 +13,9 @@
   <!-- GNOME-style top panel -->
   <header class="top-bar" role="banner">
     <div class="top-bar-left">
-      <button type="button" class="app-menu-btn" id="epiphany-btn" title="Epiphany" aria-label="Epiphany web browser">
-        <img class="app-menu-icon" src="assets/apps/epiphany.png" alt="" draggable="false" />
-        <span class="app-menu-label">Epiphany</span>
+      <button type="button" class="app-menu-btn" id="terminal-btn" title="Terminal" aria-label="Terminal">
+        <img class="app-menu-icon" src="assets/apps/org.gnome.Terminal.png" alt="" draggable="false" />
+        <span class="app-menu-label" id="app-menu-label">Terminal</span>
       </button>
     </div>
 
@@ -115,69 +115,82 @@
 
   <div class="backdrop" id="backdrop" hidden></div>
 
-  <main class="main" id="main">
-    <section class="screen" id="screen-chooser" aria-labelledby="chooser-title">
-      <h1 id="chooser-title">Install a distro</h1>
-
-      <h2 class="section-title">Recommended by <span class="retailer-name">Retailer Name</span></h2>
-      <div class="distro-grid" id="recommended-grid" role="list"></div>
-
-      <div class="other-cta">
-        <button type="button" class="btn btn-secondary" id="view-other-btn" aria-expanded="false" aria-controls="catalog">
-          <span id="view-other-label">View other distros</span>
-          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+  <!-- GNOME Terminal -->
+  <div class="term-window" id="term-window" role="dialog" aria-label="Terminal" hidden>
+    <header class="term-headerbar" id="term-headerbar">
+      <div class="term-title-wrap">
+        <img src="assets/apps/org.gnome.Terminal.png" alt="" draggable="false" />
+        <span class="term-title" id="term-title">user@firstboot: ~</span>
+      </div>
+      <div class="term-window-controls">
+        <button type="button" class="term-wc term-max" id="term-max" title="Maximize" aria-label="Maximize"></button>
+        <button type="button" class="term-wc term-close" id="term-close" title="Close" aria-label="Close">
+          <img class="sym" src="assets/status/window-close-symbolic.svg" alt="" draggable="false" />
         </button>
       </div>
+    </header>
+    <div class="term-body" id="term-body" tabindex="0" role="log" aria-live="polite" aria-relevant="additions">
+      <div class="term-scroll" id="term-scroll"></div>
+      <div class="term-input-line" id="term-input-line">
+        <span class="term-prompt-user">user@firstboot</span><span class="term-prompt-colon">:</span><span class="term-prompt-path" id="term-cwd">~</span><span class="term-prompt-dollar">$</span>
+        <span class="term-typed" id="term-typed"></span><span class="term-cursor" aria-hidden="true">▋</span>
+      </div>
+    </div>
+  </div>
 
-      <section class="catalog" id="catalog" hidden aria-labelledby="catalog-title">
-        <h2 class="section-title" id="catalog-title">Other distros</h2>
+  <main class="main" id="main">
+    <section class="screen" id="screen-chooser" aria-labelledby="chooser-title">
+      
+      <div class="distro-grid" id="recommended-grid" role="list"></div>
+
+      <section class="catalog" id="catalog" aria-labelledby="catalog-title">
         <div class="catalog-scroll" id="catalog-scroll">
           <div class="catalog-list" id="catalog-list" role="list"></div>
         </div>
       </section>
     </section>
 
-    <section class="screen" id="screen-detail" hidden aria-labelledby="detail-title">
-      <button type="button" class="back-link" id="detail-back">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
-        Back
-      </button>
+    <section class="screen screen-detail" id="screen-detail" hidden aria-labelledby="detail-title">
+      <div class="detail-popover" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+        <button type="button" class="back-link" id="detail-back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Back
+        </button>
 
-      <div class="detail-card">
-        <div class="detail-hero">
-          <img class="distro-logo large" id="detail-logo" src="" alt="" />
-          <div>
-            <h1 id="detail-title">Distro</h1>
-            <p class="detail-desktop" id="detail-desktop" hidden></p>
-            <p class="detail-version" id="detail-version"></p>
-            <p class="detail-tagline" id="detail-tagline"></p>
+        <div class="detail-card">
+          <div class="detail-hero">
+            <img class="distro-logo large" id="detail-logo" src="" alt="" />
+            <div>
+              <h1 id="detail-title">Distro</h1>
+              <p class="detail-desktop" id="detail-desktop" hidden></p>
+              <p class="detail-version" id="detail-version"></p>
+              <p class="detail-tagline" id="detail-tagline"></p>
+            </div>
           </div>
-        </div>
 
-        <p class="detail-desc" id="detail-desc"></p>
+          <p class="detail-desc" id="detail-desc"></p>
 
-        <div class="de-options" id="de-options" hidden>
-          <div class="de-options-label">Desktop environment</div>
-          <div class="de-options-list" id="de-options-list" role="list" aria-label="Desktop environments"></div>
-        </div>
+          <div class="de-options" id="de-options" hidden>
+            <div class="de-options-label">Desktop environment</div>
+            <div class="de-options-list" id="de-options-list" role="list" aria-label="Desktop environments"></div>
+          </div>
 
-        <div class="detail-warn" id="detail-warn" hidden>
-          <span id="detail-warn-text"></span>
-        </div>
+          <div class="detail-warn" id="detail-warn" hidden>
+            <span id="detail-warn-text"></span>
+          </div>
 
-        <div class="detail-actions" id="detail-actions">
-          <button type="button" class="btn btn-primary" id="install-btn">Install</button>
-          <button type="button" class="btn btn-ghost" id="cancel-detail-btn">Cancel</button>
+          <div class="detail-actions" id="detail-actions">
+            <button type="button" class="btn btn-primary" id="install-btn">Install</button>
+            <button type="button" class="btn btn-ghost" id="cancel-detail-btn">Cancel</button>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="screen" id="screen-install" hidden aria-labelledby="install-title">
-      <div class="install-panel">
+    <section class="screen screen-install" id="screen-install" hidden aria-labelledby="install-title">
+      <div class="install-panel" role="dialog" aria-modal="true" aria-labelledby="install-title">
         <img class="distro-logo large" id="install-logo" src="" alt="" />
         <h1 id="install-title">Installing…</h1>
         <p class="install-sub" id="install-subtitle"></p>
@@ -194,8 +207,8 @@
       </div>
     </section>
 
-    <section class="screen" id="screen-done" hidden aria-labelledby="done-title">
-      <div class="done-panel">
+    <section class="screen screen-done" id="screen-done" hidden aria-labelledby="done-title">
+      <div class="done-panel" role="dialog" aria-modal="true" aria-labelledby="done-title">
         <div class="done-check" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <polyline points="20 6 9 17 4 12" />
@@ -222,8 +235,9 @@
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
   <footer class="brand-footer" id="brand-footer">
-    First Boot Linux <span id="fbl-version">0.1.0</span><br />
-    Configured by <span class="retailer-name">Retailer Name</span>
+    First Boot Linux <span id="fbl-version">0.1.1</span><br />
+    Configured by <span class="retailer-name">[Retailer Name]</span><br>
+    Support: <span class="retailer-name">[Retailer Contact Details]</span>
   </footer>
 
   <script src="app.js"></script>

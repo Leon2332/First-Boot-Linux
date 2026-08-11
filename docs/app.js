@@ -57,18 +57,6 @@
       ],
     },
     {
-      id: "zorin-os",
-      name: "Zorin OS",
-      desktop: "GNOME",
-      tagline: "Designed for newcomers",
-      desc: "Layouts that can look like Windows or macOS, plus tools that ease the switch from those systems.",
-      version: "18.1",
-      recommended: true,
-      local: true,
-      logo: LOGO("zorin-os"),
-      desktops: [{ id: "gnome", name: "GNOME", size: "~3.6 GB", local: true }],
-    },
-    {
       id: "pop-os",
       name: "Pop!_OS",
       desktop: "COSMIC",
@@ -79,6 +67,21 @@
       local: true,
       logo: LOGO("pop-os"),
       desktops: [{ id: "cosmic", name: "COSMIC", size: "~2.9 GB", local: true }],
+    },
+    {
+      id: "bazzite",
+      name: "Bazzite",
+      desktop: "KDE Plasma",
+      tagline: "Gaming-ready desktop",
+      desc: "A Fedora Atomic image built for gaming PCs and handhelds, with Steam, drivers, and gaming tools ready to go.",
+      version: "43",
+      recommended: true,
+      local: true,
+      logo: LOGO("bazzite"),
+      desktops: [
+        { id: "plasma", name: "KDE Plasma", size: "~3.5 GB", local: true },
+        { id: "gnome", name: "GNOME", size: "~3.2 GB", local: false },
+      ],
     },
   ];
 
@@ -281,7 +284,6 @@
       ethernetPlugged: false,
     },
     darkStyle: true,
-    catalogOpen: false,
     /** 'recommended' | 'catalog' — which popover style to use */
     detailMode: "recommended",
     selected: null,
@@ -311,8 +313,6 @@
     wifiList: $("wifi-list"),
     backdrop: $("backdrop"),
     recommendedGrid: $("recommended-grid"),
-    viewOtherBtn: $("view-other-btn"),
-    viewOtherLabel: $("view-other-label"),
     catalog: $("catalog"),
     catalogList: $("catalog-list"),
     screenChooser: $("screen-chooser"),
@@ -348,6 +348,28 @@
     powerModalCancel: $("power-modal-cancel"),
     powerModalConfirm: $("power-modal-confirm"),
     toast: $("toast"),
+    terminalBtn: $("terminal-btn"),
+    appMenuLabel: $("app-menu-label"),
+    termWindow: $("term-window"),
+    termHeaderbar: $("term-headerbar"),
+    termTitle: $("term-title"),
+    termMax: $("term-max"),
+    termClose: $("term-close"),
+    termBody: $("term-body"),
+    termScroll: $("term-scroll"),
+    termTyped: $("term-typed"),
+    termCwd: $("term-cwd"),
+  };
+
+  const TERM = {
+    user: "user",
+    host: "firstboot",
+    cwd: "~",
+    history: [],
+    histIndex: -1,
+    draft: "",
+    line: "",
+    open: false,
   };
 
   function allDistros() {
@@ -375,6 +397,343 @@
     els.backdrop.hidden = true;
   }
 
+  /* ---------- GNOME Terminal ---------- */
+
+  function termPromptHtml() {
+    return (
+      `<span class="term-prompt-user">${TERM.user}@${TERM.host}</span>` +
+      `<span class="term-prompt-colon">:</span>` +
+      `<span class="term-prompt-path">${escapeHtml(TERM.cwd)}</span>` +
+      `<span class="term-prompt-dollar">$</span> `
+    );
+  }
+
+  function termUpdateTitle() {
+    const title = `${TERM.user}@${TERM.host}: ${TERM.cwd}`;
+    if (els.termTitle) els.termTitle.textContent = title;
+    if (els.termCwd) els.termCwd.textContent = TERM.cwd;
+    if (els.appMenuLabel && TERM.open) {
+      els.appMenuLabel.textContent = title;
+    }
+  }
+
+  function termAppendLine(html, className) {
+    const div = document.createElement("div");
+    div.className = "term-line" + (className ? " " + className : "");
+    div.innerHTML = html;
+    els.termScroll.appendChild(div);
+  }
+
+  function termScrollBottom() {
+    if (els.termBody) els.termBody.scrollTop = els.termBody.scrollHeight;
+  }
+
+  function termSetLine(text) {
+    TERM.line = text;
+    if (els.termTyped) els.termTyped.textContent = text;
+  }
+
+  function termWelcome() {
+    els.termScroll.innerHTML = "";
+    termAppendLine(
+      "Welcome to First Boot Linux — GNOME Terminal (mockup).\n" +
+        "Type <span class=\"term-cmd\">help</span> for available commands."
+    );
+    termAppendLine("");
+    termUpdateTitle();
+    termSetLine("");
+    termScrollBottom();
+  }
+
+  function termRunCommand(raw) {
+    const input = raw.trim();
+    termAppendLine(termPromptHtml() + escapeHtml(raw));
+
+    if (!input) {
+      termScrollBottom();
+      return;
+    }
+
+    TERM.history.push(raw);
+    TERM.histIndex = TERM.history.length;
+
+    const parts = input.split(/\s+/);
+    const cmd = parts[0];
+    const args = parts.slice(1);
+
+    const net = state.network;
+    const netLabel = !net.connected
+      ? "offline"
+      : net.type === "wifi"
+        ? `wifi (${net.name})`
+        : "ethernet";
+
+    if (cmd === "help" || cmd === "?") {
+      termAppendLine(
+        [
+          "Available commands:",
+          "  help              Show this help",
+          "  clear             Clear the terminal",
+          "  uname [-a]        System information",
+          "  whoami            Current user",
+          "  hostname          Machine hostname",
+          "  pwd               Print working directory",
+          "  ls                List directory",
+          "  cat /etc/os-release",
+          "  date              Current date and time",
+          "  echo [text]       Print text",
+          "  neofetch          System summary",
+          "  network           Network status",
+          "  exit              Close the terminal",
+        ].join("\n"),
+        "term-out"
+      );
+    } else if (cmd === "clear") {
+      els.termScroll.innerHTML = "";
+    } else if (cmd === "uname") {
+      if (args[0] === "-a" || args.includes("-a")) {
+        termAppendLine(
+          "Linux firstboot 6.14.0-firstboot #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux",
+          "term-out"
+        );
+      } else {
+        termAppendLine("Linux", "term-out");
+      }
+    } else if (cmd === "whoami") {
+      termAppendLine(TERM.user, "term-out");
+    } else if (cmd === "hostname") {
+      termAppendLine(TERM.host, "term-out");
+    } else if (cmd === "pwd") {
+      termAppendLine(
+        TERM.cwd === "~" ? `/home/${TERM.user}` : TERM.cwd,
+        "term-out"
+      );
+    } else if (cmd === "ls" || cmd === "ll") {
+      termAppendLine(
+        "Desktop  Documents  Downloads  Music  Pictures  Public  Templates  Videos",
+        "term-out"
+      );
+    } else if (cmd === "cat" && args[0] === "/etc/os-release") {
+      termAppendLine(
+        [
+          'NAME="First Boot Linux"',
+          'PRETTY_NAME="First Boot Linux 0.1.0"',
+          'ID=firstboot',
+          'VERSION_ID="0.1.0"',
+          "HOME_URL=\"https://example.com/first-boot-linux\"",
+        ].join("\n"),
+        "term-out"
+      );
+    } else if (cmd === "cat") {
+      termAppendLine(
+        `cat: ${args[0] || ""}: No such file or directory`,
+        "term-err"
+      );
+    } else if (cmd === "date") {
+      termAppendLine(new Date().toString(), "term-out");
+    } else if (cmd === "echo") {
+      termAppendLine(args.join(" "), "term-out");
+    } else if (cmd === "neofetch" || cmd === "fastfetch") {
+      termAppendLine(
+        [
+          `${TERM.user}@${TERM.host}`,
+          "-----------------",
+          "OS: First Boot Linux 0.1.0",
+          "Host: Retail PC",
+          "Kernel: 6.14.0-firstboot",
+          "Shell: bash 5.2.37",
+          "DE: GNOME",
+          "Terminal: gnome-terminal",
+          `Network: ${netLabel}`,
+        ].join("\n"),
+        "term-out"
+      );
+    } else if (cmd === "network" || cmd === "nmcli") {
+      if (net.connected) {
+        termAppendLine(
+          `Connected via ${net.type}${net.name ? ` (${net.name})` : ""}`,
+          "term-out"
+        );
+      } else {
+        termAppendLine("Not connected", "term-out");
+      }
+    } else if (cmd === "exit" || cmd === "logout") {
+      closeTerminal();
+      return;
+    } else {
+      termAppendLine(`bash: ${escapeHtml(cmd)}: command not found`, "term-err");
+    }
+
+    termScrollBottom();
+  }
+
+  function openTerminal() {
+    closeMenus();
+    if (!els.termWindow) return;
+    const wasHidden = els.termWindow.hidden;
+    els.termWindow.hidden = false;
+    els.termWindow.classList.remove("minimized");
+    TERM.open = true;
+    termUpdateTitle();
+    if (wasHidden && !els.termScroll.childElementCount) {
+      termWelcome();
+    }
+    els.termBody.focus();
+  }
+
+  function closeTerminal() {
+    if (!els.termWindow) return;
+    els.termWindow.hidden = true;
+    els.termWindow.classList.remove("maximized");
+    TERM.open = false;
+    termSetLine("");
+    if (els.appMenuLabel) els.appMenuLabel.textContent = "Terminal";
+  }
+
+  function toggleTerminalMaximize() {
+    if (!els.termWindow || els.termWindow.hidden) return;
+    els.termWindow.classList.toggle("maximized");
+    const maxed = els.termWindow.classList.contains("maximized");
+    els.termMax.setAttribute("aria-label", maxed ? "Restore" : "Maximize");
+    els.termMax.title = maxed ? "Restore" : "Maximize";
+  }
+
+  function enableTermDrag() {
+    const win = els.termWindow;
+    const handle = els.termHeaderbar;
+    if (!win || !handle) return;
+
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+    let origLeft = 0;
+    let origTop = 0;
+
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      if (e.target.closest(".term-wc")) return;
+      if (win.classList.contains("maximized")) return;
+
+      const rect = win.getBoundingClientRect();
+      win.style.left = rect.left + "px";
+      win.style.top = rect.top + "px";
+      win.style.transform = "none";
+      win.style.right = "auto";
+
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      origLeft = rect.left;
+      origTop = rect.top;
+      handle.setPointerCapture(e.pointerId);
+    });
+
+    handle.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      const panel = 32;
+      let left = origLeft + dx;
+      let top = origTop + dy;
+      top = Math.max(panel, top);
+      left = Math.min(Math.max(-rectWidth(win) + 80, left), window.innerWidth - 80);
+      win.style.left = left + "px";
+      win.style.top = top + "px";
+    });
+
+    handle.addEventListener("pointerup", () => {
+      dragging = false;
+    });
+    handle.addEventListener("pointercancel", () => {
+      dragging = false;
+    });
+  }
+
+  function rectWidth(el) {
+    return el.getBoundingClientRect().width;
+  }
+
+  function onTermKeydown(e) {
+    if (!TERM.open || els.termWindow.hidden) return;
+    // Don't steal keys while typing into form controls elsewhere
+    const tag = (e.target && e.target.tagName) || "";
+    if (
+      e.target !== els.termBody &&
+      (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable)
+    ) {
+      return;
+    }
+
+    if (e.key === "Escape") {
+      // Let global Escape handling close menus first when open
+      if (
+        !els.quickSettings.hidden ||
+        !els.networkMenu.hidden ||
+        !els.powerMenu.hidden ||
+        !els.powerModal.hidden
+      ) {
+        return;
+      }
+      closeTerminal();
+      e.preventDefault();
+      return;
+    }
+
+    if (e.key === "l" && (e.ctrlKey || e.metaKey)) {
+      els.termScroll.innerHTML = "";
+      e.preventDefault();
+      return;
+    }
+
+    if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
+      termAppendLine(termPromptHtml() + escapeHtml(TERM.line) + "^C");
+      termSetLine("");
+      termScrollBottom();
+      e.preventDefault();
+      return;
+    }
+
+    if (e.key === "Enter") {
+      const line = TERM.line;
+      termSetLine("");
+      termRunCommand(line);
+      e.preventDefault();
+      return;
+    }
+
+    if (e.key === "Backspace") {
+      if (TERM.line.length) termSetLine(TERM.line.slice(0, -1));
+      e.preventDefault();
+      return;
+    }
+
+    if (e.key === "ArrowUp") {
+      if (!TERM.history.length) return;
+      if (TERM.histIndex === TERM.history.length) TERM.draft = TERM.line;
+      TERM.histIndex = Math.max(0, TERM.histIndex - 1);
+      termSetLine(TERM.history[TERM.histIndex] || "");
+      e.preventDefault();
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      if (TERM.histIndex >= TERM.history.length) return;
+      TERM.histIndex = Math.min(TERM.history.length, TERM.histIndex + 1);
+      if (TERM.histIndex === TERM.history.length) {
+        termSetLine(TERM.draft);
+      } else {
+        termSetLine(TERM.history[TERM.histIndex] || "");
+      }
+      e.preventDefault();
+      return;
+    }
+
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      termSetLine(TERM.line + e.key);
+      e.preventDefault();
+    }
+  }
+
   function openQuickSettings() {
     const wasOpen =
       !els.quickSettings.hidden ||
@@ -388,11 +747,22 @@
   }
 
   function showScreen(name) {
-    els.screenChooser.hidden = name !== "chooser";
+    // Detail/install/done are blurred overlays; keep the chooser underneath so wallpaper/list show through.
+    const showChooser =
+      name === "chooser" ||
+      name === "detail" ||
+      name === "install" ||
+      name === "done";
+    els.screenChooser.hidden = !showChooser;
     els.screenDetail.hidden = name !== "detail";
     els.screenInstall.hidden = name !== "install";
     els.screenDone.hidden = name !== "done";
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.body.classList.toggle("detail-open", name === "detail");
+    document.body.classList.toggle("install-open", name === "install");
+    document.body.classList.toggle("done-open", name === "done");
+    if (name === "chooser") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }
 
   function updateClock() {
@@ -552,7 +922,10 @@
 
   function renderCatalog() {
     els.catalogList.innerHTML = "";
-    CATALOG.forEach((d) => {
+    const sorted = CATALOG.slice().sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    );
+    sorted.forEach((d) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "catalog-row";
@@ -565,18 +938,6 @@
       btn.addEventListener("click", () => openDetail(d.id, "catalog"));
       els.catalogList.appendChild(btn);
     });
-  }
-
-  function toggleCatalog() {
-    state.catalogOpen = !state.catalogOpen;
-    els.catalog.hidden = !state.catalogOpen;
-    els.viewOtherBtn.setAttribute("aria-expanded", String(state.catalogOpen));
-    els.viewOtherLabel.textContent = state.catalogOpen
-      ? "Hide other distros"
-      : "View other distros";
-    if (state.catalogOpen) {
-      renderCatalog();
-    }
   }
 
   /** Other-distros popover: DE rows with per-edition Install / Download */
@@ -831,11 +1192,15 @@
     });
     els.powerModalConfirm.addEventListener("click", confirmPower);
 
-    els.viewOtherBtn.addEventListener("click", toggleCatalog);
     els.detailBack.addEventListener("click", () => showScreen("chooser"));
     els.cancelDetailBtn.addEventListener("click", () => showScreen("chooser"));
     els.installBtn.addEventListener("click", () => startInstall(null));
     els.rebootBtn.addEventListener("click", resetChooser);
+
+    // Click blurred backdrop (outside the popover card) to dismiss
+    els.screenDetail.addEventListener("click", (e) => {
+      if (e.target === els.screenDetail) showScreen("chooser");
+    });
 
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
@@ -849,14 +1214,51 @@
           els.quickSettings.hidden = false;
           return;
         }
+        if (
+          !els.quickSettings.hidden ||
+          !els.powerMenu.hidden
+        ) {
+          closeMenus();
+          return;
+        }
+        if (TERM.open && !els.termWindow.hidden) {
+          closeTerminal();
+          return;
+        }
         closeMenus();
         if (!els.screenDetail.hidden) showScreen("chooser");
+        return;
       }
+      onTermKeydown(e);
     });
 
     els.quickSettings.addEventListener("click", (e) => e.stopPropagation());
     els.networkMenu.addEventListener("click", (e) => e.stopPropagation());
     els.powerMenu.addEventListener("click", (e) => e.stopPropagation());
+
+    if (els.terminalBtn) {
+      els.terminalBtn.addEventListener("click", () => {
+        if (TERM.open && !els.termWindow.hidden) {
+          els.termBody.focus();
+        } else {
+          openTerminal();
+        }
+      });
+    }
+    if (els.termClose) {
+      els.termClose.addEventListener("click", closeTerminal);
+    }
+    if (els.termMax) {
+      els.termMax.addEventListener("click", toggleTerminalMaximize);
+    }
+    if (els.termBody) {
+      els.termBody.addEventListener("click", () => els.termBody.focus());
+      els.termHeaderbar?.addEventListener("dblclick", (e) => {
+        if (e.target.closest(".term-wc")) return;
+        toggleTerminalMaximize();
+      });
+    }
+    enableTermDrag();
   }
 
   function init() {
@@ -864,15 +1266,9 @@
     setInterval(updateClock, 15000);
     applyTheme();
     renderRecommended();
+    renderCatalog();
     updateNetworkUI();
     bind();
-
-    const epiphanyBtn = $("epiphany-btn");
-    if (epiphanyBtn) {
-      epiphanyBtn.addEventListener("click", () => {
-        showToast("Web browser (mockup)");
-      });
-    }
   }
 
   if (document.readyState === "loading") {
