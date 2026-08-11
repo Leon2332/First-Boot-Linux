@@ -60,6 +60,35 @@ html[data-theme="dark"] {
   --font: "Cantarell", "Inter", "Segoe UI", system-ui, sans-serif;
   --transition-fast: 120ms ease;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Bibata-Modern-Classic — Xcursor → PNG (same as Cinnamon preview) */
+  --cursor-default: url("assets/cursors/default.png") 4 2, default;
+  --cursor-pointer: url("assets/cursors/pointer.png") 10 2, pointer;
+  --cursor-text: url("assets/cursors/text.png") 12 12, text;
+  --cursor-wait: url("assets/cursors/wait.png") 12 12, wait;
+  --cursor-progress: url("assets/cursors/progress.png") 4 2, progress;
+  --cursor-move: url("assets/cursors/move.png") 12 12, move;
+  --cursor-grab: url("assets/cursors/grab.png") 14 7, grab;
+  --cursor-grabbing: url("assets/cursors/grabbing.png") 12 6, grabbing;
+  --cursor-ns-resize: url("assets/cursors/ns-resize.png") 12 12, ns-resize;
+  --cursor-ew-resize: url("assets/cursors/ew-resize.png") 12 12, ew-resize;
+  --cursor-nwse-resize: url("assets/cursors/nwse-resize.png") 12 12, nwse-resize;
+  --cursor-nesw-resize: url("assets/cursors/nesw-resize.png") 12 12, nesw-resize;
+  --cursor-n-resize: url("assets/cursors/n-resize.png") 12 2, n-resize;
+  --cursor-s-resize: url("assets/cursors/s-resize.png") 12 22, s-resize;
+  --cursor-e-resize: url("assets/cursors/e-resize.png") 22 12, e-resize;
+  --cursor-w-resize: url("assets/cursors/w-resize.png") 2 12, w-resize;
+  --cursor-col-resize: url("assets/cursors/col-resize.png") 12 12, col-resize;
+  --cursor-row-resize: url("assets/cursors/row-resize.png") 12 12, row-resize;
+  --cursor-not-allowed: url("assets/cursors/not-allowed.png") 12 12, not-allowed;
+  --cursor-help: url("assets/cursors/help.png") 4 8, help;
+  --cursor-crosshair: url("assets/cursors/crosshair.png") 12 12, crosshair;
+  --cursor-copy: url("assets/cursors/copy.png") 4 2, copy;
+  --cursor-alias: url("assets/cursors/alias.png") 9 6, alias;
+  --cursor-context-menu: url("assets/cursors/context-menu.png") 5 2, context-menu;
+  --cursor-zoom-in: url("assets/cursors/zoom-in.png") 10 10, zoom-in;
+  --cursor-zoom-out: url("assets/cursors/zoom-out.png") 10 10, zoom-out;
+  --cursor-no-drop: url("assets/cursors/no-drop.png") 9 6, no-drop;
 }
 
 /* GNOME-style light content; top panel stays dark */
@@ -117,6 +146,7 @@ html {
   margin: 0;
   min-height: 100%;
   background-color: var(--bg);
+  cursor: var(--cursor-default);
 }
 
 body {
@@ -128,6 +158,13 @@ body {
   background: transparent;
   -webkit-font-smoothing: antialiased;
   transition: color 0.2s ease;
+  cursor: var(--cursor-default);
+}
+
+/* Bibata arrow only — no hand pointer on interactive elements (desktop-like) */
+body,
+body * {
+  cursor: var(--cursor-default) !important;
 }
 
 /* Full-viewport desktop wallpaper (independent of body content height) */
@@ -150,11 +187,11 @@ input {
   color: inherit;
   border: none;
   background: none;
-  cursor: default;
+  cursor: var(--cursor-default);
 }
 
 button:disabled {
-  cursor: default;
+  cursor: var(--cursor-default);
   opacity: 0.5;
 }
 
@@ -1249,14 +1286,14 @@ html[data-theme="light"] .de-option {
   background: var(--term-header-bg);
   color: var(--term-title-fg);
   border-bottom: 1px solid var(--term-header-border);
-  cursor: default;
+  cursor: var(--cursor-default);
   user-select: none;
   flex-shrink: 0;
   transition: background 0.2s ease, color 0.2s ease;
 }
 
 .term-window.maximized .term-headerbar {
-  cursor: default;
+  cursor: var(--cursor-default);
 }
 
 .term-title-wrap {
@@ -1347,11 +1384,15 @@ html[data-theme="light"] .de-option {
   font-size: 13.5px;
   line-height: 1.45;
   color: var(--term-body-fg);
-  cursor: text;
+  cursor: var(--cursor-text) !important;
   outline: none;
   scrollbar-width: thin;
   scrollbar-color: var(--term-scrollbar) transparent;
   transition: background 0.2s ease, color 0.2s ease;
+}
+
+.term-body * {
+  cursor: var(--cursor-text) !important;
 }
 
 .term-body::-webkit-scrollbar {

@@ -1,5 +1,7 @@
 # First Boot Linux
 
+![First Boot Linux screenshot](docs/Screenshot.png)
+
 A minimal **first-boot chooser** for PCs and laptops: sellers pre-install it; buyers pick a real Linux distribution on first power-on, then First Boot steps aside.
 
 ## What it is for
