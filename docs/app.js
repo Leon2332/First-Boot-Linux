@@ -348,8 +348,24 @@
     powerModalCancel: $("power-modal-cancel"),
     powerModalConfirm: $("power-modal-confirm"),
     toast: $("toast"),
-    terminalBtn: $("terminal-btn"),
-    appMenuLabel: $("app-menu-label"),
+    appMenuBtn: $("app-menu-btn"),
+    appMenu: $("app-menu"),
+    appMenuEpiphany: $("app-menu-epiphany"),
+    appMenuSysinfo: $("app-menu-sysinfo"),
+    appMenuTerminal: $("app-menu-terminal"),
+    epiWindow: $("epi-window"),
+    epiHeaderbar: $("epi-headerbar"),
+    epiTitle: $("epi-title"),
+    epiMax: $("epi-max"),
+    epiClose: $("epi-close"),
+    epiUrl: $("epi-url"),
+    epiPage: $("epi-page"),
+    infoWindow: $("info-window"),
+    infoHeaderbar: $("info-headerbar"),
+    infoMax: $("info-max"),
+    infoClose: $("info-close"),
+    infoHw: $("info-hw"),
+    infoSw: $("info-sw"),
     termWindow: $("term-window"),
     termHeaderbar: $("term-headerbar"),
     termTitle: $("term-title"),
@@ -393,7 +409,9 @@
     els.quickSettings.hidden = true;
     els.networkMenu.hidden = true;
     els.powerMenu.hidden = true;
+    els.appMenu.hidden = true;
     els.systemMenuBtn.setAttribute("aria-expanded", "false");
+    els.appMenuBtn.setAttribute("aria-expanded", "false");
     els.backdrop.hidden = true;
   }
 
@@ -412,9 +430,6 @@
     const title = `${TERM.user}@${TERM.host}: ${TERM.cwd}`;
     if (els.termTitle) els.termTitle.textContent = title;
     if (els.termCwd) els.termCwd.textContent = TERM.cwd;
-    if (els.appMenuLabel && TERM.open) {
-      els.appMenuLabel.textContent = title;
-    }
   }
 
   function termAppendLine(html, className) {
@@ -436,7 +451,7 @@
   function termWelcome() {
     els.termScroll.innerHTML = "";
     termAppendLine(
-      "Welcome to First Boot Linux — GNOME Terminal (mockup).\n" +
+      "Welcome to First Boot Linux — Terminal (mockup).\n" +
         "Type <span class=\"term-cmd\">help</span> for available commands."
     );
     termAppendLine("");
@@ -574,6 +589,7 @@
     els.termWindow.hidden = false;
     els.termWindow.classList.remove("minimized");
     TERM.open = true;
+    raiseWindow(els.termWindow);
     termUpdateTitle();
     if (wasHidden && !els.termScroll.childElementCount) {
       termWelcome();
@@ -587,21 +603,57 @@
     els.termWindow.classList.remove("maximized");
     TERM.open = false;
     termSetLine("");
-    if (els.appMenuLabel) els.appMenuLabel.textContent = "Terminal";
   }
 
-  function toggleTerminalMaximize() {
-    if (!els.termWindow || els.termWindow.hidden) return;
-    els.termWindow.classList.toggle("maximized");
-    const maxed = els.termWindow.classList.contains("maximized");
-    els.termMax.setAttribute("aria-label", maxed ? "Restore" : "Maximize");
-    els.termMax.title = maxed ? "Restore" : "Maximize";
+  let winZ = 80;
+
+  function appWindows() {
+    return [els.termWindow, els.epiWindow, els.infoWindow].filter(Boolean);
   }
 
-  function enableTermDrag() {
-    const win = els.termWindow;
-    const handle = els.termHeaderbar;
-    if (!win || !handle) return;
+  function raiseWindow(win) {
+    if (!win) return;
+    winZ += 1;
+    win.style.zIndex = String(winZ);
+  }
+
+  function topAppWindow() {
+    return appWindows()
+      .filter((w) => !w.hidden)
+      .sort((a, b) => (parseInt(b.style.zIndex || "80", 10) - parseInt(a.style.zIndex || "80", 10)))[0];
+  }
+
+  function toggleWindowMaximize(win, maxBtn) {
+    if (!win || win.hidden) return;
+    win.classList.toggle("maximized");
+    const maxed = win.classList.contains("maximized");
+    if (maxBtn) {
+      maxBtn.setAttribute("aria-label", maxed ? "Restore" : "Maximize");
+      maxBtn.title = maxed ? "Restore" : "Maximize";
+    }
+  }
+
+  function closeAppWindow(win) {
+    if (!win) return;
+    if (win === els.termWindow) {
+      closeTerminal();
+      return;
+    }
+    win.hidden = true;
+    win.classList.remove("maximized");
+  }
+
+  function enableWindowChrome(win, header, maxBtn, closeBtn) {
+    if (!win || !header) return;
+
+    win.addEventListener("pointerdown", () => raiseWindow(win));
+
+    maxBtn?.addEventListener("click", () => toggleWindowMaximize(win, maxBtn));
+    closeBtn?.addEventListener("click", () => closeAppWindow(win));
+    header.addEventListener("dblclick", (e) => {
+      if (e.target.closest(".term-wc")) return;
+      toggleWindowMaximize(win, maxBtn);
+    });
 
     let dragging = false;
     let startX = 0;
@@ -609,7 +661,7 @@
     let origLeft = 0;
     let origTop = 0;
 
-    handle.addEventListener("pointerdown", (e) => {
+    header.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       if (e.target.closest(".term-wc")) return;
       if (win.classList.contains("maximized")) return;
@@ -625,28 +677,95 @@
       startY = e.clientY;
       origLeft = rect.left;
       origTop = rect.top;
-      handle.setPointerCapture(e.pointerId);
+      header.setPointerCapture(e.pointerId);
     });
 
-    handle.addEventListener("pointermove", (e) => {
+    header.addEventListener("pointermove", (e) => {
       if (!dragging) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      const panel = 32;
       let left = origLeft + dx;
       let top = origTop + dy;
-      top = Math.max(panel, top);
+      top = Math.max(32, top);
       left = Math.min(Math.max(-rectWidth(win) + 80, left), window.innerWidth - 80);
       win.style.left = left + "px";
       win.style.top = top + "px";
     });
 
-    handle.addEventListener("pointerup", () => {
+    header.addEventListener("pointerup", () => {
       dragging = false;
     });
-    handle.addEventListener("pointercancel", () => {
+    header.addEventListener("pointercancel", () => {
       dragging = false;
     });
+  }
+
+  function renderEpiPage() {
+    const online = state.network.connected;
+    if (els.epiUrl) {
+      els.epiUrl.value = online ? "https://firstboot.local/" : "about:offline";
+    }
+    if (els.epiTitle) {
+      els.epiTitle.textContent = online ? "First Boot Linux" : "Offline";
+    }
+    if (!els.epiPage) return;
+    els.epiPage.innerHTML = online
+      ? `<div class="epi-start">
+          <h1>First Boot Linux</h1>
+          <p>Pick a distribution on the desktop. This browser is a preview for first boot only.</p>
+        </div>`
+      : `<div class="epi-start">
+          <h1>You’re offline</h1>
+          <p>Connect from the system menu to use the network. This preview has no remote pages.</p>
+        </div>`;
+  }
+
+  function openEpiphany() {
+    closeMenus();
+    if (!els.epiWindow) return;
+    renderEpiPage();
+    els.epiWindow.hidden = false;
+    raiseWindow(els.epiWindow);
+  }
+
+  function infoFields(rows) {
+    return rows
+      .map(
+        ([k, v]) =>
+          `<div class="info-field"><div class="info-field-label">${k}</div><div class="info-field-value">${escapeHtml(v)}</div></div>`
+      )
+      .join("");
+  }
+
+  function renderSysInfo() {
+    if (els.infoHw) {
+      els.infoHw.innerHTML = infoFields([
+        ["Model", "Micro-Star International Co., Ltd. MS-7D14"],
+        ["Memory", "16.0 GiB"],
+        ["Processor", "AMD Ryzen™ 7 5700G with Radeon™ Graphics × 16"],
+        ["Graphics", "AMD Radeon™ RX 7800 XT"],
+        ["Graphics 1", "AMD Radeon™ Graphics"],
+        ["Disk Capacity", "1.5 TB"],
+      ]);
+    }
+    if (els.infoSw) {
+      els.infoSw.innerHTML = infoFields([
+        ["Firmware Version", "1.G0"],
+        ["OS Name", "First Boot Linux"],
+        ["Configured by", "[Retailer Name]"],
+        ["OS Type", "64-bit"],
+        ["Windowing System", "Wayland"],
+        ["Kernel Version", "Linux 7.1.8-generic"],
+      ]);
+    }
+  }
+
+  function openSysInfo() {
+    closeMenus();
+    if (!els.infoWindow) return;
+    renderSysInfo();
+    els.infoWindow.hidden = false;
+    raiseWindow(els.infoWindow);
   }
 
   function rectWidth(el) {
@@ -670,6 +789,7 @@
         !els.quickSettings.hidden ||
         !els.networkMenu.hidden ||
         !els.powerMenu.hidden ||
+        !els.appMenu.hidden ||
         !els.powerModal.hidden
       ) {
         return;
@@ -743,6 +863,15 @@
     if (wasOpen) return;
     els.quickSettings.hidden = false;
     els.systemMenuBtn.setAttribute("aria-expanded", "true");
+    els.backdrop.hidden = false;
+  }
+
+  function openAppMenu() {
+    const wasOpen = !els.appMenu.hidden;
+    closeMenus();
+    if (wasOpen) return;
+    els.appMenu.hidden = false;
+    els.appMenuBtn.setAttribute("aria-expanded", "true");
     els.backdrop.hidden = false;
   }
 
@@ -1216,13 +1345,15 @@
         }
         if (
           !els.quickSettings.hidden ||
-          !els.powerMenu.hidden
+          !els.powerMenu.hidden ||
+          !els.appMenu.hidden
         ) {
           closeMenus();
           return;
         }
-        if (TERM.open && !els.termWindow.hidden) {
-          closeTerminal();
+        const topWin = topAppWindow();
+        if (topWin) {
+          closeAppWindow(topWin);
           return;
         }
         closeMenus();
@@ -1235,30 +1366,43 @@
     els.quickSettings.addEventListener("click", (e) => e.stopPropagation());
     els.networkMenu.addEventListener("click", (e) => e.stopPropagation());
     els.powerMenu.addEventListener("click", (e) => e.stopPropagation());
+    els.appMenu.addEventListener("click", (e) => e.stopPropagation());
 
-    if (els.terminalBtn) {
-      els.terminalBtn.addEventListener("click", () => {
-        if (TERM.open && !els.termWindow.hidden) {
-          els.termBody.focus();
-        } else {
-          openTerminal();
-        }
-      });
-    }
-    if (els.termClose) {
-      els.termClose.addEventListener("click", closeTerminal);
-    }
-    if (els.termMax) {
-      els.termMax.addEventListener("click", toggleTerminalMaximize);
-    }
+    els.appMenuBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openAppMenu();
+    });
+    els.appMenuEpiphany.addEventListener("click", () => {
+      if (els.epiWindow && !els.epiWindow.hidden) {
+        closeMenus();
+        raiseWindow(els.epiWindow);
+      } else {
+        openEpiphany();
+      }
+    });
+    els.appMenuSysinfo.addEventListener("click", () => {
+      if (els.infoWindow && !els.infoWindow.hidden) {
+        closeMenus();
+        raiseWindow(els.infoWindow);
+      } else {
+        openSysInfo();
+      }
+    });
+    els.appMenuTerminal.addEventListener("click", () => {
+      if (TERM.open && !els.termWindow.hidden) {
+        closeMenus();
+        raiseWindow(els.termWindow);
+        els.termBody.focus();
+      } else {
+        openTerminal();
+      }
+    });
     if (els.termBody) {
       els.termBody.addEventListener("click", () => els.termBody.focus());
-      els.termHeaderbar?.addEventListener("dblclick", (e) => {
-        if (e.target.closest(".term-wc")) return;
-        toggleTerminalMaximize();
-      });
     }
-    enableTermDrag();
+    enableWindowChrome(els.termWindow, els.termHeaderbar, els.termMax, els.termClose);
+    enableWindowChrome(els.epiWindow, els.epiHeaderbar, els.epiMax, els.epiClose);
+    enableWindowChrome(els.infoWindow, els.infoHeaderbar, els.infoMax, els.infoClose);
   }
 
   function init() {

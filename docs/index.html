@@ -13,9 +13,17 @@
   <!-- GNOME-style top panel -->
   <header class="top-bar" role="banner">
     <div class="top-bar-left">
-      <button type="button" class="app-menu-btn" id="terminal-btn" title="Terminal" aria-label="Terminal">
-        <img class="app-menu-icon" src="assets/apps/org.gnome.Terminal.png" alt="" draggable="false" />
-        <span class="app-menu-label" id="app-menu-label">Terminal</span>
+      <button
+        type="button"
+        class="app-menu-btn"
+        id="app-menu-btn"
+        title="Applications"
+        aria-label="Applications"
+        aria-expanded="false"
+        aria-haspopup="true"
+        aria-controls="app-menu"
+      >
+        <img class="sym" src="assets/status/view-app-grid-symbolic.svg" alt="" draggable="false" />
       </button>
     </div>
 
@@ -43,11 +51,6 @@
   <!-- Quick Settings (network + power entry points) -->
   <div class="quick-settings" id="quick-settings" role="dialog" aria-label="Quick Settings" hidden>
     <div class="qs-toolbar">
-      <div class="qs-toolbar-group">
-        <button type="button" class="qs-round-btn" title="Settings" aria-label="Settings" disabled>
-          <img class="sym" src="assets/status/cog-wheel-symbolic.svg" alt="" draggable="false" />
-        </button>
-      </div>
       <div class="qs-toolbar-group">
         <button type="button" class="qs-round-btn" id="power-menu-btn" title="Power Off" aria-label="Power menu" aria-haspopup="true">
           <img class="sym" src="assets/status/system-shutdown-symbolic.svg" alt="" draggable="false" />
@@ -103,6 +106,22 @@
     </div>
   </div>
 
+  <!-- Applications menu -->
+  <div class="app-menu" id="app-menu" role="menu" aria-label="Applications" hidden>
+    <button type="button" class="app-menu-item" id="app-menu-epiphany" role="menuitem">
+      <img class="app-menu-item-icon" src="assets/apps/epiphany.png" alt="" draggable="false" />
+      <span>Web browser</span>
+    </button>
+    <button type="button" class="app-menu-item" id="app-menu-sysinfo" role="menuitem">
+      <img class="sym app-menu-item-icon" src="assets/status/cog-wheel-symbolic.svg" alt="" draggable="false" />
+      <span>System info</span>
+    </button>
+    <button type="button" class="app-menu-item" id="app-menu-terminal" role="menuitem">
+      <img class="app-menu-item-icon" src="assets/apps/org.gnome.Terminal.png" alt="" draggable="false" />
+      <span>Terminal</span>
+    </button>
+  </div>
+
   <!-- Power menu -->
   <div class="power-menu" id="power-menu" role="menu" aria-label="Power Off" hidden>
     <div class="power-menu-header" role="presentation">
@@ -134,6 +153,54 @@
       <div class="term-input-line" id="term-input-line">
         <span class="term-prompt-user">user@firstboot</span><span class="term-prompt-colon">:</span><span class="term-prompt-path" id="term-cwd">~</span><span class="term-prompt-dollar">$</span>
         <span class="term-typed" id="term-typed"></span><span class="term-cursor" aria-hidden="true">▋</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Web browser (GNOME Web) -->
+  <div class="app-window epi-window" id="epi-window" role="dialog" aria-label="Web browser" hidden>
+    <header class="term-headerbar" id="epi-headerbar">
+      <div class="term-title-wrap">
+        <img src="assets/apps/epiphany.png" alt="" draggable="false" />
+        <span class="term-title" id="epi-title">First Boot Linux</span>
+      </div>
+      <div class="term-window-controls">
+        <button type="button" class="term-wc term-max" id="epi-max" title="Maximize" aria-label="Maximize"></button>
+        <button type="button" class="term-wc term-close" id="epi-close" title="Close" aria-label="Close">
+          <img class="sym" src="assets/status/window-close-symbolic.svg" alt="" draggable="false" />
+        </button>
+      </div>
+    </header>
+    <div class="epi-toolbar">
+      <input class="epi-url" id="epi-url" type="text" value="https://firstboot.local/" readonly tabindex="-1" aria-label="Address" />
+    </div>
+    <div class="epi-page" id="epi-page"></div>
+  </div>
+
+  <!-- System info -->
+  <div class="app-window info-window" id="info-window" role="dialog" aria-label="System info" hidden>
+    <header class="term-headerbar" id="info-headerbar">
+      <div class="term-title-wrap">
+        <img class="sym" src="assets/status/cog-wheel-symbolic.svg" alt="" draggable="false" />
+        <span class="term-title">System Details</span>
+      </div>
+      <div class="term-window-controls">
+        <button type="button" class="term-wc term-max" id="info-max" title="Maximize" aria-label="Maximize"></button>
+        <button type="button" class="term-wc term-close" id="info-close" title="Close" aria-label="Close">
+          <img class="sym" src="assets/status/window-close-symbolic.svg" alt="" draggable="false" />
+        </button>
+      </div>
+    </header>
+    <div class="info-body">
+      <div class="info-cols">
+        <section>
+          <h2>Hardware Information</h2>
+          <div class="info-fields" id="info-hw"></div>
+        </section>
+        <section>
+          <h2>Software Information</h2>
+          <div class="info-fields" id="info-sw"></div>
+        </section>
       </div>
     </div>
   </div>
