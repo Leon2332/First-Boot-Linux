@@ -1,7 +1,7 @@
 # First Boot Linux
 
-![First Boot Linux screenshot](docs/Screenshot.png)
-![First Boot Linux screenshot 2](docs/Screenshot2.png)
+![First Boot Linux screenshot](docs/Screenshot.jpg)
+![First Boot Linux screenshot 2](docs/Screenshot2.jpg)
 
 A minimal "first-boot" operating system for PCs and laptops: sellers pre-install it; buyers get to pick their preferred Linux distribution, then First Boot Linux steps aside.
 
