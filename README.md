@@ -1,5 +1,7 @@
 # First Boot Linux
 
+[![Open the mockup](https://img.shields.io/badge/Open_the_mockup-live-3584e4?style=for-the-badge)](https://leon2332.github.io/First-Boot-Linux/)
+
 ![First Boot Linux screenshot](docs/Screenshot.jpg)
 ![First Boot Linux screenshot 2](docs/Screenshot2.jpg)
 
