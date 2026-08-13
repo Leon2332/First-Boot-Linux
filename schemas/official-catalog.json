@@ -1,0 +1,519 @@
+{
+  "schema_version": 1,
+  "updated": "2026-08-13",
+  "distros": [
+    {
+      "id": "ubuntu",
+      "name": "Ubuntu",
+      "version": "26.04 LTS",
+      "tagline": "Popular and well-supported",
+      "description": "A polished desktop with excellent hardware support and a large software library. A safe default for most laptops.",
+      "family": "ubuntu",
+      "install": "ubuntu-autoinstall",
+      "can_stage": true,
+      "suggested_default": true,
+      "editions": [
+        {
+          "id": "gnome",
+          "name": "GNOME",
+          "default": true,
+          "filename": "ubuntu-26.04-desktop-amd64.iso",
+          "url": "https://releases.ubuntu.com/26.04/ubuntu-26.04-desktop-amd64.iso",
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "linux-mint",
+      "name": "Linux Mint",
+      "version": "22.3",
+      "tagline": "Familiar and easy",
+      "description": "A stable desktop that feels at home for people coming from Windows. Multimedia and drivers work out of the box.",
+      "family": "mint",
+      "install": "mint",
+      "can_stage": true,
+      "suggested_default": true,
+      "editions": [
+        {
+          "id": "cinnamon",
+          "name": "Cinnamon",
+          "default": true,
+          "filename": "linuxmint-22.3-cinnamon-64bit.iso",
+          "url": "https://ftp.heanet.ie/mirrors/linuxmint.com/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso",
+          "sha256": null,
+          "size_bytes": null
+        },
+        {
+          "id": "mate",
+          "name": "MATE",
+          "default": false,
+          "filename": "linuxmint-22.3-mate-64bit.iso",
+          "url": "https://ftp.heanet.ie/mirrors/linuxmint.com/stable/22.3/linuxmint-22.3-mate-64bit.iso",
+          "sha256": null,
+          "size_bytes": null
+        },
+        {
+          "id": "xfce",
+          "name": "Xfce",
+          "default": false,
+          "filename": "linuxmint-22.3-xfce-64bit.iso",
+          "url": "https://ftp.heanet.ie/mirrors/linuxmint.com/stable/22.3/linuxmint-22.3-xfce-64bit.iso",
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "fedora",
+      "name": "Fedora",
+      "version": "44",
+      "tagline": "Modern Plasma desktop",
+      "description": "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults.",
+      "family": "fedora",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "plasma",
+          "name": "KDE Plasma",
+          "default": true,
+          "filename": "Fedora-KDE-Live-x86_64-44.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        },
+        {
+          "id": "gnome",
+          "name": "GNOME",
+          "default": false,
+          "filename": "Fedora-Workstation-Live-x86_64-44.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "pop-os",
+      "name": "Pop!_OS",
+      "version": "24.04 LTS",
+      "tagline": "Built for productivity",
+      "description": "A focused desktop with strong NVIDIA support and window tiling. Popular for creators and developers.",
+      "family": "ubuntu",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "cosmic",
+          "name": "COSMIC",
+          "default": true,
+          "filename": "pop-os_24.04_amd64_intel.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "bazzite",
+      "name": "Bazzite",
+      "version": "43",
+      "tagline": "Gaming-ready desktop",
+      "description": "A Fedora Atomic image built for gaming PCs and handhelds, with Steam, drivers, and gaming tools ready to go.",
+      "family": "fedora",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "plasma",
+          "name": "KDE Plasma",
+          "default": true,
+          "filename": "bazzite-stable-amd64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        },
+        {
+          "id": "gnome",
+          "name": "GNOME",
+          "default": false,
+          "filename": "bazzite-gnome-stable-amd64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "elementary-os",
+      "name": "elementary OS",
+      "version": "8",
+      "tagline": "Carefully designed",
+      "description": "A thoughtfully crafted desktop with a curated app store and a calm, consistent interface.",
+      "family": "ubuntu",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "pantheon",
+          "name": "Pantheon",
+          "default": true,
+          "filename": "elementaryos-8.0-stable.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "kubuntu",
+      "name": "Kubuntu",
+      "version": "26.04 LTS",
+      "tagline": "Ubuntu with KDE Plasma",
+      "description": "The power of Ubuntu with the highly customizable KDE Plasma desktop.",
+      "family": "ubuntu",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "plasma",
+          "name": "KDE Plasma",
+          "default": true,
+          "filename": "kubuntu-26.04-desktop-amd64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "xubuntu",
+      "name": "Xubuntu",
+      "version": "26.04 LTS",
+      "tagline": "Lightweight and fast",
+      "description": "Ubuntu with the Xfce desktop — lower resource use, still fully featured.",
+      "family": "ubuntu",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "xfce",
+          "name": "Xfce",
+          "default": true,
+          "filename": "xubuntu-26.04-desktop-amd64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "lubuntu",
+      "name": "Lubuntu",
+      "version": "26.04 LTS",
+      "tagline": "Very lightweight",
+      "description": "Ubuntu with LXQt. Ideal for older machines or when you want maximum free memory.",
+      "family": "ubuntu",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "lxqt",
+          "name": "LXQt",
+          "default": true,
+          "filename": "lubuntu-26.04-desktop-amd64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "ubuntu-mate",
+      "name": "Ubuntu MATE",
+      "version": "26.04 LTS",
+      "tagline": "Classic desktop layout",
+      "description": "Traditional menus and panels with the stability of Ubuntu LTS.",
+      "family": "ubuntu",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "mate",
+          "name": "MATE",
+          "default": true,
+          "filename": "ubuntu-mate-26.04-desktop-amd64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "ubuntu-budgie",
+      "name": "Ubuntu Budgie",
+      "version": "26.04 LTS",
+      "tagline": "Elegant and efficient",
+      "description": "The Budgie desktop on Ubuntu — modern, clean, and approachable.",
+      "family": "ubuntu",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "budgie",
+          "name": "Budgie",
+          "default": true,
+          "filename": "ubuntu-budgie-26.04-desktop-amd64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "mx-linux",
+      "name": "MX Linux",
+      "version": "25.2",
+      "tagline": "Stable midweight desktop",
+      "description": "Debian-based with helpful tools, good hardware support, and a friendly community.",
+      "family": "debian",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "xfce",
+          "name": "Xfce",
+          "default": true,
+          "filename": "MX-25.2_x64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        },
+        {
+          "id": "plasma",
+          "name": "KDE Plasma",
+          "default": false,
+          "filename": "MX-25.2_KDE_x64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        },
+        {
+          "id": "fluxbox",
+          "name": "Fluxbox",
+          "default": false,
+          "filename": "MX-25.2_fluxbox_x64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "debian",
+      "name": "Debian",
+      "version": "13",
+      "tagline": "Rock-solid base",
+      "description": "The universal operating system. Extremely stable and free-software focused.",
+      "family": "debian",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "gnome",
+          "name": "GNOME",
+          "default": true,
+          "filename": "debian-13.0.0-amd64-DVD-1.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        },
+        {
+          "id": "plasma",
+          "name": "KDE Plasma",
+          "default": false,
+          "filename": "debian-13.0.0-amd64-KDE-DVD-1.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        },
+        {
+          "id": "xfce",
+          "name": "Xfce",
+          "default": false,
+          "filename": "debian-13.0.0-amd64-xfce-DVD-1.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        },
+        {
+          "id": "cinnamon",
+          "name": "Cinnamon",
+          "default": false,
+          "filename": "debian-13.0.0-amd64-cinnamon-DVD-1.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        },
+        {
+          "id": "mate",
+          "name": "MATE",
+          "default": false,
+          "filename": "debian-13.0.0-amd64-mate-DVD-1.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        },
+        {
+          "id": "lxqt",
+          "name": "LXQt",
+          "default": false,
+          "filename": "debian-13.0.0-amd64-lxqt-DVD-1.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "opensuse",
+      "name": "openSUSE Leap",
+      "version": "16.0",
+      "tagline": "Reliable and polished",
+      "description": "A carefully tested desktop with strong tools for system management.",
+      "family": "suse",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "gnome",
+          "name": "GNOME",
+          "default": true,
+          "filename": "openSUSE-Leap-16.0-GNOME-x86_64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        },
+        {
+          "id": "plasma",
+          "name": "KDE Plasma",
+          "default": false,
+          "filename": "openSUSE-Leap-16.0-KDE-x86_64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "deepin",
+      "name": "Deepin",
+      "version": "25",
+      "tagline": "Beautiful desktop",
+      "description": "A visually refined desktop environment with its own design language.",
+      "family": "debian",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "dde",
+          "name": "Deepin Desktop (DDE)",
+          "default": true,
+          "filename": "deepin-desktop-community-25-amd64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "peppermint-os",
+      "name": "Peppermint OS",
+      "version": "2024",
+      "tagline": "Cloud-friendly lightweight",
+      "description": "A light desktop that works well for web-centric and everyday use.",
+      "family": "debian",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "xfce",
+          "name": "Xfce",
+          "default": true,
+          "filename": "PeppermintOS-Debian-64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "bodhi-linux",
+      "name": "Bodhi Linux",
+      "version": "7.0",
+      "tagline": "Minimal and elegant",
+      "description": "A light Ubuntu-based system with the Moksha desktop.",
+      "family": "ubuntu",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "moksha",
+          "name": "Moksha",
+          "default": true,
+          "filename": "bodhi-7.0.0-64.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    },
+    {
+      "id": "q4os",
+      "name": "Q4OS",
+      "version": "5.8",
+      "tagline": "Classic Windows-like",
+      "description": "A Debian-based system with a Trinity desktop option that feels familiar.",
+      "family": "debian",
+      "install": null,
+      "can_stage": false,
+      "suggested_default": false,
+      "editions": [
+        {
+          "id": "trinity",
+          "name": "Trinity",
+          "default": true,
+          "filename": "q4os-5.8-x64-trinity.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        },
+        {
+          "id": "plasma",
+          "name": "KDE Plasma",
+          "default": false,
+          "filename": "q4os-5.8-x64-plasma.iso",
+          "url": null,
+          "sha256": null,
+          "size_bytes": null
+        }
+      ]
+    }
+  ]
+}

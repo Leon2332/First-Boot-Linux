@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "recommended": [
+    {
+      "id": "ubuntu",
+      "name": "Ubuntu",
+      "version": "26.04 LTS",
+      "tagline": "Popular and well-supported",
+      "description": "A polished desktop with excellent hardware support and a large software library. A safe default for most laptops.",
+      "family": "ubuntu",
+      "install": "ubuntu-autoinstall",
+      "editions": [
+        {
+          "id": "gnome",
+          "name": "GNOME",
+          "default": true,
+          "local": true,
+          "file": "images/ubuntu-26.04-desktop-amd64.iso",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "size_bytes": 5900000000
+        }
+      ]
+    },
+    {
+      "id": "linux-mint",
+      "name": "Linux Mint",
+      "version": "22.3",
+      "tagline": "Familiar and easy",
+      "description": "A stable desktop that feels at home for people coming from Windows. Multimedia and drivers work out of the box.",
+      "family": "mint",
+      "install": "mint",
+      "editions": [
+        {
+          "id": "cinnamon",
+          "name": "Cinnamon",
+          "default": true,
+          "local": true,
+          "file": "images/linuxmint-22.3-cinnamon-64bit.iso",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "size_bytes": 2800000000
+        }
+      ]
+    }
+  ],
+  "catalog": []
+}

@@ -73,53 +73,58 @@ USB
         └── bazzite-stable-amd64.iso
 ```
 
-`images/` only contains what this retailer marked recommended / on-disk. Distros that are catalog-only are not on the stick; the chooser downloads those later.
+`images/` only contains what this retailer marked recommended / on-disk. Distros that are catalog-only are not on the stick; the chooser downloads those later. v1 install support is Ubuntu then Mint, so a first shop USB may only have those two files even though this tree shows a larger set.
 
 ## What each payload file is
 
 ### `retailer.conf`
 
-Shop-facing strings and paths. Example:
+Shop-facing strings and paths. Full contract: [`schemas/README.md`](schemas/README.md). Example:
 
 ```ini
+schema_version = 1
 name = Example Computers
 support = support@example.com  /  012 345 6789
 wallpaper_dark = wallpapers/dark.jpg
 wallpaper_light = wallpapers/light.jpg
-firstboot_version = 0.1.1
 ```
+
+First Boot’s version is not here. It lives on the `fbl` partition.
 
 ### `catalog.json`
 
-Chooser source of truth. Each entry is either local (file under `images/`) or download (URL + checksum). Example shape:
+Chooser source of truth for this shop. Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either local (`file` under `images/`) or download (`url`). Example (v1: Ubuntu + Mint staged):
 
 ```json
 {
+  "schema_version": 1,
   "recommended": [
     {
       "id": "ubuntu",
       "name": "Ubuntu",
       "version": "26.04 LTS",
-      "desktop": "GNOME",
-      "local": true,
-      "file": "images/ubuntu-26.04-desktop-amd64.iso",
-      "sha256": "…"
+      "tagline": "Popular and well-supported",
+      "description": "A polished desktop with excellent hardware support and a large software library.",
+      "family": "ubuntu",
+      "install": "ubuntu-autoinstall",
+      "editions": [
+        {
+          "id": "gnome",
+          "name": "GNOME",
+          "default": true,
+          "local": true,
+          "file": "images/ubuntu-26.04-desktop-amd64.iso",
+          "sha256": "…",
+          "size_bytes": 5900000000
+        }
+      ]
     }
   ],
-  "catalog": [
-    {
-      "id": "debian",
-      "name": "Debian",
-      "version": "13",
-      "local": false,
-      "url": "https://…",
-      "sha256": "…"
-    }
-  ]
+  "catalog": []
 }
 ```
 
-`local: true` means the file must exist on this partition. The creator writes that flag only after the ISO is copied and verified.
+`local: true` means the file must exist on this partition. The creator writes that flag only after the ISO is copied and verified. The creator menu (what shops may tick) is `schemas/official-catalog.json`, not this file.
 
 ### `wallpapers/`
 
