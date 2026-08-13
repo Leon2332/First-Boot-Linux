@@ -1,0 +1,4 @@
+// First Boot is a frozen appliance. Do not pull recommends (desktop, snap, Pro).
+APT::Install-Recommends "false";
+APT::Install-Suggests "false";
+Acquire::Languages "none";

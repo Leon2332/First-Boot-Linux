@@ -1,0 +1,36 @@
+# Must not appear in the squashfs (dpkg status "ii").
+# Also pinned at priority -1 so apt will not pull them.
+
+snapd
+snapd-desktop-integration
+ubuntu-pro-client
+ubuntu-pro-client-l10n
+ubuntu-advantage-tools
+ubuntu-advantage-desktop-daemon
+ubuntu-pro-auto-attach
+unattended-upgrades
+update-notifier
+update-notifier-common
+update-manager
+update-manager-core
+ubuntu-release-upgrader-core
+ubuntu-release-upgrader-gtk
+gnome-software
+plasma-discover
+synaptic
+software-properties-gtk
+cloud-init
+cloud-init-base
+apport
+whoopsie
+popularity-contest
+motd-news-config
+ubuntu-desktop
+ubuntu-desktop-minimal
+ubuntu-standard
+ubuntu-session
+gnome-shell
+gnome-session
+gdm3
+ubiquity
+ubiquity-casper

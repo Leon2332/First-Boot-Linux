@@ -1,0 +1,93 @@
+# First Boot live seed — install these, no recommends.
+# One package per line. Comments and blanks are ignored.
+
+# --- base ---
+systemd
+systemd-sysv
+udev
+dbus
+locales
+tzdata
+sudo
+ca-certificates
+apt-utils
+kmod
+polkitd
+pkexec
+
+# --- live boot (squashfs is the live root; kernel/initrd are copied out) ---
+casper
+initramfs-tools
+busybox-initramfs
+user-setup
+localechooser-data
+eject
+uuid-runtime
+file
+finalrd
+dmsetup
+
+# --- kernel + firmware (full set: shop PCs are random) ---
+linux-image-generic
+linux-firmware
+intel-microcode
+amd64-microcode
+firmware-sof-signed
+thermald
+
+# --- network ---
+network-manager
+wpasupplicant
+wireless-regdb
+iw
+rfkill
+iproute2
+iputils-ping
+bind9-host
+curl
+netplan.io
+systemd-resolved
+systemd-timesyncd
+
+# --- disk / later install ---
+parted
+gdisk
+dosfstools
+e2fsprogs
+ntfs-3g
+rsync
+squashfs-tools
+fdisk
+lvm2
+cryptsetup
+systemd-cryptsetup
+btrfs-progs
+xfsprogs
+efibootmgr
+fuse3
+
+# --- GPU libraries only (compositor is step 3) ---
+libgl1
+libegl1
+libgles2
+libgl1-mesa-dri
+libglx-mesa0
+libegl-mesa0
+mesa-vulkan-drivers
+libdrm2
+libgbm1
+
+# --- console ---
+console-setup
+keyboard-configuration
+iso-codes
+
+# --- field debug ---
+pciutils
+usbutils
+dmidecode
+lshw
+less
+nano
+zstd
+xz-utils
