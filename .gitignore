@@ -28,3 +28,6 @@ build/
 *.iso
 *.img
 *.qcow2
+
+# Local working notes
+GROK.md
