@@ -4,11 +4,10 @@
 
 <a href="https://leon2332.github.io/First-Boot-Linux/"><img alt="Open the mockup" src="https://img.shields.io/badge/Open_the_mockup-live-3584e4?style=for-the-badge" /></a>
 
+A disposable first-boot appliance for PCs and laptops. Retailers pre-install it. The buyer picks a Linux distribution. First Boot Linux then installs that system and replaces itself.
 
 ![First Boot Linux screenshot](docs/Screenshot.jpg)
 ![First Boot Linux screenshot 2](docs/Screenshot2.jpg)
-
-A minimal "first-boot" operating system for PCs and laptops: sellers pre-install it; buyers get to pick their preferred Linux distribution, then First Boot Linux steps aside.
 
 ## What it is for
 
