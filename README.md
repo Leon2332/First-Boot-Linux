@@ -1,6 +1,9 @@
+<img src="docs/Logo/First%20Boot%20Linux.png" alt="First Boot Linux" width="128" height="128" />
+
 # First Boot Linux
 
-[![Open the mockup](https://img.shields.io/badge/Open_the_mockup-live-3584e4?style=for-the-badge)](https://leon2332.github.io/First-Boot-Linux/)
+<a href="https://leon2332.github.io/First-Boot-Linux/"><img alt="Open the mockup" src="https://img.shields.io/badge/Open_the_mockup-live-3584e4?style=for-the-badge" /></a>
+
 
 ![First Boot Linux screenshot](docs/Screenshot.jpg)
 ![First Boot Linux screenshot 2](docs/Screenshot2.jpg)
@@ -32,4 +35,3 @@ When someone unboxes a machine, they should not be locked into an operating syst
 ## Current status
 
 Early design stage.
-
