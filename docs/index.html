@@ -44,13 +44,14 @@
       >
         <span class="status-icons" aria-hidden="true">
           <img class="status-icon sym" id="net-status-icon" src="assets/status/network-offline-symbolic.svg" alt="" draggable="false" />
+          <img class="status-icon sym" id="vol-status-icon" src="assets/status/audio-volume-medium-symbolic.svg" alt="" draggable="false" />
           <img class="status-icon sym" src="assets/status/system-shutdown-symbolic.svg" alt="" draggable="false" />
         </span>
       </button>
     </div>
   </header>
 
-  <!-- Quick Settings (network + power entry points) -->
+  <!-- Quick Settings (network, dark style, volume, power) -->
   <div class="quick-settings" id="quick-settings" role="dialog" aria-label="Quick Settings" hidden>
     <div class="qs-toolbar">
       <div class="qs-toolbar-group">
@@ -80,6 +81,21 @@
           </span>
         </span>
       </button>
+    </div>
+
+    <div class="qs-slider-row">
+      <button type="button" class="qs-slider-icon" id="qs-volume-mute" title="Mute" aria-label="Mute" aria-pressed="false">
+        <img class="sym" id="qs-volume-icon" src="assets/status/audio-volume-medium-symbolic.svg" alt="" draggable="false" />
+      </button>
+      <input
+        type="range"
+        class="qs-slider"
+        id="qs-volume"
+        min="0"
+        max="100"
+        value="70"
+        aria-label="Volume"
+      />
     </div>
   </div>
 
@@ -252,7 +268,6 @@
 
           <div class="detail-actions" id="detail-actions">
             <button type="button" class="btn btn-primary" id="install-btn">Install</button>
-            <button type="button" class="btn btn-ghost" id="cancel-detail-btn">Cancel</button>
           </div>
         </div>
       </div>

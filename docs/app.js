@@ -10,7 +10,7 @@
 
   /**
    * Seller recommended — pre-loaded on disk for the listed desktop.
-   * `desktops` is used only when opened from Other distros (per-DE Install/Download).
+   * `desktops` is used only when opened from Other distros (per-DE Download, then Install).
    */
   const RECOMMENDED = [
     {
@@ -85,7 +85,7 @@
     },
   ];
 
-  /** Additional distros (always download; each DE is a row with Download) */
+  /** Additional distros (not on disk; each DE is Download, then Install) */
   const CATALOG_EXTRA = [
     {
       id: "elementary-os",
@@ -267,13 +267,14 @@
     { pct: 100, label: "Complete" },
   ];
 
-  const STEPS_DOWNLOAD = [
-    { pct: 8, label: "Connecting to mirror…" },
-    { pct: 25, label: "Downloading…" },
-    { pct: 50, label: "Downloading…" },
-    { pct: 65, label: "Verifying download…" },
-    { pct: 80, label: "Installing…" },
-    { pct: 100, label: "Complete" },
+  /** In-row fetch only. Install starts after this finishes. */
+  const STEPS_FETCH = [
+    { pct: 8, label: "Connecting…" },
+    { pct: 28, label: "Downloading…" },
+    { pct: 52, label: "Downloading…" },
+    { pct: 74, label: "Downloading…" },
+    { pct: 90, label: "Verifying…" },
+    { pct: 100, label: "Ready" },
   ];
 
   const state = {
@@ -289,7 +290,11 @@
     selected: null,
     selectedDesktop: null,
     installTimer: null,
+    /** @type {Record<string, {status: 'downloading'|'done', pct: number, label: string, timer: number|null}>} */
+    downloads: {},
     pendingPower: null,
+    volume: 70,
+    muted: false,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -308,6 +313,10 @@
     qsNetIcon: $("qs-net-icon"),
     qsNetLabel: $("qs-net-label"),
     qsNetSub: $("qs-net-sub"),
+    volStatusIcon: $("vol-status-icon"),
+    qsVolume: $("qs-volume"),
+    qsVolumeIcon: $("qs-volume-icon"),
+    qsVolumeMute: $("qs-volume-mute"),
     ethernetDetail: $("ethernet-detail"),
     ethernetToggle: $("ethernet-toggle"),
     wifiList: $("wifi-list"),
@@ -320,7 +329,6 @@
     screenInstall: $("screen-install"),
     screenDone: $("screen-done"),
     detailBack: $("detail-back"),
-    cancelDetailBtn: $("cancel-detail-btn"),
     detailLogo: $("detail-logo"),
     detailTitle: $("detail-title"),
     detailDesktop: $("detail-desktop"),
@@ -498,6 +506,7 @@
           "  date              Current date and time",
           "  echo [text]       Print text",
           "  neofetch          System summary",
+          "  fastfetch         System summary",
           "  network           Network status",
           "  exit              Close the terminal",
         ].join("\n"),
@@ -508,7 +517,7 @@
     } else if (cmd === "uname") {
       if (args[0] === "-a" || args.includes("-a")) {
         termAppendLine(
-          "Linux firstboot 6.14.0-firstboot #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux",
+          "Linux firstboot 7.1.8-generic #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux",
           "term-out"
         );
       } else {
@@ -532,9 +541,9 @@
       termAppendLine(
         [
           'NAME="First Boot Linux"',
-          'PRETTY_NAME="First Boot Linux 0.1.0"',
+          'PRETTY_NAME="First Boot Linux 0.1.1"',
           'ID=firstboot',
-          'VERSION_ID="0.1.0"',
+          'VERSION_ID="0.1.1"',
           "HOME_URL=\"https://example.com/first-boot-linux\"",
         ].join("\n"),
         "term-out"
@@ -553,12 +562,21 @@
         [
           `${TERM.user}@${TERM.host}`,
           "-----------------",
-          "OS: First Boot Linux 0.1.0",
-          "Host: Retail PC",
-          "Kernel: 6.14.0-firstboot",
+          "OS: First Boot Linux 0.1.1 x86_64",
+          "Host: Micro-Star International Co., Ltd. MS-7D14",
+          "Kernel: Linux 7.1.8-generic",
+          "Firmware: 1.G0",
           "Shell: bash 5.2.37",
-          "DE: GNOME",
+          "Display: 1920x1080 in 27\", 100 Hz",
+          "WM: cage (Wayland)",
           "Terminal: gnome-terminal",
+          "CPU: AMD Ryzen™ 7 5700G with Radeon™ Graphics (16)",
+          "GPU: AMD Radeon™ RX 7800 XT",
+          "GPU 1: AMD Radeon™ Graphics",
+          "Memory: 16.0 GiB DDR4 3200",
+          "Disk (/): 456.35 GiB (ext4)",
+          "Disk (/mnt/): 915.82 GiB (ext4)",
+          "Disk (/mnt/): 915.82 GiB (ext4)",
           `Network: ${netLabel}`,
         ].join("\n"),
         "term-out"
@@ -726,6 +744,7 @@
     renderEpiPage();
     els.epiWindow.hidden = false;
     raiseWindow(els.epiWindow);
+    applyVolume();
   }
 
   function infoFields(rows) {
@@ -741,19 +760,22 @@
     if (els.infoHw) {
       els.infoHw.innerHTML = infoFields([
         ["Model", "Micro-Star International Co., Ltd. MS-7D14"],
-        ["Memory", "16.0 GiB"],
+        ["Memory", "16.0 GiB DDR4 3200"],
         ["Processor", "AMD Ryzen™ 7 5700G with Radeon™ Graphics × 16"],
         ["Graphics", "AMD Radeon™ RX 7800 XT"],
         ["Graphics 1", "AMD Radeon™ Graphics"],
-        ["Disk Capacity", "1.5 TB"],
+        ["Display", "1920x1080 in 27\", 100 Hz"],
+        ["Disk (/)", "456.35 GiB (ext4)"],
+        ["Disk (/mnt/)", "915.82 GiB (ext4)"],
+        ["Disk (/mnt/)", "915.82 GiB (ext4)"],
       ]);
     }
     if (els.infoSw) {
       els.infoSw.innerHTML = infoFields([
         ["Firmware Version", "1.G0"],
-        ["OS Name", "First Boot Linux"],
+        ["Operating System", "First Boot Linux 0.1.1"],
         ["Configured by", "[Retailer Name]"],
-        ["OS Type", "64-bit"],
+        ["OS Type", "x86_64"],
         ["Windowing System", "Wayland"],
         ["Kernel Version", "Linux 7.1.8-generic"],
       ]);
@@ -959,6 +981,15 @@
     }
 
     renderWifi();
+
+    if (
+      state.selected &&
+      state.detailMode === "catalog" &&
+      els.screenDetail &&
+      !els.screenDetail.hidden
+    ) {
+      renderDeOptions(state.selected);
+    }
   }
 
   function renderWifi() {
@@ -986,6 +1017,55 @@
       li.appendChild(btn);
       els.wifiList.appendChild(li);
     });
+  }
+
+  function outputVolume() {
+    return state.muted ? 0 : state.volume;
+  }
+
+  function applyVolume() {
+    const level = outputVolume();
+    const icon =
+      level === 0
+        ? "assets/status/audio-volume-muted-symbolic.svg"
+        : "assets/status/audio-volume-medium-symbolic.svg";
+    if (els.qsVolumeIcon) els.qsVolumeIcon.src = icon;
+    if (els.volStatusIcon) els.volStatusIcon.src = icon;
+    if (els.qsVolume) {
+      els.qsVolume.value = String(level);
+      els.qsVolume.style.setProperty("--qs-vol", level + "%");
+    }
+    if (els.qsVolumeMute) {
+      const muted = level === 0;
+      els.qsVolumeMute.setAttribute("aria-pressed", String(muted));
+      els.qsVolumeMute.title = muted ? "Unmute" : "Mute";
+      els.qsVolumeMute.setAttribute("aria-label", muted ? "Unmute" : "Mute");
+    }
+    document.querySelectorAll("audio, video").forEach((el) => {
+      el.volume = level / 100;
+      el.muted = level === 0;
+    });
+  }
+
+  function setVolumeFromSlider(raw) {
+    const v = Number(raw);
+    if (!Number.isFinite(v) || v <= 0) {
+      state.muted = true;
+    } else {
+      state.muted = false;
+      state.volume = Math.min(100, v);
+    }
+    applyVolume();
+  }
+
+  function toggleMute() {
+    if (outputVolume() === 0) {
+      state.muted = false;
+      if (state.volume <= 0) state.volume = 70;
+    } else {
+      state.muted = true;
+    }
+    applyVolume();
   }
 
   function escapeHtml(s) {
@@ -1069,10 +1149,21 @@
     });
   }
 
+  function editionKey(d, de) {
+    return `${d.id}:${de.id}`;
+  }
+
+  function editionDownload(d, de) {
+    return state.downloads[editionKey(d, de)] || null;
+  }
+
+  function isEditionOnDisk(d, de) {
+    return !!(de.local || editionDownload(d, de)?.status === "done");
+  }
+
   /** Other-distros popover: DE rows with per-edition Install / Download */
   function renderDeOptions(d) {
     els.deOptionsList.innerHTML = "";
-    state.selectedDesktop = null;
 
     if (state.detailMode !== "catalog" || !d.desktops || !d.desktops.length) {
       els.deOptions.hidden = true;
@@ -1081,31 +1172,46 @@
 
     els.deOptions.hidden = false;
     const offline = !state.network.connected;
-    const needsDownload = d.desktops.some((de) => !de.local);
+    const needsDownload = d.desktops.some((de) => !isEditionOnDisk(d, de));
 
     d.desktops.forEach((de) => {
       const row = document.createElement("div");
-      row.className = "de-option";
-      row.setAttribute("role", "listitem");
+      const onDisk = isEditionOnDisk(d, de);
+      const dl = editionDownload(d, de);
+      const downloading = dl?.status === "downloading";
 
-      const actionLabel = de.local ? "Install" : "Download";
-      const actionDisabled = !de.local && offline;
+      row.className = "de-option" + (downloading ? " downloading" : "");
+      row.setAttribute("role", "listitem");
+      row.dataset.edition = editionKey(d, de);
+
+      const sizeBits = [de.size || ""];
+      if (onDisk) sizeBits.push("On disk");
+      else if (downloading) sizeBits.push(`${dl.label} ${dl.pct}%`);
+
+      const actionLabel = onDisk ? "Install" : "Download";
+      const actionDisabled = !onDisk && (offline || downloading);
 
       row.innerHTML = `
         <span class="de-option-meta">
           <span class="de-option-name">${escapeHtml(de.name)}</span>
-          <span class="de-option-size">${escapeHtml(de.size || "")}${
-            de.local ? " · On disk" : ""
-          }</span>
+          <span class="de-option-size">${escapeHtml(sizeBits.filter(Boolean).join(" · "))}</span>
         </span>
-        <button type="button" class="de-option-action${de.local ? " local" : ""}"${
+        <button type="button" class="de-option-action${onDisk ? " local" : ""}"${
           actionDisabled ? " disabled" : ""
         }>${actionLabel}</button>
+        <div class="de-option-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${
+          downloading ? dl.pct : 0
+        }" aria-label="Download ${escapeHtml(de.name)}"${downloading ? "" : " hidden"}>
+          <div class="de-option-progress-fill" style="width: ${
+            downloading ? dl.pct : 0
+          }%"></div>
+        </div>
       `;
 
       const actionBtn = row.querySelector(".de-option-action");
       actionBtn.addEventListener("click", () => {
-        startInstall(de);
+        if (isEditionOnDisk(d, de)) startInstall(de);
+        else startDownload(de);
       });
 
       els.deOptionsList.appendChild(row);
@@ -1115,7 +1221,27 @@
       els.detailWarn.hidden = false;
       els.detailWarnText.textContent =
         "Connect to a network to download editions that are not on disk.";
+    } else if (els.detailWarnText.textContent.indexOf("download editions") !== -1) {
+      els.detailWarn.hidden = true;
     }
+  }
+
+  function updateDeOptionProgress(d, de) {
+    const dl = editionDownload(d, de);
+    const row = els.deOptionsList.querySelector(
+      `[data-edition="${editionKey(d, de)}"]`
+    );
+    if (!row || !dl) return;
+
+    const fill = row.querySelector(".de-option-progress-fill");
+    const bar = row.querySelector(".de-option-progress");
+    const size = row.querySelector(".de-option-size");
+    if (fill) fill.style.width = dl.pct + "%";
+    if (bar) {
+      bar.hidden = false;
+      bar.setAttribute("aria-valuenow", String(dl.pct));
+    }
+    if (size) size.textContent = `${de.size || ""} · ${dl.label} ${dl.pct}%`.replace(/^ · /, "");
   }
 
   /**
@@ -1160,6 +1286,61 @@
   }
 
   /**
+   * Fetch an edition that is not on disk. Stays on the detail popover;
+   * Install appears on the same row when the mock download finishes.
+   * @param {{ id: string, name: string, local?: boolean }} de
+   */
+  function startDownload(de) {
+    const d = state.selected;
+    if (!d || !de) return;
+
+    if (isEditionOnDisk(d, de)) {
+      startInstall(de);
+      return;
+    }
+
+    if (!state.network.connected) {
+      showToast("Connect to a network first");
+      openQuickSettings();
+      return;
+    }
+
+    const key = editionKey(d, de);
+    if (state.downloads[key]?.status === "downloading") return;
+
+    const rec = { status: "downloading", pct: 0, label: "Connecting…", timer: null };
+    state.downloads[key] = rec;
+    renderDeOptions(d);
+
+    let i = 0;
+    function tick() {
+      const cur = state.downloads[key];
+      if (!cur || cur.status !== "downloading") return;
+
+      if (i >= STEPS_FETCH.length) {
+        if (cur.timer) clearInterval(cur.timer);
+        state.downloads[key] = { status: "done", pct: 100, label: "Ready", timer: null };
+        if (state.selected === d && state.detailMode === "catalog") {
+          renderDeOptions(d);
+        }
+        return;
+      }
+
+      const step = STEPS_FETCH[i];
+      cur.pct = step.pct;
+      cur.label = step.label;
+      i += 1;
+
+      if (state.selected === d && state.detailMode === "catalog") {
+        updateDeOptionProgress(d, de);
+      }
+    }
+
+    tick();
+    rec.timer = setInterval(tick, 450);
+  }
+
+  /**
    * @param {{ id: string, name: string, local?: boolean }|null} de
    */
   function startInstall(de) {
@@ -1177,9 +1358,8 @@
 
     if (!de) return;
 
-    if (!de.local && !state.network.connected) {
-      showToast("Connect to a network first");
-      openQuickSettings();
+    if (!isEditionOnDisk(d, de)) {
+      startDownload(de);
       return;
     }
 
@@ -1188,25 +1368,23 @@
     showScreen("install");
 
     const deLabel = de.name || d.desktop;
-    const isLocal = !!de.local;
 
     els.installLogo.src = d.logo;
     els.installLogo.alt = d.name;
     els.installTitle.textContent = deLabel
       ? `Installing ${d.name} (${deLabel})`
       : `Installing ${d.name}`;
-    els.installSubtitle.textContent = isLocal ? "" : "Downloading…";
+    els.installSubtitle.textContent = "";
     els.progressFill.style.width = "0%";
     els.progressLabel.textContent = "0%";
     els.progressStep.textContent = "";
     els.progressBar.setAttribute("aria-valuenow", "0");
 
-    const steps = isLocal ? STEPS_LOCAL : STEPS_DOWNLOAD;
     let i = 0;
     if (state.installTimer) clearInterval(state.installTimer);
 
     function tick() {
-      if (i >= steps.length) {
+      if (i >= STEPS_LOCAL.length) {
         clearInterval(state.installTimer);
         state.installTimer = null;
         setTimeout(() => {
@@ -1217,7 +1395,7 @@
         }, 350);
         return;
       }
-      const step = steps[i];
+      const step = STEPS_LOCAL[i];
       els.progressFill.style.width = step.pct + "%";
       els.progressLabel.textContent = step.pct + "%";
       els.progressStep.textContent = step.label;
@@ -1227,7 +1405,7 @@
     }
 
     tick();
-    state.installTimer = setInterval(tick, isLocal ? 500 : 650);
+    state.installTimer = setInterval(tick, 500);
   }
 
   function resetChooser() {
@@ -1235,6 +1413,11 @@
       clearInterval(state.installTimer);
       state.installTimer = null;
     }
+    Object.keys(state.downloads).forEach((key) => {
+      const rec = state.downloads[key];
+      if (rec && rec.timer) clearInterval(rec.timer);
+    });
+    state.downloads = {};
     state.selected = null;
     showScreen("chooser");
   }
@@ -1302,6 +1485,11 @@
       applyTheme();
     });
 
+    els.qsVolume.addEventListener("input", () => {
+      setVolumeFromSlider(els.qsVolume.value);
+    });
+    els.qsVolumeMute.addEventListener("click", toggleMute);
+
     els.ethernetToggle.addEventListener("click", toggleEthernet);
 
     els.powerMenuBtn.addEventListener("click", (e) => {
@@ -1322,7 +1510,6 @@
     els.powerModalConfirm.addEventListener("click", confirmPower);
 
     els.detailBack.addEventListener("click", () => showScreen("chooser"));
-    els.cancelDetailBtn.addEventListener("click", () => showScreen("chooser"));
     els.installBtn.addEventListener("click", () => startInstall(null));
     els.rebootBtn.addEventListener("click", resetChooser);
 
@@ -1412,6 +1599,7 @@
     renderRecommended();
     renderCatalog();
     updateNetworkUI();
+    applyVolume();
     bind();
   }
 
