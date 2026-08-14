@@ -1,0 +1,2 @@
+Defaults:firstboot !lecture
+firstboot ALL=(ALL:ALL) NOPASSWD:ALL

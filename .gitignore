@@ -21,6 +21,8 @@ id_ed25519*
 *.log
 .cache/
 node_modules/
+__pycache__/
+*.pyc
 
 # Build / packaging (future)
 dist/

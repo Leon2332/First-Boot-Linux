@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""First Boot Linux stub chooser.
+
+Fullscreen GTK4 window for the cage kiosk. No catalog, no install — that is
+step 5. This only proves the live session starts a window, not a desktop.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+
+PAYLOAD = "/run/payload"
+OS_RELEASE = "/etc/os-release"
+LOGO_PATHS = (
+    "/usr/share/firstboot/logo.png",
+    os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "docs",
+        "Logo",
+        "First Boot Linux.png",
+    ),
+)
+
+CSS = b"""
+window {
+  background-color: #1a1a1a;
+}
+.title {
+  font-size: 28pt;
+  font-weight: 700;
+}
+.version {
+  font-size: 14pt;
+  opacity: 0.7;
+}
+.stub {
+  font-size: 13pt;
+  opacity: 0.9;
+}
+.payload {
+  font-size: 11pt;
+  opacity: 0.55;
+  font-family: monospace;
+}
+"""
+
+
+def read_os_release(path: str = OS_RELEASE) -> dict[str, str]:
+    data: dict[str, str] = {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for raw in fh:
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                data[key] = value.strip().strip('"')
+    except OSError:
+        pass
+    return data
+
+
+def find_logo() -> str | None:
+    for path in LOGO_PATHS:
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def payload_status() -> str:
+    if os.path.isdir(PAYLOAD):
+        return f"Payload mounted at {PAYLOAD}"
+    return f"Payload not mounted ({PAYLOAD} missing)"
+
+
+def run_window(argv: list[str]) -> int:
+    import gi
+
+    gi.require_version("Gdk", "4.0")
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Adw", "1")
+
+    from gi.repository import Adw, Gdk, Gtk
+
+    class Chooser(Adw.Application):
+        def __init__(self) -> None:
+            super().__init__(application_id="org.firstboot.Chooser")
+            self.connect("activate", self.on_activate)
+
+        def on_activate(self, _app: Adw.Application) -> None:
+            osr = read_os_release()
+            name = osr.get("NAME") or "First Boot Linux"
+            version = osr.get("VERSION_ID") or osr.get("VERSION") or ""
+
+            style = Adw.StyleManager.get_default()
+            style.set_color_scheme(Adw.ColorScheme.FORCE_DARK)
+
+            provider = Gtk.CssProvider()
+            provider.load_from_data(CSS)
+            display = Gdk.Display.get_default()
+            if display is not None:
+                Gtk.StyleContext.add_provider_for_display(
+                    display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                )
+
+            win = Gtk.ApplicationWindow(application=self, title=name)
+            win.set_decorated(False)
+            win.set_default_size(800, 600)
+            win.fullscreen()
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+            box.set_halign(Gtk.Align.CENTER)
+            box.set_valign(Gtk.Align.CENTER)
+            box.set_margin_start(48)
+            box.set_margin_end(48)
+            box.set_margin_top(48)
+            box.set_margin_bottom(48)
+
+            logo = find_logo()
+            if logo:
+                picture = Gtk.Picture.new_for_filename(logo)
+                picture.set_content_fit(Gtk.ContentFit.CONTAIN)
+                picture.set_size_request(128, 128)
+                picture.set_can_shrink(True)
+                box.append(picture)
+
+            title = Gtk.Label(label=name)
+            title.add_css_class("title")
+            box.append(title)
+
+            if version:
+                ver = Gtk.Label(label=version)
+                ver.add_css_class("version")
+                box.append(ver)
+
+            stub = Gtk.Label(
+                label="Kiosk session is running.\nThe distro chooser will go here."
+            )
+            stub.set_justify(Gtk.Justification.CENTER)
+            stub.add_css_class("stub")
+            box.append(stub)
+
+            payload = Gtk.Label(label=payload_status())
+            payload.add_css_class("payload")
+            box.append(payload)
+
+            win.set_child(box)
+            win.present()
+
+    return int(Chooser().run(argv))
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv if argv is None else argv)
+    if len(argv) > 1 and argv[1] == "--check":
+        osr = read_os_release()
+        print(osr.get("PRETTY_NAME") or osr.get("NAME") or "First Boot Linux")
+        print(payload_status())
+        return 0
+    return run_window(argv)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

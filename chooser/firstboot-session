@@ -1,0 +1,35 @@
+#!/bin/sh
+# Start cage with the First Boot chooser. Used as the tty1 login session.
+set -eu
+
+export XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP=FirstBoot
+export GDK_BACKEND=wayland
+
+if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+  export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+  mkdir -p "$XDG_RUNTIME_DIR"
+  chmod 700 "$XDG_RUNTIME_DIR"
+fi
+
+if ! command -v cage >/dev/null 2>&1; then
+  echo "firstboot-session: cage not found" >&2
+  export FIRSTBOOT_NO_KIOSK=1
+  exec /bin/bash
+fi
+
+if ! command -v firstboot-chooser >/dev/null 2>&1; then
+  echo "firstboot-session: firstboot-chooser not found" >&2
+  export FIRSTBOOT_NO_KIOSK=1
+  exec /bin/bash
+fi
+
+logger -t firstboot-session "starting cage + chooser" || true
+
+# -s: allow VT switch for field debug (Ctrl+Alt+F2)
+# -d: no client-side decorations
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && command -v dbus-run-session >/dev/null 2>&1; then
+  exec dbus-run-session -- cage -s -d -- firstboot-chooser
+fi
+
+exec cage -s -d -- firstboot-chooser

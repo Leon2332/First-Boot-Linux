@@ -1,0 +1,33 @@
+#!/bin/sh
+# Casper overwrites /etc/fstab in 12fstab. Append the payload mount after that.
+# Mount by label so the live system does not care about vda vs sda.
+
+PREREQ="12fstab"
+DESCRIPTION="Mounting First Boot payload (FBL-DATA)..."
+FSTAB=/root/etc/fstab
+
+prereqs()
+{
+       echo "$PREREQ"
+}
+
+case $1 in
+prereqs)
+       prereqs
+       exit 0
+       ;;
+esac
+
+. /scripts/casper-functions
+
+log_begin_msg "$DESCRIPTION"
+
+mkdir -p /root/run/payload
+
+if ! grep -q ' /run/payload ' "$FSTAB" 2>/dev/null; then
+    cat >> "$FSTAB" <<EOF
+LABEL=FBL-DATA /run/payload ext4 defaults,nofail,x-systemd.device-timeout=15s 0 0
+EOF
+fi
+
+log_end_msg

@@ -153,7 +153,21 @@ copy_overlay() {
   printf '%s\n' "$VERSION" > "$ROOTFS/etc/firstboot/version"
   printf '%s\n' "$SUITE" > "$ROOTFS/etc/firstboot/suite"
   chown root:root "$ROOTFS"
-  find "$ROOTFS" -user 1000 -exec chown root:root {} +
+  # Stay on the rootfs mount. Walking /proc while it is bound in is racy
+  # and find exits 1, which aborts the build under set -e.
+  find "$ROOTFS" -xdev -user 1000 -exec chown root:root {} +
+  chmod 440 "$ROOTFS/etc/sudoers.d/firstboot"
+}
+
+install_chooser() {
+  install -D -m 0755 "$REPO_DIR/chooser/firstboot-chooser" \
+    "$ROOTFS/usr/bin/firstboot-chooser"
+  install -D -m 0755 "$REPO_DIR/chooser/firstboot-session" \
+    "$ROOTFS/usr/bin/firstboot-session"
+  local logo="$REPO_DIR/docs/Logo/First Boot Linux.png"
+  if [[ -f $logo ]]; then
+    install -D -m 0644 "$logo" "$ROOTFS/usr/share/firstboot/logo.png"
+  fi
 }
 
 apt_get() {
@@ -257,11 +271,49 @@ make_squashfs() {
   mksquashfs "${args[@]}"
 }
 
+export_efi() {
+  # Signed removable-media boot files for the ESP. Not installed in the live
+  # root: shim/grub live on FBL-ESP, not in the squashfs.
+  local tmp shim_src grub_src
+  tmp=$(mktemp -d)
+  mkdir -p "$OUT/efi"
+
+  if [[ -e /usr/lib/shim/shimx64.efi.signed ]]; then
+    shim_src=/usr/lib/shim
+    grub_src=/usr/lib/grub/x86_64-efi-signed
+  else
+    log "download shim-signed grub-efi-amd64-signed for ESP"
+    apt-get update -qq
+    (cd "$tmp" && apt-get download shim-signed grub-efi-amd64-signed)
+    dpkg-deb -x "$tmp"/shim-signed_*.deb "$tmp/shim"
+    dpkg-deb -x "$tmp"/grub-efi-amd64-signed_*.deb "$tmp/grub"
+    shim_src=$tmp/shim/usr/lib/shim
+    grub_src=$tmp/grub/usr/lib/grub/x86_64-efi-signed
+  fi
+
+  [[ -e $shim_src/shimx64.efi.signed ]] || die "no shimx64.efi.signed"
+  [[ -f $grub_src/gcdx64.efi.signed ]] || die "no gcdx64.efi.signed"
+  [[ -f $shim_src/mmx64.efi ]] || die "no mmx64.efi"
+
+  # Follow the alternatives symlink (shimx64.efi.signed → signed.latest).
+  cp -L "$shim_src/shimx64.efi.signed" "$OUT/efi/BOOTX64.EFI"
+  cp -L "$shim_src/shimx64.efi.signed" "$OUT/efi/shimx64.efi"
+  cp -a "$shim_src/mmx64.efi" "$OUT/efi/mmx64.efi"
+  # gcdx64 searches disks for /boot/grub/grub.cfg (live / removable).
+  cp -a "$grub_src/gcdx64.efi.signed" "$OUT/efi/grubx64.efi"
+  chmod 644 "$OUT/efi"/*
+  rm -rf "$tmp"
+  log "efi $(ls -1 "$OUT/efi" | tr '\n' ' ')"
+}
+
 checksums() {
   (
     cd "$OUT"
     sha256sum filesystem.squashfs filesystem.manifest filesystem.size \
       vmlinuz initrd os-release BUILDINFO > SHA256SUMS
+    if [[ -d efi ]]; then
+      sha256sum efi/* >> SHA256SUMS
+    fi
   )
 }
 
@@ -355,6 +407,7 @@ apt_get -y install --no-install-recommends "${pkgs[@]}"
 
 log "overlay"
 copy_overlay
+install_chooser
 run_hooks
 
 # drop chroot-only guards before the image is frozen
@@ -371,6 +424,7 @@ log "audit"
 bash "$SEED_DIR/audit.sh" "$OUT/filesystem.manifest"
 
 export_kernel
+export_efi
 write_buildinfo
 make_squashfs
 checksums
