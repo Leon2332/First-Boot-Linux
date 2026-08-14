@@ -89,11 +89,10 @@ wallpaper_dark = wallpapers/dark.jpg
 wallpaper_light = wallpapers/light.jpg
 ```
 
-First Boot’s version is not here. It lives on the `fbl` partition.
 
 ### `catalog.json`
 
-Chooser source of truth for this shop. Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either local (`file` under `images/`) or download (`url`). Example (v1: Ubuntu + Mint staged):
+Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either local (`file` under `images/`) or download (`url`). Example (v1: Ubuntu + Mint staged):
 
 ```json
 {
@@ -128,11 +127,11 @@ Chooser source of truth for this shop. Full contract and JSON Schema: [`schemas/
 
 ### `wallpapers/`
 
-Exactly two images from the creator: dark and light. The live session switches with the Dark Style toggle.
+Two images from the creator: dark and light. The live session switches with the Dark Style toggle.
 
 ### `images/`
 
-Official upstream ISOs (or later, disk images) named as in the official catalog. No random shop-dropped ISOs in v1.
+Official upstream ISOs (or later, disk images) named as in the official catalog.
 
 ### `checksums.sha256`
 
@@ -146,7 +145,6 @@ SHA-256 of `retailer.conf`, `catalog.json`, wallpapers, and every file in `image
 4. Session mounts `FBL-DATA` at `/run/payload` (by label, not by device name).
 5. Chooser reads `/run/payload/catalog.json` and `/run/payload/retailer.conf`.
 
-The squashfs does not contain retailer files. Swapping Mint for Bazzite never remasters `fbl`.
 
 ## Shop install onto a PC
 
