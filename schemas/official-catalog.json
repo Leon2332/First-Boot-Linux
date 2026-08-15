@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-08-13",
+  "updated": "2026-08-15",
   "distros": [
     {
       "id": "ubuntu",
@@ -40,7 +40,7 @@
           "name": "Cinnamon",
           "default": true,
           "filename": "linuxmint-22.3-cinnamon-64bit.iso",
-          "url": "https://ftp.heanet.ie/mirrors/linuxmint.com/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso",
+          "url": "https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso",
           "sha256": null,
           "size_bytes": null
         },
@@ -49,7 +49,7 @@
           "name": "MATE",
           "default": false,
           "filename": "linuxmint-22.3-mate-64bit.iso",
-          "url": "https://ftp.heanet.ie/mirrors/linuxmint.com/stable/22.3/linuxmint-22.3-mate-64bit.iso",
+          "url": "https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-mate-64bit.iso",
           "sha256": null,
           "size_bytes": null
         },
@@ -58,7 +58,7 @@
           "name": "Xfce",
           "default": false,
           "filename": "linuxmint-22.3-xfce-64bit.iso",
-          "url": "https://ftp.heanet.ie/mirrors/linuxmint.com/stable/22.3/linuxmint-22.3-xfce-64bit.iso",
+          "url": "https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-xfce-64bit.iso",
           "sha256": null,
           "size_bytes": null
         }

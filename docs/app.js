@@ -1,17 +1,8 @@
-/**
- * First Boot Linux — interactive mockup
- * GNOME-style top bar; beginner-friendly distros only.
- */
-
 (function () {
   "use strict";
 
   const LOGO = (id) => `assets/distros/${id}.png`;
 
-  /**
-   * Seller recommended — pre-loaded on disk for the listed desktop.
-   * `desktops` is used only when opened from Other distros (per-DE Download, then Install).
-   */
   const RECOMMENDED = [
     {
       id: "ubuntu",
@@ -85,7 +76,6 @@
     },
   ];
 
-  /** Additional distros (not on disk; each DE is Download, then Install) */
   const CATALOG_EXTRA = [
     {
       id: "elementary-os",
@@ -249,7 +239,6 @@
     },
   ];
 
-  /** Full “other distros” list: recommended first, then the rest */
   const CATALOG = RECOMMENDED.concat(CATALOG_EXTRA);
 
   const WIFI_NETWORKS = [
@@ -267,7 +256,6 @@
     { pct: 100, label: "Complete" },
   ];
 
-  /** In-row fetch only. Install starts after this finishes. */
   const STEPS_FETCH = [
     { pct: 8, label: "Connecting…" },
     { pct: 28, label: "Downloading…" },
@@ -285,12 +273,10 @@
       ethernetPlugged: false,
     },
     darkStyle: true,
-    /** 'recommended' | 'catalog' — which popover style to use */
     detailMode: "recommended",
     selected: null,
     selectedDesktop: null,
     installTimer: null,
-    /** @type {Record<string, {status: 'downloading'|'done', pct: number, label: string, timer: number|null}>} */
     downloads: {},
     pendingPower: null,
     volume: 70,
@@ -423,8 +409,6 @@
     els.backdrop.hidden = true;
   }
 
-  /* ---------- GNOME Terminal ---------- */
-
   function termPromptHtml() {
     return (
       `<span class="term-prompt-user">${TERM.user}@${TERM.host}</span>` +
@@ -505,7 +489,6 @@
           "  cat /etc/os-release",
           "  date              Current date and time",
           "  echo [text]       Print text",
-          "  neofetch          System summary",
           "  fastfetch         System summary",
           "  network           Network status",
           "  exit              Close the terminal",
@@ -557,7 +540,7 @@
       termAppendLine(new Date().toString(), "term-out");
     } else if (cmd === "echo") {
       termAppendLine(args.join(" "), "term-out");
-    } else if (cmd === "neofetch" || cmd === "fastfetch") {
+    } else if (cmd === "fastfetch") {
       termAppendLine(
         [
           `${TERM.user}@${TERM.host}`,
@@ -573,10 +556,10 @@
           "CPU: AMD Ryzen™ 7 5700G with Radeon™ Graphics (16)",
           "GPU: AMD Radeon™ RX 7800 XT",
           "GPU 1: AMD Radeon™ Graphics",
-          "Memory: 16.0 GiB DDR4 3200",
-          "Disk (/): 456.35 GiB (ext4)",
-          "Disk (/mnt/): 915.82 GiB (ext4)",
-          "Disk (/mnt/): 915.82 GiB (ext4)",
+          "Memory: 16.0 GiB DDR4-3200",
+          "Disk (/): PCIe 3.0 - 456.35 GiB (ext4)",
+          "Disk (/mnt/): SATA 3.0 - 915.82 GiB (ext4)",
+          "Disk (/mnt/): SATA 3.0 - 915.82 GiB (ext4)",
           `Network: ${netLabel}`,
         ].join("\n"),
         "term-out"
@@ -751,7 +734,7 @@
     return rows
       .map(
         ([k, v]) =>
-          `<div class="info-field"><div class="info-field-label">${k}</div><div class="info-field-value">${escapeHtml(v)}</div></div>`
+          `<div class="info-field"><div class="info-field-label">${k}</div><div class="info-field-value">${escapeHtml(v).replace(/\n/g, "<br>")}</div></div>`
       )
       .join("");
   }
@@ -760,24 +743,24 @@
     if (els.infoHw) {
       els.infoHw.innerHTML = infoFields([
         ["Model", "Micro-Star International Co., Ltd. MS-7D14"],
-        ["Memory", "16.0 GiB DDR4 3200"],
-        ["Processor", "AMD Ryzen™ 7 5700G with Radeon™ Graphics × 16"],
+        ["Memory", "16.0 GiB DDR4-3200"],
+        ["Processor", "AMD Ryzen™ 7 5700G with Radeon™"],
         ["Graphics", "AMD Radeon™ RX 7800 XT"],
         ["Graphics 1", "AMD Radeon™ Graphics"],
         ["Display", "1920x1080 in 27\", 100 Hz"],
-        ["Disk (/)", "456.35 GiB (ext4)"],
-        ["Disk (/mnt/)", "915.82 GiB (ext4)"],
-        ["Disk (/mnt/)", "915.82 GiB (ext4)"],
+        ["Disk (/)", "PCIe 3.0 - 456.35 GiB (ext4)"],
+        ["Disk (/mnt/)", "SATA 3.0 - 915.82 GiB (ext4)"],
+        ["Disk (/mnt/)", "SATA 3.0 - 915.82 GiB (ext4)"],
       ]);
     }
     if (els.infoSw) {
       els.infoSw.innerHTML = infoFields([
-        ["Firmware Version", "1.G0"],
         ["Operating System", "First Boot Linux 0.1.1"],
-        ["Configured by", "[Retailer Name]"],
         ["OS Type", "x86_64"],
         ["Windowing System", "Wayland"],
         ["Kernel Version", "Linux 7.1.8-generic"],
+        ["Firmware Version", "1.G0"],
+        ["Configured by", "[Retailer Name]\n[Retailer Contact Details]"],
       ]);
     }
   }
@@ -796,7 +779,6 @@
 
   function onTermKeydown(e) {
     if (!TERM.open || els.termWindow.hidden) return;
-    // Don't steal keys while typing into form controls elsewhere
     const tag = (e.target && e.target.tagName) || "";
     if (
       e.target !== els.termBody &&
@@ -806,7 +788,6 @@
     }
 
     if (e.key === "Escape") {
-      // Let global Escape handling close menus first when open
       if (
         !els.quickSettings.hidden ||
         !els.networkMenu.hidden ||
@@ -898,7 +879,6 @@
   }
 
   function showScreen(name) {
-    // Detail/install/done are blurred overlays; keep the chooser underneath so wallpaper/list show through.
     const showChooser =
       name === "chooser" ||
       name === "detail" ||
@@ -1161,7 +1141,6 @@
     return !!(de.local || editionDownload(d, de)?.status === "done");
   }
 
-  /** Other-distros popover: DE rows with per-edition Install / Download */
   function renderDeOptions(d) {
     els.deOptionsList.innerHTML = "";
 
@@ -1244,10 +1223,6 @@
     if (size) size.textContent = `${de.size || ""} · ${dl.label} ${dl.pct}%`.replace(/^ · /, "");
   }
 
-  /**
-   * @param {string} id
-   * @param {'recommended'|'catalog'} mode
-   */
   function openDetail(id, mode) {
     const d = findDistro(id);
     if (!d) return;
@@ -1265,7 +1240,6 @@
     els.detailWarn.hidden = true;
 
     if (state.detailMode === "recommended") {
-      // Simple popover: fixed DE + single Install
       els.detailDesktop.hidden = false;
       els.detailDesktop.textContent = d.desktop || "";
       els.deOptions.hidden = true;
@@ -1275,7 +1249,6 @@
       els.installBtn.disabled = false;
       els.installBtn.textContent = "Install";
     } else {
-      // Other distros: DE list with per-row Install / Download
       els.detailDesktop.hidden = true;
       els.detailDesktop.textContent = "";
       els.detailActions.classList.add("catalog-mode");
@@ -1285,11 +1258,6 @@
     showScreen("detail");
   }
 
-  /**
-   * Fetch an edition that is not on disk. Stays on the detail popover;
-   * Install appears on the same row when the mock download finishes.
-   * @param {{ id: string, name: string, local?: boolean }} de
-   */
   function startDownload(de) {
     const d = state.selected;
     if (!d || !de) return;
@@ -1340,14 +1308,10 @@
     rec.timer = setInterval(tick, 450);
   }
 
-  /**
-   * @param {{ id: string, name: string, local?: boolean }|null} de
-   */
   function startInstall(de) {
     const d = state.selected;
     if (!d) return;
 
-    // Recommended popover: install the pre-loaded desktop
     if (state.detailMode === "recommended") {
       de = {
         id: "default",
@@ -1513,7 +1477,6 @@
     els.installBtn.addEventListener("click", () => startInstall(null));
     els.rebootBtn.addEventListener("click", resetChooser);
 
-    // Click blurred backdrop (outside the popover card) to dismiss
     els.screenDetail.addEventListener("click", (e) => {
       if (e.target === els.screenDetail) showScreen("chooser");
     });

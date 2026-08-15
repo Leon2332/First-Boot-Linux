@@ -70,12 +70,18 @@ list_pkgs() {
 }
 
 unmount_rootfs() {
-  [[ $MOUNTED -eq 1 && -d $ROOTFS ]] || return 0
-  # reverse order; lazy so a leftover process cannot trap the build
-  for m in dev/pts dev proc sys run; do
-    if mountpoint -q "$ROOTFS/$m" 2>/dev/null; then
-      umount -l "$ROOTFS/$m" || true
-    fi
+  [[ -d $ROOTFS ]] || return 0
+  local mp
+  # Longest path first. /proc/mounts encodes spaces as \040.
+  mapfile -t mps < <(awk -v p="$ROOTFS" '
+    {
+      m = $2
+      gsub(/\\040/, " ", m)
+      if (m == p || index(m, p "/") == 1) print length(m), m
+    }
+  ' /proc/mounts | sort -nr | cut -d" " -f2-)
+  for mp in "${mps[@]+"${mps[@]}"}"; do
+    umount -l "$mp" 2>/dev/null || true
   done
   MOUNTED=0
 }
@@ -91,7 +97,10 @@ mount_rootfs() {
   mount -t sysfs sys "$ROOTFS/sys"
   mount --bind /dev "$ROOTFS/dev"
   mount -t devpts devpts "$ROOTFS/dev/pts"
-  mount --bind /run "$ROOTFS/run"
+  # Private tmpfs: a bind of host /run lets chroot systemctl talk to the
+  # workstation's PID 1 (enable/disable/mask).
+  mount -t tmpfs -o mode=755 tmpfs "$ROOTFS/run"
+  mkdir -p "$ROOTFS/run/lock" "$ROOTFS/run/systemd"
   MOUNTED=1
 }
 
@@ -155,8 +164,10 @@ copy_overlay() {
   chown root:root "$ROOTFS"
   # Stay on the rootfs mount. Walking /proc while it is bound in is racy
   # and find exits 1, which aborts the build under set -e.
-  find "$ROOTFS" -xdev -user 1000 -exec chown root:root {} +
+  # Before 45-kiosk.sh creates the live user (also often uid 1000).
+  find "$ROOTFS" -xdev ! -user 0 -exec chown root:root {} +
   chmod 440 "$ROOTFS/etc/sudoers.d/firstboot"
+  chmod 755 "$ROOTFS/usr/share/initramfs-tools/scripts/casper-bottom/27payload"
 }
 
 install_chooser() {
@@ -322,8 +333,6 @@ chown_out() {
     chown -R "${HOST_UID}:${HOST_GID:-$HOST_UID}" "$OUT"
   fi
 }
-
-# --- main ---
 
 need_root
 command -v debootstrap >/dev/null || die "debootstrap not installed"

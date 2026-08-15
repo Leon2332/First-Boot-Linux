@@ -8,4 +8,9 @@ systemctl mask apt-daily.timer apt-daily.service \
 
 systemctl mask motd-news.timer motd-news.service 2>/dev/null || true
 
+# Frozen live disk: do not re-read the squashfs on every boot, and do not
+# prompt to "remove the installation medium" on reboot (this is a disk).
+systemctl mask casper-md5check.service casper-md5check.timer 2>/dev/null || true
+systemctl mask casper.service 2>/dev/null || true
+
 passwd -l root >/dev/null

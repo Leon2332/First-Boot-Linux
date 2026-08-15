@@ -4,7 +4,7 @@ How a First Boot Linux **shop USB** is laid out after the creator writes it.
 
 This is a partitioned disk, not a single ISO9660 image. The UI may still say “write ISO.” On the stick it is GPT + three partitions. The same layout is copied onto the PC’s internal disk when the shop installs First Boot.
 
-Example below is one retailer who staged Ubuntu, Linux Mint, Fedora, Pop!_OS, and Bazzite.
+The normative v1 example below is a shop that staged Ubuntu and Linux Mint. The `docs/` mockup still shows a larger recommended set (Fedora, Pop!_OS, Bazzite, …); those are not `can_stage` until an install driver exists.
 
 ## Partitions
 
@@ -15,11 +15,11 @@ GPT
 └── p3  payload   ext4    rest      retailer config + staged ISOs
 ```
 
-| Partition | Label   | FS    | Mount (live)     | Changes per retailer |
-| --------- | ------- | ----- | ---------------- | -------------------- |
-| p1        | `FBL-ESP` | FAT32 | `/boot/efi`    | No (same signed boot) |
-| p2        | `FBL-SYS` | ext4  | `/run/fbl`     | No (golden base)      |
-| p3        | `FBL-DATA` | ext4 | `/run/payload` | Yes                   |
+| Partition | Label   | FS    | Role | Live mount | Changes per retailer |
+| --------- | ------- | ----- | ---- | ---------- | -------------------- |
+| p1        | `FBL-ESP` | FAT32 | EFI System (shim + gcdx64) | not mounted | No (same signed boot) |
+| p2        | `FBL-SYS` | ext4  | Casper live medium (squashfs + kernel) | casper (`/cdrom` or equivalent), not `/run/fbl` | No (golden base) |
+| p3        | `FBL-DATA` | ext4 | Shop payload | `/run/payload` (by label) | Yes |
 
 - GPT + UEFI is the v1 path. Optional BIOS `bios_grub` partition later if shops still need CSM.
 - `payload` is ext4 so files can be larger than 4 GB. Do not use FAT32 for ISOs.
@@ -34,12 +34,15 @@ USB
 │   └── EFI
 │       ├── BOOT
 │       │   ├── BOOTX64.EFI     shim (Secure Boot first stage)
-│       │   ├── grubx64.efi
+│       │   ├── grubx64.efi     gcdx64 (searches disks for /boot/grub/grub.cfg)
+│       │   ├── grub.cfg        stub: search FBL-SYS, load /boot/grub/grub.cfg
 │       │   └── mmx64.efi       MokManager, recovery only
-│       └── firstboot
-│           ├── grub.cfg        points kernel at FBL-SYS
-│           ├── shimx64.efi
-│           └── grubx64.efi
+│       ├── firstboot
+│       │   ├── grub.cfg        stub: search FBL-SYS, load /boot/grub/grub.cfg
+│       │   ├── shimx64.efi
+│       │   └── grubx64.efi
+│       └── ubuntu
+│           └── grub.cfg        same stub (firmware that looks for EFI/ubuntu)
 │
 ├── fbl                         (p2, FBL-SYS, ext4)
 │   ├── .disk
@@ -67,13 +70,10 @@ USB
     │   └── light.jpg
     └── images
         ├── ubuntu-26.04-desktop-amd64.iso
-        ├── linuxmint-22.3-cinnamon-64bit.iso
-        ├── Fedora-KDE-Live-x86_64-44.iso
-        ├── pop-os_24.04_amd64_intel_20.iso
-        └── bazzite-stable-amd64.iso
+        └── linuxmint-22.3-cinnamon-64bit.iso
 ```
 
-`images/` only contains what this retailer marked recommended / on-disk. Distros that are catalog-only are not on the stick; the chooser downloads those later. v1 install support is Ubuntu then Mint, so a first shop USB may only have those two files even though this tree shows a larger set.
+`images/` only contains what this retailer marked recommended / on-disk. Distros that are catalog-only are not on the stick; the chooser downloads those later. v1 may stage only distros with official `can_stage` and `install` (Ubuntu, then Mint). Basenames come from `schemas/official-catalog.json` `filename` fields.
 
 ## What each payload file is
 
@@ -92,7 +92,7 @@ wallpaper_light = wallpapers/light.jpg
 
 ### `catalog.json`
 
-Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either local (`file` under `images/`) or download (`url`). Example (v1: Ubuntu + Mint staged):
+Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either local (`file` under `images/`) or download (`url`). Example (v1: Ubuntu + Mint staged) — same bytes as [`schemas/examples/catalog.json`](schemas/examples/catalog.json):
 
 ```json
 {
@@ -103,7 +103,7 @@ Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either lo
       "name": "Ubuntu",
       "version": "26.04 LTS",
       "tagline": "Popular and well-supported",
-      "description": "A polished desktop with excellent hardware support and a large software library.",
+      "description": "A polished desktop with excellent hardware support and a large software library. A safe default for most laptops.",
       "family": "ubuntu",
       "install": "ubuntu-autoinstall",
       "editions": [
@@ -113,8 +113,28 @@ Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either lo
           "default": true,
           "local": true,
           "file": "images/ubuntu-26.04-desktop-amd64.iso",
-          "sha256": "…",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "size_bytes": 5900000000
+        }
+      ]
+    },
+    {
+      "id": "linux-mint",
+      "name": "Linux Mint",
+      "version": "22.3",
+      "tagline": "Familiar and easy",
+      "description": "A stable desktop that feels at home for people coming from Windows. Multimedia and drivers work out of the box.",
+      "family": "mint",
+      "install": "mint",
+      "editions": [
+        {
+          "id": "cinnamon",
+          "name": "Cinnamon",
+          "default": true,
+          "local": true,
+          "file": "images/linuxmint-22.3-cinnamon-64bit.iso",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "size_bytes": 2800000000
         }
       ]
     }
@@ -139,11 +159,11 @@ SHA-256 of `retailer.conf`, `catalog.json`, wallpapers, and every file in `image
 
 ## Boot and mount
 
-1. Firmware loads `ESP/EFI/BOOT/BOOTX64.EFI` (shim).
-2. GRUB reads `EFI/firstboot/grub.cfg`, kernel + initrd from `fbl/casper/`.
-3. Casper boots `filesystem.squashfs`.
-4. Session mounts `FBL-DATA` at `/run/payload` (by label, not by device name).
-5. Chooser reads `/run/payload/catalog.json` and `/run/payload/retailer.conf`.
+1. Firmware loads `ESP/EFI/BOOT/BOOTX64.EFI` (shim), which loads `EFI/BOOT/grubx64.efi` (gcdx64).
+2. The ESP `grub.cfg` stubs (`EFI/BOOT`, `EFI/firstboot`, `EFI/ubuntu`) search for label `FBL-SYS` and `configfile` `/boot/grub/grub.cfg`. The casper kernel command line lives on **FBL-SYS**, not on the ESP.
+3. Casper boots `filesystem.squashfs` from the live medium (`live-media=/dev/disk/by-label/FBL-SYS`). FBL-SYS is not mounted at `/run/fbl`. The ESP is not mounted at `/boot/efi` in the live session.
+4. `casper-bottom/27payload` appends `LABEL=FBL-DATA` → `/run/payload` to `/etc/fstab` (casper’s `12fstab` overwrites fstab first).
+5. Chooser reads `/run/payload/catalog.json` and `/run/payload/retailer.conf`. First Boot’s own version is `/etc/os-release` in the squashfs (also `fbl/.disk/info` on the partition).
 
 
 ## Shop install onto a PC

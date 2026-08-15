@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Timezone UTC, C.UTF-8 default, en_US.UTF-8 generated for later UI.
+# Timezone UTC, C.UTF-8 default, generate en_US.UTF-8.
 set -euo pipefail
 
 echo UTC > /etc/timezone

@@ -10,7 +10,7 @@ Two files on every shop USB (`payload/`). One file in this repo for the creator.
 
 The live chooser reads only `/run/payload/retailer.conf` and `/run/payload/catalog.json`. It does not need `official-catalog.json`. That file is how the creator knows what may be ticked, staged, or offered as a download.
 
-First Boot’s own version is **not** in `retailer.conf`. It lives on the `fbl` partition (`/etc/os-release` or `fbl/.disk/info`).
+First Boot’s own version is **not** in `retailer.conf`. In the live session it is `/etc/os-release` inside the squashfs. On the `fbl` partition the file is `fbl/.disk/info`.
 
 `docs/app.js` is UI exploration. These files are the contract.
 
@@ -77,17 +77,28 @@ Self-contained shop catalog. Schema: [`catalog.schema.json`](catalog.schema.json
 
 The chooser grid is `recommended`. The “other distros” list is `recommended` followed by `catalog` (do not duplicate ids in the JSON).
 
-Each distro copies display fields from the official catalog (`id`, `name`, `version`, `tagline`, `description`, `family`, `install`) plus `editions`.
+Each distro copies display fields from the official catalog (`id`, `name`, `version`, `tagline`, `description`, `family`, `install`) plus `editions`. Do not copy official edition objects through: they have `filename` and nullable hashes, which this schema rejects (`additionalProperties: false`).
+
+Official edition → shop edition:
+
+- keep `id`, `name`, `default`
+- `file` = `images/` + official `filename` when `local` is true
+- drop `filename`
+- pin `sha256` and `size_bytes` (never null on the stick)
+- set `local` and, if not local, `url`
 
 Each edition on the stick:
 
-| Field | Meaning |
-| --- | --- |
-| `local` | ISO is on this payload |
-| `file` | Required if `local`. Path like `images/ubuntu-26.04-desktop-amd64.iso` |
-| `url` | Required if not `local` |
-| `sha256` | Always required (64 lowercase hex) |
-| `size_bytes` | Always required |
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `id` | yes | Same kebab-case id as the official edition (`gnome`, `cinnamon`, …) |
+| `name` | yes | Display name |
+| `default` | yes | Featured edition (exactly one `true` per distro) |
+| `local` | yes | ISO is on this payload |
+| `file` | if `local` | Path like `images/ubuntu-26.04-desktop-amd64.iso` |
+| `url` | if not `local` | Direct ISO URL |
+| `sha256` | yes | 64 lowercase hex |
+| `size_bytes` | yes | ISO size in bytes |
 
 The creator sets `local: true` and `file` only after the ISO is copied and verified. Recommended entries must have at least one local default edition.
 

@@ -49,8 +49,15 @@ done
 log() { printf '==> %s\n' "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
+path_in_repo() {
+  case $1 in
+    "$REPO_DIR"|"$REPO_DIR"/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 if [[ $WRITE -eq 1 ]]; then
-  bash "$IMAGE_DIR/write-live.sh"
+  bash "$IMAGE_DIR/write-live.sh" --out "$IMG"
 fi
 
 [[ -f $IMG ]] || die "no image at $IMG (run image/write-live.sh, or pass --write)"
@@ -106,14 +113,33 @@ qemu_args() {
 prepare_vars() {
   local template=$1
   mkdir -p "$(dirname "$VARS")"
+  local reset=0
   if [[ ! -f $VARS || $WRITE -eq 1 ]]; then
-    cp -a "$template" "$VARS"
-    if [[ -n ${HOST_UID:-} ]]; then
-      chown "${HOST_UID}:${HOST_GID:-$HOST_UID}" "$VARS" 2>/dev/null || true
-    elif [[ $(id -u) -ne 0 ]]; then
-      :
-    fi
+    reset=1
+  elif [[ -f $template && $(stat -c %s "$VARS") != $(stat -c %s "$template") ]]; then
+    reset=1
   fi
+  if [[ $reset -eq 1 ]]; then
+    cp -a "$template" "$VARS"
+  fi
+  if [[ -n ${HOST_UID:-} ]]; then
+    chown "${HOST_UID}:${HOST_GID:-$HOST_UID}" "$VARS" 2>/dev/null || true
+  fi
+}
+
+serial_plain() {
+  # systemd colour codes sit inside "Welcome to …"; strip CSI/OSC.
+  sed -E 's/\x1B\[[0-9;?]*[ -/]*[@-~]//g; s/\x1B\][^\a]*(\a|\x1B\\)//g' \
+    "$SERIAL_LOG" 2>/dev/null || true
+}
+
+smoke_ok() {
+  local text
+  text=$(serial_plain)
+  grep -Eq 'Unable to find a medium containing a live file system' <<<"$text" && return 1
+  grep -Eq '/run/payload' <<<"$text" || return 1
+  grep -Eq 'getty@tty1' <<<"$text" || return 1
+  return 0
 }
 
 smoke_watch() {
@@ -134,8 +160,8 @@ smoke_watch() {
       tail -n 40 "$SERIAL_LOG" >&2 || true
       return 1
     fi
-    if grep -Eq 'Reached target ([Gg]raphical|[Mm]ulti-[Uu]ser)|Welcome to First Boot|firstboot login|Started .+[Gg]etty|firstboot-session|Starting cage' "$SERIAL_LOG" 2>/dev/null; then
-      log "smoke: live session reached"
+    if smoke_ok; then
+      log "smoke: /run/payload mounted and getty@tty1 started"
       kill "$qemu_pid" 2>/dev/null || true
       wait "$qemu_pid" || true
       return 0
@@ -144,7 +170,7 @@ smoke_watch() {
   done
   kill "$qemu_pid" 2>/dev/null || true
   wait "$qemu_pid" || true
-  echo "error: smoke timed out after ${SMOKE_TIMEOUT}s" >&2
+  echo "error: smoke timed out after ${SMOKE_TIMEOUT}s (need /run/payload and getty@tty1)" >&2
   tail -n 60 "$SERIAL_LOG" >&2 || true
   return 1
 }
@@ -168,18 +194,20 @@ run_host() {
 run_docker() {
   command -v docker >/dev/null || die "qemu-system-x86_64/ovmf not installed, and docker is missing"
   [[ -e /dev/kvm ]] || die "/dev/kvm missing"
+  path_in_repo "$IMG" || die "docker qemu --img must be under the repo ($REPO_DIR)"
   log "qemu image $QEMU_IMAGE"
   docker build -t "$QEMU_IMAGE" -f "$IMAGE_DIR/Dockerfile.qemu" "$IMAGE_DIR"
 
-  local code_c=/usr/share/OVMF/OVMF_CODE_4M.fd
-  local vars_c=/src/build/OVMF_VARS.fd
   local img_c=/src/${IMG#"$REPO_DIR"/}
   local serial_c=/src/build/fbl-vm-serial.log
 
-  # Seed VARS from the image on first run (container copies if missing).
   mkdir -p "$REPO_DIR/build"
   local docker_display=( -display none )
-  local extra=( )
+  local extra=(
+    -e HOST_UID="$(id -u)"
+    -e HOST_GID="$(id -g)"
+    -e FBL_RESET_VARS="$WRITE"
+  )
   if [[ $DISPLAY_MODE == gtk && -n ${DISPLAY:-} ]]; then
     docker_display=( -display gtk )
     extra+=(
@@ -190,18 +218,15 @@ run_docker() {
       extra+=( -e "XAUTHORITY=$XAUTHORITY" -v "$XAUTHORITY:$XAUTHORITY" )
     fi
     if command -v xhost >/dev/null; then
-      xhost +SI:localuser:root >/dev/null 2>&1 || xhost +local: >/dev/null 2>&1 || true
+      xhost +SI:localuser:root >/dev/null 2>&1 || true
     fi
   fi
 
   local cmd=(
-    qemu-system-x86_64
     -enable-kvm
     -machine q35,smm=off
     -m "$MEM"
     -smp "$SMP"
-    -drive if=pflash,format=raw,unit=0,readonly=on,file="$code_c"
-    -drive if=pflash,format=raw,unit=1,file="$vars_c"
     -drive file="$img_c",format=raw,if=none,id=bootdisk
     -device virtio-blk-pci,drive=bootdisk,bootindex=0
     -device virtio-vga
@@ -219,13 +244,29 @@ run_docker() {
     "${extra[@]}"
     "$QEMU_IMAGE"
     bash -c 'set -euo pipefail
+      code=/usr/share/OVMF/OVMF_CODE_4M.fd
       tmpl=/usr/share/OVMF/OVMF_VARS_4M.fd
-      [[ -f $tmpl ]] || tmpl=/usr/share/OVMF/OVMF_VARS.fd
-      if [[ ! -f /src/build/OVMF_VARS.fd ]]; then
-        cp -a "$tmpl" /src/build/OVMF_VARS.fd
+      if [[ ! -f $code ]]; then
+        code=/usr/share/OVMF/OVMF_CODE.fd
+        tmpl=/usr/share/OVMF/OVMF_VARS.fd
       fi
-      exec "$@"'
-    bash
+      [[ -f $code && -f $tmpl ]] || { echo "error: OVMF firmware missing in qemu image" >&2; exit 1; }
+      vars=/src/build/OVMF_VARS.fd
+      mkdir -p /src/build
+      reset=${FBL_RESET_VARS:-0}
+      if [[ ! -f $vars || $reset == 1 ]]; then
+        cp -a "$tmpl" "$vars"
+      elif [[ $(stat -c %s "$vars") != $(stat -c %s "$tmpl") ]]; then
+        cp -a "$tmpl" "$vars"
+      fi
+      if [[ -n ${HOST_UID:-} ]]; then
+        chown "${HOST_UID}:${HOST_GID:-$HOST_UID}" "$vars" || true
+      fi
+      exec qemu-system-x86_64 \
+        -drive if=pflash,format=raw,unit=0,readonly=on,file="$code" \
+        -drive if=pflash,format=raw,unit=1,file="$vars" \
+        "$@"
+    ' bash
     "${cmd[@]}"
   )
 

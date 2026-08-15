@@ -8,7 +8,7 @@ This is the daily test loop. It is not a shop USB and does not flash a stick.
 GPT
 ├── p1  FBL-ESP   FAT32   512 MiB   shim + gcdx64
 ├── p2  FBL-SYS   ext4      2 GiB   casper/ + squashfs
-└── p3  FBL-DATA  ext4       rest   dummy retailer.conf
+└── p3  FBL-DATA  ext4       rest   dummy retailer.conf + catalog.json
 ```
 
 ## Write
@@ -42,8 +42,8 @@ Otherwise the same QEMU line runs in Docker (`--device /dev/kvm`). Cage needs a 
 
 Serial goes to `build/fbl-vm-serial.log`. Ctrl+Alt+F2 in the guest is a debug TTY.
 
-`--smoke` is a success when serial shows a live session (`Welcome to First Boot Linux`, `FBL-DATA` mounted at `/run/payload`, `getty@tty1`). The last console on the kernel command line is `ttyS0` so systemd prints there; tty1 still gets the kiosk.
+`--smoke` succeeds only when serial shows `/run/payload` mounted **and** `getty@tty1` started. Multi-user.target or serial-getty alone is not enough. The last console on the kernel command line is `ttyS0` so systemd prints there; tty1 still gets the kiosk. `--write` rebuilds the image at `--img` / `FBL_LIVE_IMG`.
 
 ## Dummy payload
 
-`dummy-payload/` is a valid empty shop catalog (no staged ISOs). Wallpapers are copied from `docs/assets/Wallpaper/` at write time. Casper mounts `LABEL=FBL-DATA` at `/run/payload`.
+`dummy-payload/` is a valid empty shop catalog (no staged ISOs). Missing wallpapers are filled from the mockup photos at write time: annie-spratt → `dark.jpg`, ands-mahardika → `light.jpg`. Casper mounts `LABEL=FBL-DATA` at `/run/payload`.

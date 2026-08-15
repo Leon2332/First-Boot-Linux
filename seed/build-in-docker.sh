@@ -5,6 +5,7 @@ set -euo pipefail
 SEED_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_DIR=$(cd "$SEED_DIR/.." && pwd)
 IMAGE=${FBL_BUILD_IMAGE:-firstboot-seed-builder:26.04}
+VOLUME=${FBL_SEED_VOLUME:-firstboot-seed-work}
 
 command -v docker >/dev/null || { echo "error: docker not found" >&2; exit 1; }
 
@@ -14,15 +15,18 @@ log "builder image $IMAGE"
 docker build -t "$IMAGE" -f "$SEED_DIR/Dockerfile" "$SEED_DIR"
 
 mkdir -p "$REPO_DIR/build/seed"
+docker volume create "$VOLUME" >/dev/null
 
-# Chroot lives on the container overlay (real root). Snap Docker maps bind-mount
+# Chroot lives on a named volume (real root). Snap Docker maps bind-mount
 # files to the host uid, which would make squashfs "/" owned by 1000.
-log "build seed"
+# The volume keeps rootfs across runs so --skip-debootstrap / --squashfs-only work.
+log "build seed (work volume $VOLUME)"
 exec docker run --rm --privileged \
   -e DEBIAN_FRONTEND=noninteractive \
   -e HOST_UID="$(id -u)" \
   -e HOST_GID="$(id -g)" \
   -e FBL_SUITE="${FBL_SUITE:-}" \
+  -e FBL_ARCH="${FBL_ARCH:-}" \
   -e FBL_MIRROR="${FBL_MIRROR:-}" \
   -e FBL_SECURITY_MIRROR="${FBL_SECURITY_MIRROR:-}" \
   -e FBL_COMP="${FBL_COMP:-}" \
@@ -31,6 +35,7 @@ exec docker run --rm --privileged \
   -e https_proxy="${https_proxy:-}" \
   -e no_proxy="${no_proxy:-}" \
   -v "$REPO_DIR:/src" \
+  -v "$VOLUME:/var/tmp/fbl-seed" \
   -w /src \
   "$IMAGE" \
   --work /var/tmp/fbl-seed \

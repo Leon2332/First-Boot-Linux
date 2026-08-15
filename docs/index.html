@@ -9,10 +9,9 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cantarell:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cantarell:wght@300;400;500;700&display=swap" rel="stylesheet" />
 </head>
 <body>
-  <!-- GNOME-style top panel -->
   <header class="top-bar" role="banner">
     <div class="top-bar-left">
       <button
@@ -51,7 +50,6 @@
     </div>
   </header>
 
-  <!-- Quick Settings (network, dark style, volume, power) -->
   <div class="quick-settings" id="quick-settings" role="dialog" aria-label="Quick Settings" hidden>
     <div class="qs-toolbar">
       <div class="qs-toolbar-group">
@@ -99,7 +97,6 @@
     </div>
   </div>
 
-  <!-- Network submenu -->
   <div class="network-menu" id="network-menu" role="dialog" aria-label="Network" hidden>
     <div class="menu-header">
       <button type="button" class="menu-back" id="network-back" aria-label="Back">
@@ -124,7 +121,6 @@
     </div>
   </div>
 
-  <!-- Applications menu -->
   <div class="app-menu" id="app-menu" role="menu" aria-label="Applications" hidden>
     <button type="button" class="app-menu-item" id="app-menu-epiphany" role="menuitem">
       <img class="app-menu-item-icon" src="assets/apps/epiphany.png" alt="" draggable="false" />
@@ -132,7 +128,7 @@
     </button>
     <button type="button" class="app-menu-item" id="app-menu-sysinfo" role="menuitem">
       <img class="sym app-menu-item-icon" src="assets/status/cog-wheel-symbolic.svg" alt="" draggable="false" />
-      <span>System info</span>
+      <span>System details</span>
     </button>
     <button type="button" class="app-menu-item" id="app-menu-terminal" role="menuitem">
       <img class="app-menu-item-icon" src="assets/apps/org.gnome.Terminal.png" alt="" draggable="false" />
@@ -140,7 +136,6 @@
     </button>
   </div>
 
-  <!-- Power menu -->
   <div class="power-menu" id="power-menu" role="menu" aria-label="Power Off" hidden>
     <div class="power-menu-header" role="presentation">
       <img class="sym" src="assets/status/system-shutdown-symbolic.svg" alt="" draggable="false" />
@@ -152,7 +147,6 @@
 
   <div class="backdrop" id="backdrop" hidden></div>
 
-  <!-- GNOME Terminal -->
   <div class="term-window" id="term-window" role="dialog" aria-label="Terminal" hidden>
     <header class="term-headerbar" id="term-headerbar">
       <div class="term-title-wrap">
@@ -175,7 +169,6 @@
     </div>
   </div>
 
-  <!-- Web browser (GNOME Web) -->
   <div class="app-window epi-window" id="epi-window" role="dialog" aria-label="Web browser" hidden>
     <header class="term-headerbar" id="epi-headerbar">
       <div class="term-title-wrap">
@@ -195,12 +188,11 @@
     <div class="epi-page" id="epi-page"></div>
   </div>
 
-  <!-- System info -->
-  <div class="app-window info-window" id="info-window" role="dialog" aria-label="System info" hidden>
+  <div class="app-window info-window" id="info-window" role="dialog" aria-label="System details" hidden>
     <header class="term-headerbar" id="info-headerbar">
       <div class="term-title-wrap">
         <img class="sym" src="assets/status/cog-wheel-symbolic.svg" alt="" draggable="false" />
-        <span class="term-title">System Details</span>
+        <span class="term-title">System details</span>
       </div>
       <div class="term-window-controls">
         <button type="button" class="term-wc term-max" id="info-max" title="Maximize" aria-label="Maximize"></button>
@@ -217,6 +209,20 @@
         </section>
         <section>
           <h2>Software Information</h2>
+          <div class="info-sw-brand">
+            <img
+              class="logo-dark"
+              src="Logo/First%20Boot%20Linux%20-%20dark%20mode.png"
+              alt=""
+              draggable="false"
+            />
+            <img
+              class="logo-light"
+              src="Logo/First%20Boot%20Linux-%20light%20mode.png"
+              alt=""
+              draggable="false"
+            />
+          </div>
           <div class="info-fields" id="info-sw"></div>
         </section>
       </div>
@@ -225,10 +231,17 @@
 
   <main class="main" id="main">
     <section class="screen" id="screen-chooser" aria-labelledby="chooser-title">
-      
+      <div class="chooser-heading">
+        <h2 id="chooser-title">Recommended by [Retailer Name]</h2>
+        <p>Support: [Retailer Contact Details]</p>
+      </div>
       <div class="distro-grid" id="recommended-grid" role="list"></div>
 
       <section class="catalog" id="catalog" aria-labelledby="catalog-title">
+        <div class="chooser-heading">
+          <h2 id="catalog-title">Other distros</h2>
+          <p>Not supported by retailer</p>
+        </div>
         <div class="catalog-scroll" id="catalog-scroll">
           <div class="catalog-list" id="catalog-list" role="list"></div>
         </div>
@@ -319,8 +332,6 @@
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
   <footer class="brand-footer" id="brand-footer">
-    First Boot Linux <span id="fbl-version">0.1.1</span><br />
-    Configured by <span class="retailer-name">[Retailer Name]</span><br>
     Support: <span class="retailer-name">[Retailer Contact Details]</span>
   </footer>
 

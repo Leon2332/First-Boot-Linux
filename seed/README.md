@@ -43,12 +43,12 @@ Useful flags (both wrappers pass them through):
 
 ```bash
 ./seed/build-in-docker.sh --mirror http://na.archive.ubuntu.com/ubuntu
-./seed/build-in-docker.sh --skip-debootstrap   # reuse build/seed/rootfs
+./seed/build-in-docker.sh --skip-debootstrap   # reuse the Docker work volume
 ./seed/build-in-docker.sh --squashfs-only
 ./seed/build-in-docker.sh --clean
 ```
 
-A first build downloads the archive and takes a while. Artifacts land in `build/seed/` (gitignored). The Docker wrapper builds the chroot in `/var/tmp` inside the container so `/` in the squashfs is root-owned (Snap Docker remaps bind-mount uids).
+A first build downloads the archive and takes a while. Artifacts land in `build/seed/` (gitignored). The Docker wrapper keeps the chroot in the named volume `firstboot-seed-work` (override with `FBL_SEED_VOLUME`) mounted at `/var/tmp/fbl-seed`, so `/` in the squashfs is root-owned (Snap Docker remaps bind-mount uids) and `--skip-debootstrap` / `--squashfs-only` reuse that volume. Host `sudo ./seed/build-seed.sh` leaves `build/seed/rootfs/` on disk instead. `--clean` deletes the work directory (volume contents or `build/seed/rootfs`).
 
 ## Output
 
@@ -63,7 +63,7 @@ build/seed/
   os-release
   BUILDINFO
   SHA256SUMS
-  rootfs/                 chroot left in place for iteration
+  rootfs/                 host-root builds only; Docker keeps this in the work volume
 ```
 
 Check the package set without root:

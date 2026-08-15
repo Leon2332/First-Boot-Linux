@@ -15,7 +15,6 @@ SYS_MIB=${FBL_SYS_MIB:-2048}
 WRITER_IMAGE=${FBL_WRITER_IMAGE:-firstboot-image-writer:26.04}
 
 CLEAN=0
-ORIG_ARGS=("$@")
 
 usage() {
   cat <<EOF
@@ -48,26 +47,44 @@ done
 log() { printf '==> %s\n' "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
+path_in_repo() {
+  case $1 in
+    "$REPO_DIR"|"$REPO_DIR"/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+to_src() {
+  printf '/src%s\n' "${1#"$REPO_DIR"}"
+}
+
 if [[ $(id -u) -ne 0 ]]; then
   command -v docker >/dev/null || die "run as root, or install docker"
+  SEED=$(readlink -f "$SEED")
+  OUT=$(readlink -f "$OUT")
+  PAYLOAD=$(readlink -f "$PAYLOAD")
+  path_in_repo "$SEED" || die "docker writer --seed must be under the repo ($REPO_DIR)"
+  path_in_repo "$OUT" || die "docker writer --out must be under the repo ($REPO_DIR)"
+  path_in_repo "$PAYLOAD" || die "docker writer --payload must be under the repo ($REPO_DIR)"
   log "writer image $WRITER_IMAGE"
   docker build -t "$WRITER_IMAGE" -f "$IMAGE_DIR/Dockerfile" "$IMAGE_DIR"
   mkdir -p "$(dirname "$OUT")"
-  docker_args=()
-  for a in "${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}"; do
-    if [[ $a == "$REPO_DIR"/* ]]; then
-      docker_args+=("/src${a#"$REPO_DIR"}")
-    else
-      docker_args+=("$a")
-    fi
-  done
+  docker_args=(
+    --seed "$(to_src "$SEED")"
+    --out "$(to_src "$OUT")"
+    --payload "$(to_src "$PAYLOAD")"
+    --size "$SIZE"
+    --esp-mib "$ESP_MIB"
+    --sys-mib "$SYS_MIB"
+  )
+  [[ $CLEAN -eq 1 ]] && docker_args+=(--clean)
   exec docker run --rm --privileged \
     -e HOST_UID="$(id -u)" \
     -e HOST_GID="$(id -g)" \
     -v "$REPO_DIR:/src" \
     -w /src \
     "$WRITER_IMAGE" \
-    "${docker_args[@]+"${docker_args[@]}"}"
+    "${docker_args[@]}"
 fi
 
 need() { command -v "$1" >/dev/null || die "$1 not installed"; }
@@ -109,6 +126,15 @@ detach_image_loops "fbl-live.img"
 [[ -f $SEED/initrd ]] || die "no initrd in $SEED"
 [[ -d $PAYLOAD ]] || die "no payload at $PAYLOAD"
 
+casper_need=$((32 * 1024 * 1024))
+for f in filesystem.squashfs vmlinuz initrd; do
+  casper_need=$((casper_need + $(stat -c %s "$SEED/$f")))
+done
+casper_cap=$((SYS_MIB * 1024 * 1024))
+if (( casper_need >= casper_cap )); then
+  die "casper files need ${casper_need} bytes; FBL-SYS is ${SYS_MIB}MiB"
+fi
+
 VERSION=unknown
 if [[ -f $SEED/os-release ]]; then
   VERSION=$(awk -F= '/^VERSION_ID=/{gsub(/"/,"",$2); print $2}' "$SEED/os-release")
@@ -140,7 +166,7 @@ resolve_efi() {
 
 sector_field() {
   # sgdisk -i N: "First sector: 2048 (at 1024.0 KiB)"
-  sgdisk -i "$1" "$OUT" | awk -F: -v key="$2" '
+  LC_ALL=C sgdisk -i "$1" "$OUT" | awk -F: -v key="$2" '
     $1 ~ key { gsub(/^[ \t]+/, "", $2); split($2, a, / /); print a[1]; exit }
   '
 }
@@ -256,13 +282,15 @@ else
   cp -a "$PAYLOAD"/. "$MNT/data/"
 fi
 install -d -m 0755 "$MNT/data/wallpapers" "$MNT/data/images"
-if [[ ! -f $MNT/data/wallpapers/dark.jpg && -d $REPO_DIR/docs/assets/Wallpaper ]]; then
-  # First file → dark, second → light. Names are the mockup photos.
-  mapfile -t walls < <(find "$REPO_DIR/docs/assets/Wallpaper" -maxdepth 1 -type f \
-    \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \) | sort)
-  if [[ ${#walls[@]} -ge 2 ]]; then
-    install -m 0644 "${walls[0]}" "$MNT/data/wallpapers/dark.jpg"
-    install -m 0644 "${walls[1]}" "$MNT/data/wallpapers/light.jpg"
+wall_src=$REPO_DIR/docs/assets/Wallpaper
+if [[ -d $wall_src ]]; then
+  if [[ ! -f $MNT/data/wallpapers/dark.jpg && -f $wall_src/annie-spratt-nJGaLopCqJk-unsplash.jpg ]]; then
+    install -m 0644 "$wall_src/annie-spratt-nJGaLopCqJk-unsplash.jpg" \
+      "$MNT/data/wallpapers/dark.jpg"
+  fi
+  if [[ ! -f $MNT/data/wallpapers/light.jpg && -f $wall_src/ands-mahardika--MRPyzpWsh0-unsplash.jpg ]]; then
+    install -m 0644 "$wall_src/ands-mahardika--MRPyzpWsh0-unsplash.jpg" \
+      "$MNT/data/wallpapers/light.jpg"
   fi
 fi
 (
@@ -294,10 +322,9 @@ if [[ -n ${HOST_UID:-} ]]; then
 fi
 
 log "partitions"
-sgdisk -p "$OUT"
+LC_ALL=C sgdisk -p "$OUT"
 log "wrote $OUT"
 du -h "$OUT" | awk '{print}'
-# Sparse file: also show allocated size
 if command -v stat >/dev/null; then
   log "allocated $(stat -c %s "$OUT" | awk '{printf "%.1fG logical\n", $1/1024/1024/1024}') / $(stat -c %b "$OUT" | awk '{printf "%.1fG on disk\n", $1*512/1024/1024/1024}')"
 fi

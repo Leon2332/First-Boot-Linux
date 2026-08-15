@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""First Boot Linux stub chooser.
-
-Fullscreen GTK4 window for the cage kiosk. No catalog, no install — that is
-step 5. This only proves the live session starts a window, not a desktop.
-"""
+"""Fullscreen GTK4 chooser for the First Boot kiosk session."""
 
 from __future__ import annotations
 
