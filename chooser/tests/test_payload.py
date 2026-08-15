@@ -249,6 +249,47 @@ class LoadPayloadTests(unittest.TestCase):
         self.assertEqual(mint.editions[0].action, "download")
         self.assertEqual(mint.editions[1].action, "download")
 
+    def test_recommended_download_only_is_ok(self) -> None:
+        windows = {
+            "id": "ms-windows",
+            "name": "MS Windows",
+            "version": "11",
+            "tagline": "Familiar and widely used",
+            "description": "Download only.",
+            "family": "windows",
+            "install": "windows",
+            "editions": [
+                {
+                    "id": "windows-11",
+                    "name": "Windows 11",
+                    "default": True,
+                    "local": False,
+                    "url": "https://example.invalid/windows.iso",
+                    "sha256": ZERO,
+                    "size_bytes": 6500000000,
+                }
+            ],
+        }
+        _write(
+            self.tmp,
+            "catalog.json",
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "recommended": [UBUNTU, windows],
+                    "catalog": [],
+                }
+            ),
+        )
+        p = load_payload(self.tmp)
+        self.assertEqual([d.id for d in p.recommended], ["ubuntu", "ms-windows"])
+        win = next(d for d in p.recommended if d.id == "ms-windows")
+        self.assertEqual(win.install, "windows")
+        self.assertEqual(win.family, "windows")
+        self.assertFalse(win.default_edition.claimed_local)
+        self.assertFalse(win.default_edition.available)
+        self.assertEqual(win.default_edition.action, "download")
+
     def test_edition_is_present_rejects_unsafe(self) -> None:
         self.assertFalse(edition_is_present(self.tmp, "../catalog.json"))
         self.assertFalse(edition_is_present(self.tmp, "/etc/passwd"))

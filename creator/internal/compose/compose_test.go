@@ -47,6 +47,7 @@ func TestWriteTinyImage(t *testing.T) {
 		Distros: []catalog.Distro{{
 			ID: "ubuntu", Name: "Ubuntu", Version: "26.04 LTS",
 			Tagline: "t", Description: "d", Family: "ubuntu",
+			Redistributable: true,
 			Install: strp("ubuntu-autoinstall"), CanStage: true, SuggestedDefault: true,
 			Editions: []catalog.Edition{{
 				ID: "gnome", Name: "GNOME", Default: true,

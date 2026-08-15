@@ -51,6 +51,7 @@
         "tagline",
         "description",
         "family",
+        "redistributable",
         "install",
         "can_stage",
         "suggested_default",
@@ -64,10 +65,14 @@
         "description": { "type": "string", "minLength": 1 },
         "family": {
           "type": "string",
-          "enum": ["ubuntu", "mint", "fedora", "debian", "suse", "other"]
+          "enum": ["ubuntu", "mint", "fedora", "debian", "suse", "windows", "bsd", "other"]
+        },
+        "redistributable": {
+          "type": "boolean",
+          "description": "We may copy an official edition onto payload/images/. False for licenses that forbid redistribution (e.g. MS Windows). Independent of install."
         },
         "install": {
-          "description": "Install driver id, or null if we cannot install this distro yet.",
+          "description": "Install driver id, or null if we cannot install this distro yet. windows and freebsd are reserved; no driver yet.",
           "anyOf": [
             {
               "type": "string",
@@ -75,7 +80,9 @@
                 "ubuntu-autoinstall",
                 "mint",
                 "fedora-kickstart",
-                "debian-preseed"
+                "debian-preseed",
+                "windows",
+                "freebsd"
               ]
             },
             { "type": "null" }
@@ -83,18 +90,41 @@
         },
         "can_stage": {
           "type": "boolean",
-          "description": "Creator may copy an edition ISO to payload/images/. True only when install is set."
+          "description": "Creator may copy an edition ISO to payload/images/. True only when install is set and redistributable is true."
         },
         "suggested_default": {
           "type": "boolean",
-          "description": "Pre-tick in the creator. True only when can_stage is true."
+          "description": "Pre-tick in the creator. Requires install. May be true when redistributable is false (download-only recommended)."
         },
         "editions": {
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/edition" }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "redistributable": { "const": false } },
+            "required": ["redistributable"]
+          },
+          "then": {
+            "properties": { "can_stage": { "const": false } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "can_stage": { "const": true } },
+            "required": ["can_stage"]
+          },
+          "then": {
+            "properties": {
+              "redistributable": { "const": true },
+              "install": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      ]
     },
     "edition": {
       "type": "object",

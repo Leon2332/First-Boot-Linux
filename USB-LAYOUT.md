@@ -73,7 +73,7 @@ USB
         └── linuxmint-22.3-cinnamon-64bit.iso
 ```
 
-`images/` only contains what this retailer marked recommended / on-disk. Distros that are catalog-only are not on the stick; the chooser downloads those later. v1 may stage only distros with official `can_stage` and `install` (Ubuntu, then Mint). Basenames come from `schemas/official-catalog.json` `filename` fields.
+`images/` only contains redistributable ISOs this retailer staged. Recommended can include a download-only row (official `redistributable: false`) with nothing under `images/`. Distros that are catalog-only are also not on the stick; the chooser downloads those later. v1 may stage only distros with official `can_stage`, `redistributable`, and `install` (Ubuntu, then Mint). Basenames come from `schemas/official-catalog.json` `filename` fields.
 
 ## What each payload file is
 

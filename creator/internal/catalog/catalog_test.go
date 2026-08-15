@@ -13,8 +13,8 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 		t.Fatalf("load: %v", err)
 	}
 	u := cat.Distro("ubuntu")
-	if u == nil || !u.Stageable() {
-		t.Fatalf("ubuntu should be stageable")
+	if u == nil || !u.Redistributable || !u.Stageable() {
+		t.Fatalf("ubuntu should be redistributable and stageable")
 	}
 	if u.DefaultEdition() == nil || u.DefaultEdition().SHA256 == nil {
 		t.Fatalf("ubuntu default edition not pinned")
@@ -86,6 +86,66 @@ func TestBuildShop(t *testing.T) {
 		t.Fatalf("empty selection must be rejected")
 	}
 }
+
+func TestBuildShopDownloadOnlyRecommended(t *testing.T) {
+	url := "https://example.invalid/windows.iso"
+	sum := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	size := int64(6 << 30)
+	install := "windows"
+	off := &Official{
+		SchemaVersion: 1,
+		Distros: []Distro{
+			{
+				ID: "ubuntu", Name: "Ubuntu", Version: "26.04 LTS",
+				Tagline: "t", Description: "d", Family: "ubuntu",
+				Redistributable: true, Install: strp("ubuntu-autoinstall"),
+				CanStage: true, SuggestedDefault: true,
+				Editions: []Edition{{
+					ID: "gnome", Name: "GNOME", Default: true,
+					Filename: "ubuntu.iso", URL: &url, SHA256: &sum, SizeBytes: &size,
+				}},
+			},
+			{
+				ID: "ms-windows", Name: "MS Windows", Version: "11",
+				Tagline: "t", Description: "d", Family: "windows",
+				Redistributable: false, Install: &install,
+				CanStage: false, SuggestedDefault: false,
+				Editions: []Edition{{
+					ID: "windows-11", Name: "Windows 11", Default: true,
+					Filename: "windows.iso", URL: &url, SHA256: &sum, SizeBytes: &size,
+				}},
+			},
+		},
+	}
+	if off.Distro("ms-windows").Stageable() {
+		t.Fatal("windows must not be stageable")
+	}
+	if !off.Distro("ms-windows").Offerable() {
+		t.Fatal("windows should be offerable as download-only")
+	}
+	shop, err := BuildShop(off, []string{"ubuntu", "ms-windows"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(shop.Recommended) != 2 {
+		t.Fatalf("recommended %d", len(shop.Recommended))
+	}
+	win := shop.Recommended[1]
+	if win.ID != "ms-windows" || win.Install != "windows" || win.Family != "windows" {
+		t.Fatalf("windows row %+v", win)
+	}
+	if len(win.Editions) != 1 || win.Editions[0].Local || win.Editions[0].File != "" || win.Editions[0].URL == "" {
+		t.Fatalf("windows must be download-only: %+v", win.Editions)
+	}
+	if !shop.Recommended[0].Editions[0].Local {
+		t.Fatal("ubuntu should still be local")
+	}
+	if len(shop.LocalEditions()) != 1 {
+		t.Fatalf("local editions %d", len(shop.LocalEditions()))
+	}
+}
+
+func strp(s string) *string { return &s }
 
 func TestRetailerFile(t *testing.T) {
 	dir := t.TempDir()

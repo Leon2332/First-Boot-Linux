@@ -6,8 +6,9 @@
 
 A disposable first-boot appliance for PCs and laptops. Retailers pre-install it. The buyer picks a Linux distribution. First Boot Linux then installs that system and replaces itself.
 
-![First Boot Linux screenshot](docs/screenshot_2026-08-15_dark.png)
-![First Boot Linux screenshot 2](docs/screenshot_2026-08-15_light.png)
+![First Boot Linux screenshot](docs/screenshots/screenshot_2026-08-15_dark.png)
+<p align="center"><i>First Boot Linux desktop environment</i></p>
+
 
 ## What it is for
 
@@ -21,7 +22,7 @@ When someone unboxes a machine, they should not be locked into an operating syst
 
 
 MS Windows acquired unnatural levels of popularity through pre-installs on new hardware. This alternative should have existed ~20 years ago.
-By all means, a retailer may configure their iso to provide Linux distros, BSD or even MS Windows (if possible).
+By all means, a retailer may configure their FBL intall to provide Linux distros, BSD or even MS Windows (if possible).
 
 <i>"It's not for us to tell people what they should want to use. It's for us to provide a choice."</i>
 
@@ -33,6 +34,16 @@ By all means, a retailer may configure their iso to provide Linux distros, BSD o
 | **PC / laptop retailers** | Ship hardware with real distro choice without imaging one OS per order. |
 | **Independent refurbishers & shops** | Offer a clean Linux path out of the box without forcing any single distro on every customer. |
 
-## Current status
 
-Alpha
+<img src="docs/Logo/First%20Boot%20Linux.png" alt="First Boot Linux" width="128" height="128" />
+
+# First Boot USB Creator
+
+The USB Creator provides a method for pre-installing First Boot Linux with its configuration and iso packages. Simply complete the configuration steps and write to a flash drive. Then install on one or multiple devices.
+> [!Note]
+> Currently, only an AppImage is available.
+
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-01.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-02.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-03.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-04.png)

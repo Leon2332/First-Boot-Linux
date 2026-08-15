@@ -90,6 +90,7 @@ func (s *session) state(w http.ResponseWriter, r *http.Request) {
 		Tagline          string `json:"tagline"`
 		Description      string `json:"description"`
 		Stageable        bool   `json:"stageable"`
+		Redistributable  bool   `json:"redistributable"`
 		SuggestedDefault bool   `json:"suggested_default"`
 		Edition          string `json:"edition"`
 		Size             string `json:"size"`
@@ -100,7 +101,8 @@ func (s *session) state(w http.ResponseWriter, r *http.Request) {
 		item := distro{
 			ID: d.ID, Name: d.Name, Version: d.Version,
 			Tagline: d.Tagline, Description: d.Description,
-			Stageable: d.Stageable(), SuggestedDefault: d.SuggestedDefault,
+			Stageable: d.Stageable(), Redistributable: d.Redistributable,
+			SuggestedDefault: d.SuggestedDefault,
 			Logo: assets.DistroLogo(d.ID) != "",
 		}
 		if ed := d.DefaultEdition(); ed != nil {

@@ -38,8 +38,9 @@ Each distro:
 | --- | --- |
 | `id` | Stable kebab-case id (logo key, chooser id) |
 | `name`, `version`, `tagline`, `description` | UI copy |
-| `family` | Distro family (`ubuntu`, `mint`, `fedora`, `debian`, `suse`, `other`) |
-| `install` | Install driver id, or `null` if we cannot install it yet |
+| `family` | Distro family (`ubuntu`, `mint`, `fedora`, `debian`, `suse`, `windows`, `bsd`, `other`) |
+| `redistributable` | We may copy an official ISO onto `payload/images/`. False when the license forbids redistribution (MS Windows). Independent of `install`. |
+| `install` | Install driver id, or `null` if we cannot install it yet. `windows` and `freebsd` are reserved; no driver yet. |
 | `can_stage` | Creator may copy an edition ISO onto `payload/images/` |
 | `suggested_default` | Pre-tick in the creator GUI |
 | `editions[]` | One ISO per desktop (or flavor) |
@@ -58,9 +59,10 @@ Each edition:
 
 Rules:
 
-- `can_stage` is true only when `install` is set. Do not stage an ISO we cannot install.
-- `suggested_default` is true only when `can_stage` is true.
-- v1 **install** is Ubuntu (`ubuntu-autoinstall`) then Linux Mint (`mint`). Other entries are reserved ids for the GUI; the creator must not offer them as on-disk or download until `install` is set.
+- `can_stage` is true only when `install` is set **and** `redistributable` is true. Do not stage an ISO we cannot install or may not copy.
+- `redistributable: false` forces `can_stage: false`. The shop may still put that distro in `recommended` as download-only once `install` is set. The creator must never write its ISO to `images/`.
+- `suggested_default` requires `install`. It may be true when `redistributable` is false (pre-tick as download-only recommended).
+- v1 **install** is Ubuntu (`ubuntu-autoinstall`) then Linux Mint (`mint`). `windows` and `freebsd` are reserved driver ids with no implementation. Other entries stay `install: null` until a driver exists. The creator must not offer a row until `install` is set.
 - Pin `url`, `sha256`, and `size_bytes` before the creator downloads that edition. Ubuntu 26.04 desktop and Mint 22.3 (Cinnamon, MATE, Xfce) are pinned. Other rows stay `null` until an install driver exists.
 
 ## `catalog.json` (on the USB)
@@ -70,8 +72,8 @@ Self-contained shop catalog. Schema: [`catalog.schema.json`](catalog.schema.json
 ```json
 {
   "schema_version": 1,
-  "recommended": [ /* grid; at least one edition local */ ],
-  "catalog": [ /* download-only extras; no id also in recommended */ ]
+  "recommended": [ /* grid; editions may be local or download-only */ ],
+  "catalog": [ /* extras; no id also in recommended */ ]
 }
 ```
 
@@ -100,7 +102,7 @@ Each edition on the stick:
 | `sha256` | yes | 64 lowercase hex |
 | `size_bytes` | yes | ISO size in bytes |
 
-The creator sets `local: true` and `file` only after the ISO is copied and verified. Recommended entries must have at least one local default edition.
+The creator sets `local: true` and `file` only after the ISO is copied and verified. Recommended entries may be entirely download-only when the official row is not redistributable. Never set `local: true` on a non-redistributable edition.
 
 Logos are bundled in the chooser by `id` (`assets/distros/<id>.png` in the mockup). Not payload files.
 
@@ -114,5 +116,5 @@ Logos are bundled in the chooser by `id` (`assets/distros/<id>.png` in the mocku
 2. `catalog.json` matches `catalog.schema.json`.
 3. Every distro `id` / edition exists in `official-catalog.json`.
 4. Every `local` edition file exists under `images/` and matches `sha256`.
-5. No `local` / recommended edition unless official `can_stage` and `install` are set.
+5. No `local` edition unless official `can_stage`, `redistributable`, and `install` are set. Recommended may list a non-redistributable distro with every edition `local: false`.
 6. No `..` or absolute paths.

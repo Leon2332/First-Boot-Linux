@@ -23,6 +23,7 @@ type Distro struct {
 	Tagline           string    `json:"tagline"`
 	Description       string    `json:"description"`
 	Family            string    `json:"family"`
+	Redistributable   bool      `json:"redistributable"`
 	Install           *string   `json:"install"`
 	CanStage          bool      `json:"can_stage"`
 	SuggestedDefault  bool      `json:"suggested_default"`
@@ -121,11 +122,28 @@ func (d *Distro) DefaultEdition() *Edition {
 }
 
 func (d *Distro) Stageable() bool {
-	if !d.CanStage || d.Install == nil || *d.Install == "" {
+	if !d.Redistributable || !d.CanStage || d.Install == nil || *d.Install == "" {
 		return false
 	}
 	ed := d.DefaultEdition()
 	return ed != nil && ed.Pinned()
+}
+
+// Offerable is true when the shop catalog may list this distro.
+// Redistributable rows need can_stage. Non-redistributable rows need install
+// and a pinned default; they go in recommended as download-only.
+func (d *Distro) Offerable() bool {
+	if d.Install == nil || *d.Install == "" {
+		return false
+	}
+	ed := d.DefaultEdition()
+	if ed == nil || !ed.Pinned() {
+		return false
+	}
+	if d.Stageable() {
+		return true
+	}
+	return !d.Redistributable
 }
 
 func (e *Edition) Pinned() bool {
@@ -196,16 +214,17 @@ func sanitizeValue(s string) string {
 }
 
 // BuildShop turns the ticked official ids into a shop catalog.json.
-// Each ticked distro is recommended; its default edition is local. Other
-// pinned editions of that distro stay as downloads. Unticked rows are omitted
-// (shop catalog cannot carry install: null).
-func BuildShop(off *Official, stagedIDs []string) (*Shop, error) {
-	if len(stagedIDs) == 0 {
+// Each ticked distro is recommended. Stageable defaults become local; a
+// non-redistributable row is recommended with every edition as a download.
+// Other pinned editions of a staged distro stay as downloads. Unticked rows
+// are omitted (shop catalog cannot carry install: null).
+func BuildShop(off *Official, selectedIDs []string) (*Shop, error) {
+	if len(selectedIDs) == 0 {
 		return nil, fmt.Errorf("pick at least one distro to keep on the USB")
 	}
 	seen := map[string]bool{}
 	shop := &Shop{SchemaVersion: 1, Recommended: []ShopDistro{}, Catalog: []ShopDistro{}}
-	for _, id := range stagedIDs {
+	for _, id := range selectedIDs {
 		if seen[id] {
 			return nil, fmt.Errorf("duplicate distro %s", id)
 		}
@@ -214,8 +233,8 @@ func BuildShop(off *Official, stagedIDs []string) (*Shop, error) {
 		if d == nil {
 			return nil, fmt.Errorf("unknown distro %s", id)
 		}
-		if !d.Stageable() {
-			return nil, fmt.Errorf("%s cannot be staged yet", d.Name)
+		if !d.Offerable() {
+			return nil, fmt.Errorf("%s cannot be offered yet", d.Name)
 		}
 		sd, err := shopDistro(d)
 		if err != nil {
@@ -251,13 +270,16 @@ func shopDistro(d *Distro) (ShopDistro, error) {
 			SHA256:    *ed.SHA256,
 			SizeBytes: *ed.SizeBytes,
 		}
-		if ed.Default {
+		if d.Stageable() && ed.Default {
 			se.Local = true
 			se.File = "images/" + ed.Filename
 			haveDefault = true
 		} else {
 			se.Local = false
 			se.URL = *ed.URL
+			if ed.Default {
+				haveDefault = true
+			}
 		}
 		sd.Editions = append(sd.Editions, se)
 	}

@@ -13,9 +13,18 @@ from dataclasses import dataclass, field
 
 SCHEMA_VERSION = 1
 DEFAULT_PAYLOAD = "/run/payload"
-FAMILIES = frozenset({"ubuntu", "mint", "fedora", "debian", "suse", "other"})
+FAMILIES = frozenset(
+    {"ubuntu", "mint", "fedora", "debian", "suse", "windows", "bsd", "other"}
+)
 INSTALL_DRIVERS = frozenset(
-    {"ubuntu-autoinstall", "mint", "fedora-kickstart", "debian-preseed"}
+    {
+        "ubuntu-autoinstall",
+        "mint",
+        "fedora-kickstart",
+        "debian-preseed",
+        "windows",
+        "freebsd",
+    }
 )
 ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")

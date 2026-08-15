@@ -13,7 +13,7 @@
     },
     "recommended": {
       "type": "array",
-      "description": "Chooser grid. Each entry must have at least one local edition.",
+      "description": "Chooser grid. Editions may be local or download-only. Non-redistributable official rows (e.g. MS Windows) must not have local editions.",
       "items": { "$ref": "#/$defs/distro" }
     },
     "catalog": {
@@ -52,7 +52,7 @@
         "description": { "type": "string", "minLength": 1 },
         "family": {
           "type": "string",
-          "enum": ["ubuntu", "mint", "fedora", "debian", "suse", "other"]
+          "enum": ["ubuntu", "mint", "fedora", "debian", "suse", "windows", "bsd", "other"]
         },
         "install": {
           "type": "string",
@@ -60,7 +60,9 @@
             "ubuntu-autoinstall",
             "mint",
             "fedora-kickstart",
-            "debian-preseed"
+            "debian-preseed",
+            "windows",
+            "freebsd"
           ]
         },
         "editions": {
