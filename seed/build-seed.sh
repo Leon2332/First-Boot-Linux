@@ -170,6 +170,9 @@ copy_overlay() {
   done < <(cd "$SEED_DIR/overlay" && find . -print0)
   chmod 440 "$ROOTFS/etc/sudoers.d/firstboot"
   chmod 755 "$ROOTFS/usr/share/initramfs-tools/scripts/casper-bottom/27payload"
+  if [[ -f $ROOTFS/usr/share/initramfs-tools/scripts/casper-bottom/28livepass ]]; then
+    chmod 755 "$ROOTFS/usr/share/initramfs-tools/scripts/casper-bottom/28livepass"
+  fi
   if [[ -f $ROOTFS/usr/libexec/firstboot/print-secureboot ]]; then
     chmod 755 "$ROOTFS/usr/libexec/firstboot/print-secureboot"
   fi

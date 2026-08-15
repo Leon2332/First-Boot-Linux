@@ -6,8 +6,8 @@
 
 A disposable first-boot appliance for PCs and laptops. Retailers pre-install it. The buyer picks a Linux distribution. First Boot Linux then installs that system and replaces itself.
 
-![First Boot Linux screenshot](docs/Screenshot.jpg)
-![First Boot Linux screenshot 2](docs/Screenshot2.jpg)
+![First Boot Linux screenshot](docs/screenshot_2026-08-15_dark.png)
+![First Boot Linux screenshot 2](docs/screenshot_2026-08-15_light.png)
 
 ## What it is for
 

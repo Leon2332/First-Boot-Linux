@@ -61,7 +61,7 @@ Rules:
 - `can_stage` is true only when `install` is set. Do not stage an ISO we cannot install.
 - `suggested_default` is true only when `can_stage` is true.
 - v1 **install** is Ubuntu (`ubuntu-autoinstall`) then Linux Mint (`mint`). Other entries are reserved ids for the GUI; the creator must not offer them as on-disk or download until `install` is set.
-- Pin `url`, `sha256`, and `size_bytes` before the creator ships. Example / unpinned values stay `null`.
+- Pin `url`, `sha256`, and `size_bytes` before the creator downloads that edition. Ubuntu 26.04 desktop and Mint 22.3 (Cinnamon, MATE, Xfce) are pinned. Other rows stay `null` until an install driver exists.
 
 ## `catalog.json` (on the USB)
 

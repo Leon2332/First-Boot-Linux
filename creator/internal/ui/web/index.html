@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>First Boot — USB creator</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="/api/icon">
+</head>
+<body>
+  <aside class="rail">
+    <div class="brand">
+      <img src="/api/icon" alt="" width="36" height="36">
+      <div>
+        <strong>First Boot</strong>
+        <span>USB creator</span>
+      </div>
+    </div>
+    <nav id="steps"></nav>
+  </aside>
+  <main>
+    <section id="page-0" class="page">
+      <h1>Shop details</h1>
+      <p class="lead">This is what the customer sees in the footer, plus the password you will use if you need to support the PC.</p>
+      <label>Shop name
+        <input id="name" type="text" maxlength="80" placeholder="Example Computers" autocomplete="organization">
+      </label>
+      <label>Support
+        <input id="support" type="text" maxlength="160" placeholder="support@example.com  /  012 345 6789">
+      </label>
+      <div class="row">
+        <label>Support password
+          <input id="pass" type="password" autocomplete="new-password" placeholder="Used on tty2 and for sudo">
+        </label>
+        <label>Confirm
+          <input id="pass2" type="password" autocomplete="new-password" placeholder="Same password again">
+        </label>
+      </div>
+      <label class="check">
+        <input id="empty-pw" type="checkbox">
+        <span>VM / test image — leave the live user unlocked</span>
+      </label>
+      <p class="note">The password is hashed onto the live system at write time. It is not stored in retailer.conf.</p>
+    </section>
+
+    <section id="page-1" class="page hidden">
+      <h1>Wallpapers</h1>
+      <p class="lead">The live session switches between these with Dark Style. First Boot defaults are already selected.</p>
+      <div class="walls">
+        <figure>
+          <figcaption>Dark</figcaption>
+          <img id="dark-preview" alt="Dark wallpaper">
+          <label class="btn ghost">Choose photo…
+            <input id="dark-file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+          </label>
+        </figure>
+        <figure>
+          <figcaption>Light</figcaption>
+          <img id="light-preview" alt="Light wallpaper">
+          <label class="btn ghost">Choose photo…
+            <input id="light-file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+          </label>
+        </figure>
+      </div>
+      <button type="button" class="btn ghost" id="reset-walls">Use First Boot defaults</button>
+    </section>
+
+    <section id="page-2" class="page hidden">
+      <h1>Recommended distros</h1>
+      <p class="lead">Ticked editions are copied onto the USB. The customer sees them first, already on disk.</p>
+      <div id="ready" class="cards"></div>
+      <h2>Coming later</h2>
+      <p class="note">These stay in the official menu. They cannot go on the stick until an install driver exists.</p>
+      <div id="later" class="cards"></div>
+    </section>
+
+    <section id="page-3" class="page hidden">
+      <h1>Write</h1>
+      <p class="lead">The creator builds a partitioned disk image first. Writing a stick only needs permission for that last copy.</p>
+      <p id="size" class="size"></p>
+      <p id="hint" class="note"></p>
+      <fieldset>
+        <label class="check"><input type="radio" name="target" value="image" checked> Save a disk image (boot it in a VM, or write later)</label>
+        <label class="check"><input type="radio" name="target" value="usb"> Write a USB stick now</label>
+      </fieldset>
+      <label>Disk image
+        <input id="img-path" type="text" spellcheck="false">
+      </label>
+      <label>USB stick
+        <span class="row">
+          <select id="device"></select>
+          <button type="button" class="btn ghost" id="refresh-disks">Refresh</button>
+        </span>
+      </label>
+      <div class="progress-wrap">
+        <div class="bar"><span id="bar"></span></div>
+        <p id="status">Ready.</p>
+      </div>
+    </section>
+
+    <footer>
+      <p id="error"></p>
+      <div class="actions">
+        <button type="button" class="btn ghost" id="back">Back</button>
+        <button type="button" class="btn primary" id="next">Continue</button>
+      </div>
+    </footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

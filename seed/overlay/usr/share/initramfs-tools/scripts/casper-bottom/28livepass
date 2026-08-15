@@ -1,0 +1,52 @@
+#!/bin/sh
+# Apply the shop support password from FBL-SYS. Missing file keeps the empty
+# live-user password used by the VM loop.
+
+PREREQ="27payload"
+DESCRIPTION="Applying First Boot live-user password..."
+
+prereqs()
+{
+       echo "$PREREQ"
+}
+
+case $1 in
+prereqs)
+       prereqs
+       exit 0
+       ;;
+esac
+
+. /scripts/casper-functions
+
+log_begin_msg "$DESCRIPTION"
+
+hashfile=""
+for d in /cdrom /root/cdrom /run/live/medium; do
+       if [ -f "$d/firstboot/live-user.hash" ]; then
+               hashfile="$d/firstboot/live-user.hash"
+               break
+       fi
+done
+
+if [ -n "$hashfile" ]; then
+       hash=$(tr -d '\n\r' < "$hashfile")
+       case "$hash" in
+       \$6\$[A-Za-z0-9./$]*)
+               if [ -f /root/etc/shadow ]; then
+                       awk -F: -v h="$hash" 'BEGIN { OFS=":" } $1=="firstboot" { $2=h } { print }' \
+                               /root/etc/shadow > /root/etc/shadow.new &&
+                               mv /root/etc/shadow.new /root/etc/shadow
+                       chmod 640 /root/etc/shadow
+                       chown root:shadow /root/etc/shadow 2>/dev/null || chown root:root /root/etc/shadow
+               fi
+               if [ -d /root/etc/sudoers.d ]; then
+                       printf 'Defaults:firstboot !lecture\nfirstboot ALL=(ALL:ALL) ALL\n' \
+                               > /root/etc/sudoers.d/firstboot
+                       chmod 440 /root/etc/sudoers.d/firstboot
+               fi
+               ;;
+       esac
+fi
+
+log_end_msg

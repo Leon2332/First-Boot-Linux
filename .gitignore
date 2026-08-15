@@ -30,6 +30,8 @@ build/
 *.iso
 *.img
 *.qcow2
+creator/bin/
+creator/.link/
 
 # Local working notes
 GROK.md
