@@ -48,18 +48,6 @@
       ],
     },
     {
-      id: "pop-os",
-      name: "Pop!_OS",
-      desktop: "COSMIC",
-      tagline: "Built for productivity",
-      desc: "A focused desktop with strong NVIDIA support and window tiling. Popular for creators and developers.",
-      version: "24.04 LTS",
-      recommended: true,
-      local: true,
-      logo: LOGO("pop-os"),
-      desktops: [{ id: "cosmic", name: "COSMIC", size: "~2.9 GB", local: true }],
-    },
-    {
       id: "bazzite",
       name: "Bazzite",
       desktop: "KDE Plasma",
@@ -73,6 +61,18 @@
         { id: "plasma", name: "KDE Plasma", size: "~3.5 GB", local: true },
         { id: "gnome", name: "GNOME", size: "~3.2 GB", local: false },
       ],
+    },
+    {
+      id: "ms-windows",
+      name: "MS Windows",
+      desktop: "Windows 11",
+      tagline: "Familiar and widely used",
+      desc: "The desktop most people already know. Broad software and hardware support, with a familiar Start menu and settings.",
+      version: "11",
+      recommended: true,
+      local: false,
+      logo: LOGO("ms-windows"),
+      desktops: [{ id: "windows-11", name: "Windows 11", size: "~6.5 GB", local: false }],
     },
   ];
 
@@ -237,6 +237,21 @@
         { id: "plasma", name: "KDE Plasma", size: "~2.5 GB", local: false },
       ],
     },
+    {
+      id: "free-bsd",
+      name: "FreeBSD",
+      desktop: "KDE Plasma",
+      tagline: "The other free Unix",
+      desc: "A reliable Unix-like system with a strong networking stack, ports collection, and optional desktop environments.",
+      version: "15.0",
+      local: false,
+      logo: LOGO("free-bsd"),
+      desktops: [
+        { id: "plasma", name: "KDE Plasma", size: "~3.2 GB", local: false },
+        { id: "gnome", name: "GNOME", size: "~3.0 GB", local: false },
+        { id: "xfce", name: "Xfce", size: "~2.4 GB", local: false },
+      ],
+    },
   ];
 
   const CATALOG = RECOMMENDED.concat(CATALOG_EXTRA);
@@ -327,6 +342,8 @@
     detailWarnText: $("detail-warn-text"),
     detailActions: $("detail-actions"),
     installBtn: $("install-btn"),
+    detailProgress: $("detail-progress"),
+    detailProgressFill: $("detail-progress-fill"),
     installLogo: $("install-logo"),
     installTitle: $("install-title"),
     installSubtitle: $("install-subtitle"),
@@ -962,13 +979,9 @@
 
     renderWifi();
 
-    if (
-      state.selected &&
-      state.detailMode === "catalog" &&
-      els.screenDetail &&
-      !els.screenDetail.hidden
-    ) {
-      renderDeOptions(state.selected);
+    if (state.selected && els.screenDetail && !els.screenDetail.hidden) {
+      if (state.detailMode === "catalog") renderDeOptions(state.selected);
+      else renderRecommendedActions(state.selected);
     }
   }
 
@@ -1129,6 +1142,11 @@
     });
   }
 
+  function recommendedEdition(d) {
+    if (d.desktops && d.desktops.length) return d.desktops[0];
+    return { id: "default", name: d.desktop, local: !!d.local };
+  }
+
   function editionKey(d, de) {
     return `${d.id}:${de.id}`;
   }
@@ -1223,6 +1241,52 @@
     if (size) size.textContent = `${de.size || ""} · ${dl.label} ${dl.pct}%`.replace(/^ · /, "");
   }
 
+  function setDetailProgress(dl) {
+    if (!els.detailProgress) return;
+    const downloading = dl?.status === "downloading";
+    els.detailProgress.hidden = !downloading;
+    if (!downloading) return;
+    const pct = dl.pct || 0;
+    if (els.detailProgressFill) els.detailProgressFill.style.width = pct + "%";
+    els.detailProgress.setAttribute("aria-valuenow", String(pct));
+  }
+
+  function renderRecommendedActions(d) {
+    const de = recommendedEdition(d);
+    const onDisk = isEditionOnDisk(d, de);
+    const dl = editionDownload(d, de);
+    const downloading = dl?.status === "downloading";
+    const offline = !state.network.connected;
+
+    els.detailDesktop.hidden = false;
+    els.detailDesktop.textContent = d.desktop || "";
+    els.deOptions.hidden = true;
+    els.deOptionsList.innerHTML = "";
+    els.detailActions.classList.remove("catalog-mode");
+    els.installBtn.hidden = false;
+
+    if (onDisk) {
+      els.installBtn.textContent = "Install";
+      els.installBtn.disabled = false;
+      els.detailWarn.hidden = true;
+      setDetailProgress(null);
+      return;
+    }
+
+    els.installBtn.textContent = downloading
+      ? `${dl.label} ${dl.pct}%`
+      : "Download";
+    els.installBtn.disabled = offline || downloading;
+    if (offline) {
+      els.detailWarn.hidden = false;
+      els.detailWarnText.textContent =
+        "Connect to a network to download editions that are not on disk.";
+    } else {
+      els.detailWarn.hidden = true;
+    }
+    setDetailProgress(dl);
+  }
+
   function openDetail(id, mode) {
     const d = findDistro(id);
     if (!d) return;
@@ -1238,16 +1302,10 @@
     els.detailTagline.textContent = d.tagline;
     els.detailDesc.textContent = d.desc;
     els.detailWarn.hidden = true;
+    setDetailProgress(null);
 
     if (state.detailMode === "recommended") {
-      els.detailDesktop.hidden = false;
-      els.detailDesktop.textContent = d.desktop || "";
-      els.deOptions.hidden = true;
-      els.deOptionsList.innerHTML = "";
-      els.detailActions.classList.remove("catalog-mode");
-      els.installBtn.hidden = false;
-      els.installBtn.disabled = false;
-      els.installBtn.textContent = "Install";
+      renderRecommendedActions(d);
     } else {
       els.detailDesktop.hidden = true;
       els.detailDesktop.textContent = "";
@@ -1278,7 +1336,8 @@
 
     const rec = { status: "downloading", pct: 0, label: "Connecting…", timer: null };
     state.downloads[key] = rec;
-    renderDeOptions(d);
+    if (state.detailMode === "catalog") renderDeOptions(d);
+    else renderRecommendedActions(d);
 
     let i = 0;
     function tick() {
@@ -1288,8 +1347,9 @@
       if (i >= STEPS_FETCH.length) {
         if (cur.timer) clearInterval(cur.timer);
         state.downloads[key] = { status: "done", pct: 100, label: "Ready", timer: null };
-        if (state.selected === d && state.detailMode === "catalog") {
-          renderDeOptions(d);
+        if (state.selected === d) {
+          if (state.detailMode === "catalog") renderDeOptions(d);
+          else renderRecommendedActions(d);
         }
         return;
       }
@@ -1299,8 +1359,9 @@
       cur.label = step.label;
       i += 1;
 
-      if (state.selected === d && state.detailMode === "catalog") {
-        updateDeOptionProgress(d, de);
+      if (state.selected === d) {
+        if (state.detailMode === "catalog") updateDeOptionProgress(d, de);
+        else renderRecommendedActions(d);
       }
     }
 
@@ -1313,11 +1374,7 @@
     if (!d) return;
 
     if (state.detailMode === "recommended") {
-      de = {
-        id: "default",
-        name: d.desktop,
-        local: true,
-      };
+      de = recommendedEdition(d);
     }
 
     if (!de) return;

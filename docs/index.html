@@ -239,7 +239,7 @@
 
       <section class="catalog" id="catalog" aria-labelledby="catalog-title">
         <div class="chooser-heading">
-          <h2 id="catalog-title">Other distros</h2>
+          <h2 id="catalog-title">Other options</h2>
         </div>
         <div class="catalog-scroll" id="catalog-scroll">
           <div class="catalog-list" id="catalog-list" role="list"></div>
@@ -280,6 +280,18 @@
 
           <div class="detail-actions" id="detail-actions">
             <button type="button" class="btn btn-primary" id="install-btn">Install</button>
+            <div
+              class="detail-progress"
+              id="detail-progress"
+              hidden
+              role="progressbar"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="0"
+              aria-label="Download progress"
+            >
+              <div class="detail-progress-fill" id="detail-progress-fill"></div>
+            </div>
           </div>
         </div>
       </div>
