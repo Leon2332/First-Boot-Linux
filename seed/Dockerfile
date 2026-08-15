@@ -11,6 +11,8 @@ RUN apt-get update \
       ubuntu-keyring \
       shim-signed \
       grub-efi-amd64-signed \
+      sbsigntool \
+      grub-common \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src

@@ -4,7 +4,13 @@ set -u
 
 export XDG_SESSION_TYPE=wayland
 export XDG_CURRENT_DESKTOP=FirstBoot
+export FIRSTBOOT_KIOSK=1
 export GDK_BACKEND=wayland
+# GTK4 a11y / GSK / wlroots EGL abort on virtio + llvmpipe.
+export GTK_A11Y=none
+export NO_AT_BRIDGE=1
+export GSK_RENDERER="${GSK_RENDERER:-cairo}"
+export WLR_RENDERER="${WLR_RENDERER:-pixman}"
 
 drop_to_shell() {
   echo "firstboot-session: $*" >&2

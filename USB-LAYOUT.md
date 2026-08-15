@@ -33,7 +33,7 @@ USB
 ├── ESP                         (p1, FBL-ESP, FAT32)
 │   └── EFI
 │       ├── BOOT
-│       │   ├── BOOTX64.EFI     shim (Secure Boot first stage)
+│       │   ├── BOOTX64.EFI     Ubuntu shim, Microsoft-signed
 │       │   ├── grubx64.efi     gcdx64 (searches disks for /boot/grub/grub.cfg)
 │       │   ├── grub.cfg        stub: search FBL-SYS, load /boot/grub/grub.cfg
 │       │   └── mmx64.efi       MokManager, recovery only
@@ -159,7 +159,7 @@ SHA-256 of `retailer.conf`, `catalog.json`, wallpapers, and every file in `image
 
 ## Boot and mount
 
-1. Firmware loads `ESP/EFI/BOOT/BOOTX64.EFI` (shim), which loads `EFI/BOOT/grubx64.efi` (gcdx64).
+1. Firmware loads `ESP/EFI/BOOT/BOOTX64.EFI` (Ubuntu’s Microsoft-signed shim), which loads `EFI/BOOT/grubx64.efi` (Canonical-signed gcdx64). Shop PCs with Secure Boot on do not enroll a First Boot key. Initrd is unsigned (same as Ubuntu).
 2. The ESP `grub.cfg` stubs (`EFI/BOOT`, `EFI/firstboot`, `EFI/ubuntu`) search for label `FBL-SYS` and `configfile` `/boot/grub/grub.cfg`. The casper kernel command line lives on **FBL-SYS**, not on the ESP.
 3. Casper boots `filesystem.squashfs` from the live medium (`live-media=/dev/disk/by-label/FBL-SYS`). FBL-SYS is not mounted at `/run/fbl`. The ESP is not mounted at `/boot/efi` in the live session.
 4. `casper-bottom/27payload` appends `LABEL=FBL-DATA` → `/run/payload` to `/etc/fstab` (casper’s `12fstab` overwrites fstab first).

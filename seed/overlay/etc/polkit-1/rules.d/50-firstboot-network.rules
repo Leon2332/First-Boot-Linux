@@ -1,0 +1,17 @@
+// Live user may manage NetworkManager from the kiosk (Wi-Fi / Ethernet).
+polkit.addRule(function (action, subject) {
+    if (subject.user !== "firstboot") {
+        return;
+    }
+    var id = action.id;
+    if (
+        id === "org.freedesktop.NetworkManager.enable-disable-network" ||
+        id === "org.freedesktop.NetworkManager.enable-disable-wifi" ||
+        id === "org.freedesktop.NetworkManager.network-control" ||
+        id === "org.freedesktop.NetworkManager.settings.modify.own" ||
+        id === "org.freedesktop.NetworkManager.settings.modify.system" ||
+        id === "org.freedesktop.NetworkManager.wifi.scan"
+    ) {
+        return polkit.Result.YES;
+    }
+});

@@ -1,0 +1,30 @@
+#!/bin/sh
+# Emit Secure Boot state on the console for serial smoke and field debug.
+set -eu
+
+read_var() {
+  name=$1
+  for f in /sys/firmware/efi/efivars/"$name"-*; do
+    if [ -e "$f" ]; then
+      od -An -j4 -N1 -t u1 "$f" | tr -d ' \n'
+      return 0
+    fi
+  done
+  return 1
+}
+
+if [ ! -d /sys/firmware/efi ]; then
+  printf 'firstboot-sb: firmware=legacy\n'
+  exit 0
+fi
+
+if [ ! -d /sys/firmware/efi/efivars ]; then
+  printf 'firstboot-sb: efivars=missing\n'
+  exit 0
+fi
+
+sb=unknown
+setup=unknown
+sb=$(read_var SecureBoot) || sb=unknown
+setup=$(read_var SetupMode) || setup=unknown
+printf 'firstboot-sb: SecureBoot=%s SetupMode=%s\n' "$sb" "$setup"

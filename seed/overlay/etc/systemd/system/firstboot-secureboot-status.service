@@ -1,0 +1,15 @@
+[Unit]
+Description=Print First Boot Secure Boot state to the console
+DefaultDependencies=no
+After=sysinit.target
+Before=getty@tty1.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/firstboot/print-secureboot
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

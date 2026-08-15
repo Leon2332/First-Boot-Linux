@@ -12,7 +12,7 @@ It is not a desktop and not a shop remaster. The squashfs is the live root on `F
 | systemd, udev, casper, initramfs | snapd (apt-pinned out) |
 | NetworkManager, `wpasupplicant`, systemd-resolved | unattended-upgrades, update-notifier |
 | Mesa libraries | Ubuntu Pro / `cloud-init` / apport |
-| cage + GTK4 stub chooser (tty1 autologin, not a desktop) | App Center, ubiquity |
+| cage + GTK4 chooser (tty1 autologin; GNOME-like panel / QS, not a desktop) | App Center, ubiquity |
 | Disk tools: parted, gdisk, ntfs-3g, lvm2, cryptsetup, rsync | |
 | `apt` / `dpkg` (hidden from the future UI) | |
 
@@ -20,7 +20,7 @@ It is not a desktop and not a shop remaster. The squashfs is the live root on `F
 
 Retailer files (`catalog.json`, wallpapers, staged ISOs) are **not** here. They go on `FBL-DATA`.
 
-The live session is not a desktop. `getty@tty1` logs in `firstboot` and `/etc/profile.d/firstboot-kiosk.sh` execs `firstboot-session` → cage → `firstboot-chooser`. Ctrl+Alt+F2 is a debug TTY. The chooser is a stub until it reads the payload.
+The live session is not a desktop. `getty@tty1` logs in `firstboot` and `/etc/profile.d/firstboot-kiosk.sh` execs `firstboot-session` → cage → `firstboot-chooser`. Ctrl+Alt+F2 is a debug TTY. The chooser paints the mockup chrome (top bar, quick settings, NetworkManager Ethernet/Wi-Fi, power) and reads `/run/payload/catalog.json`, `retailer.conf`, and the two wallpapers. Local vs download is whether the edition file exists under `images/`. It does not install yet. The optional mockup apps (browser, terminal, system details) are listed in the grid menu and do not launch.
 
 Casper overwrites `/etc/fstab`. `casper-bottom/27payload` appends `LABEL=FBL-DATA` → `/run/payload` so the shop partition is mounted by label after live boot.
 
@@ -59,7 +59,7 @@ build/seed/
   filesystem.manifest     package + version
   vmlinuz                 copied next to the squashfs for the live disk
   initrd
-  efi/                    signed shim + gcdx64 for FBL-ESP
+  efi/                    Microsoft-signed shim + Canonical-signed gcdx64 for FBL-ESP
   os-release
   BUILDINFO
   SHA256SUMS
@@ -70,6 +70,7 @@ Check the package set without root:
 
 ```bash
 ./seed/check-packages.sh              # names exist on this Ubuntu
+./seed/check-secureboot.sh            # Microsoft shim + Canonical GRUB/kernel
 ./seed/audit.sh build/seed/filesystem.manifest
 ```
 

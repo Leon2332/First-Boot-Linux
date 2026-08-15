@@ -162,12 +162,17 @@ copy_overlay() {
   printf '%s\n' "$VERSION" > "$ROOTFS/etc/firstboot/version"
   printf '%s\n' "$SUITE" > "$ROOTFS/etc/firstboot/suite"
   chown root:root "$ROOTFS"
-  # Stay on the rootfs mount. Walking /proc while it is bound in is racy
-  # and find exits 1, which aborts the build under set -e.
-  # Before 45-kiosk.sh creates the live user (also often uid 1000).
-  find "$ROOTFS" -xdev ! -user 0 -exec chown root:root {} +
+  # Only files this function just copied. A whole-rootfs `find ! -user 0`
+  # on --skip-debootstrap rewrites /home/firstboot (uid 1000) to root.
+  local rel
+  while IFS= read -r -d '' rel; do
+    chown root:root "$ROOTFS/$rel"
+  done < <(cd "$SEED_DIR/overlay" && find . -print0)
   chmod 440 "$ROOTFS/etc/sudoers.d/firstboot"
   chmod 755 "$ROOTFS/usr/share/initramfs-tools/scripts/casper-bottom/27payload"
+  if [[ -f $ROOTFS/usr/libexec/firstboot/print-secureboot ]]; then
+    chmod 755 "$ROOTFS/usr/libexec/firstboot/print-secureboot"
+  fi
 }
 
 install_chooser() {
@@ -175,10 +180,29 @@ install_chooser() {
     "$ROOTFS/usr/bin/firstboot-chooser"
   install -D -m 0755 "$REPO_DIR/chooser/firstboot-session" \
     "$ROOTFS/usr/bin/firstboot-session"
+  install -d -m 0755 \
+    "$ROOTFS/usr/share/firstboot/python" \
+    "$ROOTFS/usr/share/firstboot/distros" \
+    "$ROOTFS/usr/share/firstboot/status" \
+    "$ROOTFS/usr/share/firstboot/apps"
+  cp -a "$REPO_DIR/chooser/firstboot" "$ROOTFS/usr/share/firstboot/python/firstboot"
+  find "$ROOTFS/usr/share/firstboot/python" -depth -type d -name __pycache__ -exec rm -rf {} +
   local logo="$REPO_DIR/docs/Logo/First Boot Linux.png"
   if [[ -f $logo ]]; then
     install -D -m 0644 "$logo" "$ROOTFS/usr/share/firstboot/logo.png"
   fi
+  if [[ -d $REPO_DIR/docs/assets/distros ]]; then
+    cp -a "$REPO_DIR/docs/assets/distros/." "$ROOTFS/usr/share/firstboot/distros/"
+  fi
+  if [[ -d $REPO_DIR/docs/assets/status ]]; then
+    cp -a "$REPO_DIR/docs/assets/status/." "$ROOTFS/usr/share/firstboot/status/"
+  fi
+  if [[ -d $REPO_DIR/docs/assets/apps ]]; then
+    cp -a "$REPO_DIR/docs/assets/apps/." "$ROOTFS/usr/share/firstboot/apps/"
+  fi
+  chown -R root:root "$ROOTFS/usr/share/firstboot"
+  find "$ROOTFS/usr/share/firstboot" -type d -exec chmod 755 {} +
+  find "$ROOTFS/usr/share/firstboot" -type f -exec chmod 644 {} +
 }
 
 apt_get() {
@@ -315,6 +339,11 @@ export_efi() {
   chmod 644 "$OUT/efi"/*
   rm -rf "$tmp"
   log "efi $(ls -1 "$OUT/efi" | tr '\n' ' ')"
+  if command -v sbverify >/dev/null; then
+    bash "$SEED_DIR/check-secureboot.sh" --seed "$OUT"
+  else
+    log "skip signature check (no sbverify)"
+  fi
 }
 
 checksums() {

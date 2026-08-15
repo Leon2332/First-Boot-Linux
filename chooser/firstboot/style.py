@@ -1,0 +1,590 @@
+"""GTK CSS aimed at docs/styles.css (dark / light)."""
+
+from __future__ import annotations
+
+CSS = """
+window.firstboot {
+  background-color: #0e1014;
+  color: #eef1f6;
+  font-family: Cantarell, "Inter", "Segoe UI", sans-serif;
+}
+
+window.firstboot.light {
+  background-color: #f0f2f5;
+  color: #1c1c1c;
+}
+
+window.firstboot button {
+  box-shadow: none;
+  outline: none;
+}
+
+.wallpaper {
+  background-color: #0e1014;
+}
+
+/* ===== GNOME top bar — always dark ===== */
+
+.top-bar {
+  min-height: 32px;
+  background-color: #1c1c1c;
+  color: #f6f5f4;
+  padding: 0 8px;
+}
+
+.clock {
+  font-size: 13px;
+  font-weight: 500;
+  color: #f6f5f4;
+  padding: 0 12px;
+}
+
+.panel-btn {
+  min-height: 24px;
+  min-width: 24px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+  color: #f6f5f4;
+}
+
+.panel-btn:hover,
+.panel-btn.open {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.panel-icons {
+  padding: 0 2px;
+}
+
+/* ===== Floating shell menus ===== */
+
+.shell-panel {
+  background-color: #242424;
+  color: #f6f5f4;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 16px;
+  min-width: 340px;
+}
+
+window.firstboot.light .shell-panel {
+  background-color: #ffffff;
+  color: #1c1c1c;
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+.shell-panel.power-menu,
+.shell-panel.app-menu {
+  border-radius: 18px;
+  padding: 8px;
+  min-width: 220px;
+}
+
+.shell-panel.app-menu {
+  min-width: 240px;
+}
+
+.qs-toolbar {
+  padding: 0 0 2px;
+}
+
+.qs-round {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.10);
+  border: none;
+}
+
+.qs-round:hover {
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+window.firstboot.light .qs-round {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+window.firstboot.light .qs-round:hover {
+  background-color: rgba(0, 0, 0, 0.10);
+}
+
+button.qs-toggle {
+  min-height: 52px;
+  min-width: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.10);
+  border: none;
+  color: #f6f5f4;
+}
+
+button.qs-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+button.qs-toggle.active {
+  background-color: #3584e4;
+  color: #ffffff;
+}
+
+window.firstboot.light button.qs-toggle {
+  background-color: rgba(0, 0, 0, 0.06);
+  color: #1c1c1c;
+}
+
+window.firstboot.light button.qs-toggle:hover {
+  background-color: rgba(0, 0, 0, 0.10);
+}
+
+window.firstboot.light button.qs-toggle.active {
+  background-color: #3584e4;
+  color: #ffffff;
+}
+
+.qs-toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+}
+
+.qs-toggle-sub {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.9;
+  color: inherit;
+}
+
+.qs-slider-icon {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+}
+
+.qs-slider-icon:hover {
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+window.firstboot.light .qs-slider-icon:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+scale.qs-slider {
+  min-width: 220px;
+  padding: 8px 6px;
+}
+
+scale.qs-slider trough {
+  min-height: 4px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+window.firstboot.light scale.qs-slider trough {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+scale.qs-slider highlight {
+  min-height: 4px;
+  border-radius: 999px;
+  background-color: #3584e4;
+}
+
+scale.qs-slider slider {
+  min-width: 16px;
+  min-height: 16px;
+  margin: -6px 0;
+  border-radius: 999px;
+  background-color: #f6f5f4;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+window.firstboot.light scale.qs-slider slider {
+  background-color: #ffffff;
+}
+
+.menu-header {
+  padding: 4px 4px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 10px;
+}
+
+window.firstboot.light .menu-header {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+.menu-header-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.menu-back {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.10);
+  border: none;
+}
+
+.menu-back:hover {
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+
+
+window.firstboot.light .menu-back {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.net-section {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(246, 245, 244, 0.75);
+  padding: 8px 4px 4px;
+}
+
+window.firstboot.light .net-section {
+  color: rgba(28, 28, 28, 0.7);
+}
+
+.net-row {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+window.firstboot.light .net-row {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.net-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.net-detail {
+  font-size: 12px;
+  color: rgba(246, 245, 244, 0.75);
+}
+
+window.firstboot.light .net-detail {
+  color: rgba(28, 28, 28, 0.7);
+}
+
+.btn-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background-color: rgba(255, 255, 255, 0.10);
+  border: none;
+}
+
+.btn-pill:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+window.firstboot.light .btn-pill {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.wifi-item {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
+}
+
+.wifi-item:hover {
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+.wifi-item.active {
+  background-color: rgba(53, 132, 228, 0.25);
+}
+
+window.firstboot.light .wifi-item:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.wifi-ssid {
+  font-size: 13px;
+}
+
+.wifi-meta {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.app-menu-item, .power-menu-item {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.app-menu-item:hover, .power-menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+window.firstboot.light .app-menu-item:hover,
+window.firstboot.light .power-menu-item:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.power-menu-header {
+  padding: 10px 12px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(246, 245, 244, 0.75);
+}
+
+window.firstboot.light .power-menu-header {
+  color: rgba(28, 28, 28, 0.7);
+}
+
+/* ===== Chooser content ===== */
+
+.content {
+  padding: 48px 24px 72px;
+}
+
+.chooser-heading {
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  background-image: linear-gradient(90deg, rgba(18, 20, 26, 0.78), transparent 50%);
+}
+
+.chooser-heading.catalog-heading {
+  margin-top: 24px;
+}
+
+window.firstboot.light .chooser-heading {
+  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.78), transparent 50%);
+}
+
+.heading-title {
+  font-size: 16px;
+  font-weight: 400;
+  color: #797979;
+}
+
+window.firstboot.light .heading-title {
+  color: #1c1c1c;
+}
+
+.heading-sub {
+  font-size: 13px;
+  font-weight: 300;
+  color: #5a5a5a;
+  margin-top: 2px;
+}
+
+window.firstboot.light .heading-sub {
+  color: #5e6772;
+}
+
+.distro-card {
+  padding: 22px 12px 18px;
+  border-radius: 16px;
+  background-color: rgba(18, 20, 26, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+}
+
+.distro-card:hover {
+  background-color: rgba(28, 32, 40, 0.86);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+window.firstboot.light .distro-card {
+  background-color: rgba(255, 255, 255, 0.78);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+window.firstboot.light .distro-card:hover {
+  background-color: rgba(255, 255, 255, 0.92);
+}
+
+.card-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 10px;
+  color: #eef1f6;
+}
+
+window.firstboot.light .card-name {
+  color: #1c1c1c;
+}
+
+.card-desktop, .card-version {
+  font-size: 12px;
+  font-weight: 500;
+  color: #9aa3b2;
+}
+
+window.firstboot.light .card-desktop,
+window.firstboot.light .card-version {
+  color: #5e6772;
+}
+
+.catalog-row {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background-color: rgba(18, 20, 26, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.catalog-row:hover {
+  background-color: rgba(28, 32, 40, 0.86);
+}
+
+window.firstboot.light .catalog-row {
+  background-color: rgba(255, 255, 255, 0.78);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.row-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #eef1f6;
+}
+
+window.firstboot.light .row-name {
+  color: #1c1c1c;
+}
+
+.row-meta {
+  font-size: 12px;
+  color: #9aa3b2;
+}
+
+window.firstboot.light .row-meta {
+  color: #5e6772;
+}
+
+.dimmer {
+  background-color: transparent;
+}
+
+.detail-card {
+  background-color: rgba(36, 36, 36, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 28px;
+  min-width: 420px;
+}
+
+window.firstboot.light .detail-card {
+  background-color: rgba(255, 255, 255, 0.96);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.back-link {
+  color: #9aa3b2;
+  background: transparent;
+  padding: 4px 0;
+  margin-bottom: 8px;
+  border: none;
+}
+
+window.firstboot.light .back-link {
+  color: #5e6772;
+}
+
+.detail-title {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+window.firstboot.light .detail-title {
+  color: #1c1c1c;
+}
+
+.detail-desktop {
+  font-size: 14px;
+  font-weight: 500;
+  color: #9aa3b2;
+}
+
+.detail-version, .detail-tagline, .detail-desc {
+  font-size: 14px;
+  color: #9aa3b2;
+}
+
+.detail-desc {
+  color: #eef1f6;
+  margin-top: 10px;
+}
+
+window.firstboot.light .detail-desktop,
+window.firstboot.light .detail-version,
+window.firstboot.light .detail-tagline,
+window.firstboot.light .de-label {
+  color: #5e6772;
+}
+
+window.firstboot.light .detail-desc {
+  color: #1c1c1c;
+}
+
+.de-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #9aa3b2;
+  margin-top: 14px;
+  margin-bottom: 6px;
+}
+
+.de-row {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.btn-primary {
+  background-color: #3584e4;
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 10px 26px;
+  font-weight: 600;
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: #62a0ea;
+}
+
+.btn-danger {
+  background-color: #e01b24;
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 8px 16px;
+  border: none;
+}
+
+.empty-note, .error-note {
+  font-size: 14px;
+  color: #9aa3b2;
+  padding: 12px 16px;
+}
+
+.net-empty {
+  font-size: 13px;
+  color: rgba(246, 245, 244, 0.75);
+  padding: 8px 12px;
+}
+
+window.firstboot.light .net-empty {
+  color: rgba(28, 28, 28, 0.7);
+}
+""".encode("utf-8")

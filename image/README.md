@@ -38,12 +38,15 @@ Otherwise the same QEMU line runs in Docker (`--device /dev/kvm`). Cage needs a 
 ```bash
 ./image/boot-vm.sh --write --display gtk
 ./image/boot-vm.sh --smoke          # headless; watch serial for a live session
+./image/boot-vm.sh --secure-boot --smoke   # same, with firmware Secure Boot on
 ```
 
 Serial goes to `build/fbl-vm-serial.log`. Ctrl+Alt+F2 in the guest is a debug TTY.
 
 `--smoke` succeeds only when serial shows `/run/payload` mounted **and** `getty@tty1` started. Multi-user.target or serial-getty alone is not enough. The last console on the kernel command line is `ttyS0` so systemd prints there; tty1 still gets the kiosk. `--write` rebuilds the image at `--img` / `FBL_LIVE_IMG`.
 
+`--secure-boot` is the step 6 gate. It uses `OVMF_CODE_4M.secboot.fd` and a vars file cloned from `OVMF_VARS_4M.ms.fd` (Microsoft keys enrolled, Secure Boot on). That approximates a shop PC; it is not a hardware result. The ESP already carries Ubuntu’s Microsoft-signed shim and Canonical-signed gcdx64. Combined with `--smoke`, serial must also show `firstboot-sb: SecureBoot=1`. `./seed/check-secureboot.sh` checks the seed signatures without booting.
+
 ## Dummy payload
 
-`dummy-payload/` is a valid empty shop catalog (no staged ISOs). Missing wallpapers are filled from the mockup photos at write time: annie-spratt → `dark.jpg`, ands-mahardika → `light.jpg`. Casper mounts `LABEL=FBL-DATA` at `/run/payload`.
+`dummy-payload/` is a valid shop catalog (Ubuntu + Mint, no staged ISOs). The chooser treats missing `images/` files as downloads. Missing wallpapers are filled from the mockup photos at write time: annie-spratt → `dark.jpg`, ands-mahardika → `light.jpg`. Casper mounts `LABEL=FBL-DATA` at `/run/payload`. Host chrome check: `chooser/firstboot-chooser --payload image/dummy-payload --screenshot /tmp/fbl.png` (add `--menu qs` / `--light`); the dummy dir has no wallpapers until write time.

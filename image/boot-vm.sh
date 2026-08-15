@@ -10,13 +10,14 @@ IMG=${FBL_LIVE_IMG:-$REPO_DIR/build/fbl-live.img}
 MEM=${FBL_VM_MEM:-2G}
 SMP=${FBL_VM_SMP:-2}
 QEMU_IMAGE=${FBL_QEMU_IMAGE:-firstboot-qemu:26.04}
-VARS=$REPO_DIR/build/OVMF_VARS.fd
 SERIAL_LOG=$REPO_DIR/build/fbl-vm-serial.log
 
 WRITE=0
 SMOKE=0
+SECURE_BOOT=0
 DISPLAY_MODE=auto   # auto | gtk | none
 SMOKE_TIMEOUT=${FBL_SMOKE_TIMEOUT:-180}
+VARS=$REPO_DIR/build/OVMF_VARS.fd
 
 usage() {
   cat <<EOF
@@ -29,6 +30,7 @@ Usage: $0 [options]
   --display gtk|none
   --smoke          headless boot; succeed if serial shows a live session
   --smoke-timeout N   seconds for --smoke (default: 180)
+  --secure-boot    OVMF secboot + Microsoft keys (shop-PC approximation)
 EOF
 }
 
@@ -41,6 +43,7 @@ while [[ $# -gt 0 ]]; do
     --display) DISPLAY_MODE=$2; shift 2 ;;
     --smoke) SMOKE=1; DISPLAY_MODE=none; shift ;;
     --smoke-timeout) SMOKE_TIMEOUT=$2; shift 2 ;;
+    --secure-boot) SECURE_BOOT=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "error: unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -62,6 +65,10 @@ fi
 
 [[ -f $IMG ]] || die "no image at $IMG (run image/write-live.sh, or pass --write)"
 
+if [[ $SECURE_BOOT -eq 1 && -f $REPO_DIR/build/seed/efi/BOOTX64.EFI ]]; then
+  bash "$REPO_DIR/seed/check-secureboot.sh" --seed "$REPO_DIR/build/seed"
+fi
+
 if [[ $DISPLAY_MODE == auto ]]; then
   if [[ -n ${DISPLAY:-} || -n ${WAYLAND_DISPLAY:-} ]]; then
     DISPLAY_MODE=gtk
@@ -72,28 +79,70 @@ fi
 
 find_ovmf() {
   local d
+  OVMF_CODE=
+  OVMF_VARS_TEMPLATE=
+  OVMF_CODE_SECBOOT=
+  OVMF_VARS_MS_TEMPLATE=
   for d in /usr/share/OVMF /usr/share/ovmf /usr/share/qemu; do
     if [[ -f $d/OVMF_CODE_4M.fd ]]; then
       OVMF_CODE=$d/OVMF_CODE_4M.fd
       OVMF_VARS_TEMPLATE=$d/OVMF_VARS_4M.fd
-      return 0
-    fi
-    if [[ -f $d/OVMF_CODE.fd ]]; then
+    elif [[ -f $d/OVMF_CODE.fd ]]; then
       OVMF_CODE=$d/OVMF_CODE.fd
       OVMF_VARS_TEMPLATE=$d/OVMF_VARS.fd
-      return 0
+    else
+      continue
     fi
+    if [[ -f $d/OVMF_CODE_4M.secboot.fd ]]; then
+      OVMF_CODE_SECBOOT=$d/OVMF_CODE_4M.secboot.fd
+    elif [[ -f $d/OVMF_CODE_4M.ms.fd ]]; then
+      OVMF_CODE_SECBOOT=$d/OVMF_CODE_4M.ms.fd
+    elif [[ -f $d/OVMF_CODE.secboot.fd ]]; then
+      OVMF_CODE_SECBOOT=$d/OVMF_CODE.secboot.fd
+    fi
+    if [[ -f $d/OVMF_VARS_4M.ms.fd ]]; then
+      OVMF_VARS_MS_TEMPLATE=$d/OVMF_VARS_4M.ms.fd
+    elif [[ -f $d/OVMF_VARS.ms.fd ]]; then
+      OVMF_VARS_MS_TEMPLATE=$d/OVMF_VARS.ms.fd
+    fi
+    return 0
   done
   return 1
+}
+
+select_firmware() {
+  if [[ $SECURE_BOOT -eq 1 ]]; then
+    VARS=$REPO_DIR/build/OVMF_VARS.sb.fd
+    [[ -n ${OVMF_CODE_SECBOOT:-} && -f $OVMF_CODE_SECBOOT ]] \
+      || die "no OVMF secboot firmware (need OVMF_CODE_4M.secboot.fd)"
+    [[ -n ${OVMF_VARS_MS_TEMPLATE:-} && -f $OVMF_VARS_MS_TEMPLATE ]] \
+      || die "no OVMF Microsoft vars (need OVMF_VARS_4M.ms.fd)"
+    OVMF_CODE_USE=$OVMF_CODE_SECBOOT
+    OVMF_VARS_TEMPLATE_USE=$OVMF_VARS_MS_TEMPLATE
+  else
+    VARS=$REPO_DIR/build/OVMF_VARS.fd
+    OVMF_CODE_USE=$OVMF_CODE
+    OVMF_VARS_TEMPLATE_USE=$OVMF_VARS_TEMPLATE
+  fi
 }
 
 qemu_args() {
   local code=$1 vars=$2
   QEMU_ARGS=(
     -enable-kvm
-    -machine q35,smm=off
     -m "$MEM"
     -smp "$SMP"
+  )
+  if [[ $SECURE_BOOT -eq 1 ]]; then
+    QEMU_ARGS+=(
+      -machine q35,smm=on
+      -global driver=cfi.pflash01,property=secure,value=on
+      -global ICH9-LPC.disable_s3=1
+    )
+  else
+    QEMU_ARGS+=( -machine q35,smm=off )
+  fi
+  QEMU_ARGS+=(
     -drive if=pflash,format=raw,unit=0,readonly=on,file="$code"
     -drive if=pflash,format=raw,unit=1,file="$vars"
     -drive file="$IMG",format=raw,if=none,id=bootdisk
@@ -139,6 +188,10 @@ smoke_ok() {
   grep -Eq 'Unable to find a medium containing a live file system' <<<"$text" && return 1
   grep -Eq '/run/payload' <<<"$text" || return 1
   grep -Eq 'getty@tty1' <<<"$text" || return 1
+  if [[ $SECURE_BOOT -eq 1 ]]; then
+    grep -Eq 'firstboot-sb: SecureBoot=1' <<<"$text" || return 1
+    grep -Eq 'firstboot-sb: SecureBoot=0' <<<"$text" && return 1
+  fi
   return 0
 }
 
@@ -161,7 +214,11 @@ smoke_watch() {
       return 1
     fi
     if smoke_ok; then
-      log "smoke: /run/payload mounted and getty@tty1 started"
+      if [[ $SECURE_BOOT -eq 1 ]]; then
+        log "smoke: Secure Boot on, /run/payload mounted, getty@tty1 started"
+      else
+        log "smoke: /run/payload mounted and getty@tty1 started"
+      fi
       kill "$qemu_pid" 2>/dev/null || true
       wait "$qemu_pid" || true
       return 0
@@ -170,7 +227,11 @@ smoke_watch() {
   done
   kill "$qemu_pid" 2>/dev/null || true
   wait "$qemu_pid" || true
-  echo "error: smoke timed out after ${SMOKE_TIMEOUT}s (need /run/payload and getty@tty1)" >&2
+  if [[ $SECURE_BOOT -eq 1 ]]; then
+    echo "error: smoke timed out after ${SMOKE_TIMEOUT}s (need /run/payload, getty@tty1, firstboot-sb: SecureBoot=1)" >&2
+  else
+    echo "error: smoke timed out after ${SMOKE_TIMEOUT}s (need /run/payload and getty@tty1)" >&2
+  fi
   tail -n 60 "$SERIAL_LOG" >&2 || true
   return 1
 }
@@ -179,9 +240,10 @@ run_host() {
   find_ovmf || return 1
   command -v qemu-system-x86_64 >/dev/null || return 1
   [[ -e /dev/kvm ]] || die "/dev/kvm missing"
-  prepare_vars "$OVMF_VARS_TEMPLATE"
-  qemu_args "$OVMF_CODE" "$VARS"
-  log "qemu host  display=$DISPLAY_MODE  img=$IMG"
+  select_firmware
+  prepare_vars "$OVMF_VARS_TEMPLATE_USE"
+  qemu_args "$OVMF_CODE_USE" "$VARS"
+  log "qemu host  display=$DISPLAY_MODE  img=$IMG  secure-boot=$SECURE_BOOT"
   : > "$SERIAL_LOG"
   if [[ $SMOKE -eq 1 ]]; then
     qemu-system-x86_64 "${QEMU_ARGS[@]}" &
@@ -207,6 +269,7 @@ run_docker() {
     -e HOST_UID="$(id -u)"
     -e HOST_GID="$(id -g)"
     -e FBL_RESET_VARS="$WRITE"
+    -e FBL_SECURE_BOOT="$SECURE_BOOT"
   )
   if [[ $DISPLAY_MODE == gtk && -n ${DISPLAY:-} ]]; then
     docker_display=( -display gtk )
@@ -222,9 +285,17 @@ run_docker() {
     fi
   fi
 
+  local machine_args=( -machine q35,smm=off )
+  if [[ $SECURE_BOOT -eq 1 ]]; then
+    machine_args=(
+      -machine q35,smm=on
+      -global driver=cfi.pflash01,property=secure,value=on
+      -global ICH9-LPC.disable_s3=1
+    )
+  fi
   local cmd=(
     -enable-kvm
-    -machine q35,smm=off
+    "${machine_args[@]}"
     -m "$MEM"
     -smp "$SMP"
     -drive file="$img_c",format=raw,if=none,id=bootdisk
@@ -244,14 +315,24 @@ run_docker() {
     "${extra[@]}"
     "$QEMU_IMAGE"
     bash -c 'set -euo pipefail
-      code=/usr/share/OVMF/OVMF_CODE_4M.fd
-      tmpl=/usr/share/OVMF/OVMF_VARS_4M.fd
-      if [[ ! -f $code ]]; then
-        code=/usr/share/OVMF/OVMF_CODE.fd
-        tmpl=/usr/share/OVMF/OVMF_VARS.fd
+      sb=${FBL_SECURE_BOOT:-0}
+      if [[ $sb == 1 ]]; then
+        code=/usr/share/OVMF/OVMF_CODE_4M.secboot.fd
+        [[ -f $code ]] || code=/usr/share/OVMF/OVMF_CODE_4M.ms.fd
+        [[ -f $code ]] || code=/usr/share/OVMF/OVMF_CODE.secboot.fd
+        tmpl=/usr/share/OVMF/OVMF_VARS_4M.ms.fd
+        [[ -f $tmpl ]] || tmpl=/usr/share/OVMF/OVMF_VARS.ms.fd
+        vars=/src/build/OVMF_VARS.sb.fd
+      else
+        code=/usr/share/OVMF/OVMF_CODE_4M.fd
+        tmpl=/usr/share/OVMF/OVMF_VARS_4M.fd
+        if [[ ! -f $code ]]; then
+          code=/usr/share/OVMF/OVMF_CODE.fd
+          tmpl=/usr/share/OVMF/OVMF_VARS.fd
+        fi
+        vars=/src/build/OVMF_VARS.fd
       fi
-      [[ -f $code && -f $tmpl ]] || { echo "error: OVMF firmware missing in qemu image" >&2; exit 1; }
-      vars=/src/build/OVMF_VARS.fd
+      [[ -f $code && -f $tmpl ]] || { echo "error: OVMF firmware missing in qemu image (secure-boot=$sb)" >&2; exit 1; }
       mkdir -p /src/build
       reset=${FBL_RESET_VARS:-0}
       if [[ ! -f $vars || $reset == 1 ]]; then
@@ -270,7 +351,7 @@ run_docker() {
     "${cmd[@]}"
   )
 
-  log "qemu docker  display=$DISPLAY_MODE  img=$IMG"
+  log "qemu docker  display=$DISPLAY_MODE  img=$IMG  secure-boot=$SECURE_BOOT"
   : > "$SERIAL_LOG"
   if [[ $SMOKE -eq 1 ]]; then
     "${run[@]}" &

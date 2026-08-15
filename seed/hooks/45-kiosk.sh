@@ -5,6 +5,9 @@ set -euo pipefail
 if ! getent passwd firstboot >/dev/null; then
   useradd --create-home --shell /bin/bash --comment "First Boot" firstboot
 fi
+mkdir -p /home/firstboot
+chown firstboot:firstboot /home/firstboot
+chmod 0755 /home/firstboot
 
 for g in audio video render input plugdev netdev sudo cdrom dip users; do
   if getent group "$g" >/dev/null; then
