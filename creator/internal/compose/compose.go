@@ -179,13 +179,13 @@ func Write(ctx context.Context, req Request) error {
 		return err
 	}
 
-	report(req, "assemble disk", 0, est.ImageBytes)
+	report(req, "assemble disk", 0, est.ESPBytes+est.SYSBytes+est.DataBytes)
 	if err := os.MkdirAll(filepath.Dir(req.Out), 0o755); err != nil && !os.IsExist(err) {
 		return err
 	}
 	tmpOut := req.Out + ".partial"
 	_ = os.Remove(tmpOut)
-	if err := assemble(tmpOut, est, espImg, sysImg, dataImg, req.Progress); err != nil {
+	if err := assemble(ctx, tmpOut, est, espImg, sysImg, dataImg, req.Progress); err != nil {
 		_ = os.Remove(tmpOut)
 		return err
 	}
@@ -431,7 +431,7 @@ func fatWrite(fs filesystem.FileSystem, dest, src string) error {
 	return nil
 }
 
-func assemble(out string, est Estimate, esp, sys, data string, progress ProgressFunc) error {
+func assemble(ctx context.Context, out string, est Estimate, esp, sys, data string, progress ProgressFunc) error {
 	if err := truncate(out, est.ImageBytes); err != nil {
 		return err
 	}
@@ -461,28 +461,28 @@ func assemble(out string, est Estimate, esp, sys, data string, progress Progress
 	if err := writeGPT(f, est.ImageBytes, parts); err != nil {
 		return err
 	}
-	if err := copyAt(f, int64(espStart)*sectorSize, esp, progress, "write ESP"); err != nil {
+	all := est.ESPBytes + est.SYSBytes + est.DataBytes
+	var copied int64
+	if err := copyAt(ctx, f, int64(espStart)*sectorSize, esp, progress, "write ESP", copied, all); err != nil {
 		return err
 	}
-	if err := copyAt(f, int64(sysStart)*sectorSize, sys, progress, "write FBL-SYS"); err != nil {
+	copied += est.ESPBytes
+	if err := copyAt(ctx, f, int64(sysStart)*sectorSize, sys, progress, "write FBL-SYS", copied, all); err != nil {
 		return err
 	}
-	if err := copyAt(f, int64(dataStart)*sectorSize, data, progress, "write FBL-DATA"); err != nil {
+	copied += est.SYSBytes
+	if err := copyAt(ctx, f, int64(dataStart)*sectorSize, data, progress, "write FBL-DATA", copied, all); err != nil {
 		return err
 	}
 	return f.Sync()
 }
 
-func copyAt(dst *os.File, off int64, srcPath string, progress ProgressFunc, stage string) error {
+func copyAt(ctx context.Context, dst *os.File, off int64, srcPath string, progress ProgressFunc, stage string, base, all int64) error {
 	in, err := os.Open(srcPath)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
-	st, err := in.Stat()
-	if err != nil {
-		return err
-	}
 	if _, err := dst.Seek(off, io.SeekStart); err != nil {
 		return err
 	}
@@ -490,6 +490,9 @@ func copyAt(dst *os.File, off int64, srcPath string, progress ProgressFunc, stag
 	var got int64
 	last := time.Now()
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		n, readErr := in.Read(buf)
 		if n > 0 {
 			if _, err := dst.Write(buf[:n]); err != nil {
@@ -497,7 +500,7 @@ func copyAt(dst *os.File, off int64, srcPath string, progress ProgressFunc, stag
 			}
 			got += int64(n)
 			if progress != nil && time.Since(last) > 100*time.Millisecond {
-				progress(stage, got, st.Size())
+				progress(stage, base+got, all)
 				last = time.Now()
 			}
 		}
@@ -509,7 +512,7 @@ func copyAt(dst *os.File, off int64, srcPath string, progress ProgressFunc, stag
 		}
 	}
 	if progress != nil {
-		progress(stage, got, st.Size())
+		progress(stage, base+got, all)
 	}
 	return nil
 }

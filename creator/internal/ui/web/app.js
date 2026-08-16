@@ -1,7 +1,8 @@
-const steps = ["Shop", "Look", "Distros", "Write"];
+const steps = ["Shop", "Look", "Recommendations", "Write"];
 let state = null;
 let step = 0;
 let busy = false;
+let barFrac = 0;
 
 const $ = (id) => document.getElementById(id);
 
@@ -114,6 +115,27 @@ async function refreshDisks() {
     sel.appendChild(o);
   });
   if (prev) sel.value = prev;
+  updateDiskWarn();
+}
+
+function updateDiskWarn() {
+  const usb = document.querySelector("input[name=target]:checked")?.value === "usb";
+  const hasDisk = !!$("device").value;
+  $("disk-warn").hidden = !(usb && hasDisk);
+}
+
+function renderTasks(tasks) {
+  const list = $("task-list");
+  if (!tasks || !tasks.length) {
+    list.hidden = true;
+    list.innerHTML = "";
+    return;
+  }
+  list.hidden = false;
+  list.innerHTML = tasks.map((t) => {
+    const st = t.status === "done" || t.status === "active" || t.status === "error" ? t.status : "pending";
+    return `<li class="${st}"><span class="task-mark" aria-hidden="true"></span><span>${escapeHtml(t.label)}</span></li>`;
+  }).join("");
 }
 
 function render() {
@@ -122,9 +144,31 @@ function render() {
     p.classList.toggle("hidden", i !== step);
   });
   $("back").disabled = step === 0 || busy;
-  $("next").textContent = step === 3 ? "Write" : "Continue";
-  $("next").disabled = busy;
-  if (step === 3) refreshEstimate();
+  const next = $("next");
+  if (busy) {
+    next.textContent = "Cancel";
+    next.classList.remove("primary");
+    next.classList.add("danger");
+    next.disabled = false;
+  } else {
+    next.textContent = step === 3 ? "Write" : "Continue";
+    next.classList.add("primary");
+    next.classList.remove("danger");
+    next.disabled = false;
+  }
+  if (step === 3 && !busy) refreshEstimate();
+}
+
+function setBar(frac) {
+  frac = Math.max(0, Math.min(1, Number(frac) || 0));
+  const el = $("bar");
+  if (frac + 0.002 < barFrac) {
+    el.style.transition = "none";
+  } else {
+    el.style.transition = "transform 160ms linear";
+  }
+  el.style.transform = `scaleX(${frac})`;
+  barFrac = frac;
 }
 
 async function uploadWallpaper(which, file) {
@@ -150,12 +194,13 @@ async function startWrite() {
   if (target === "usb") {
     const disk = (await api("/api/devices")).disks.find((d) => d.path === body.device);
     const label = disk ? disk.label : body.device;
-    if (!confirm(`Erase ${body.device} (${label}) and write First Boot?\n\nEverything on that stick will be lost.`)) {
+    if (!confirm(`Your disk will be formatted. All data will be permanently erased.\n\nErase ${body.device} (${label}) and write First Boot?`)) {
       return;
     }
   }
   busy = true;
   showError("");
+  setBar(0);
   render();
   try {
     await api("/api/start", {
@@ -163,6 +208,8 @@ async function startWrite() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    const first = await api("/api/progress");
+    renderTasks(first.tasks);
     poll();
   } catch (e) {
     busy = false;
@@ -174,8 +221,9 @@ async function startWrite() {
 async function poll() {
   try {
     const p = await api("/api/progress");
+    renderTasks(p.tasks);
+    setBar(p.fraction || 0);
     $("status").textContent = p.stage || "Working…";
-    $("bar").style.width = `${Math.round((p.fraction || 0) * 100)}%`;
     if (p.done) {
       busy = false;
       if (p.error) showError(p.error);
@@ -207,7 +255,10 @@ async function init() {
 
   $("back").onclick = () => { if (step > 0 && !busy) { step--; showError(""); render(); } };
   $("next").onclick = async () => {
-    if (busy) return;
+    if (busy) {
+      try { await api("/api/cancel", { method: "POST" }); } catch (e) { showError(e.message); }
+      return;
+    }
     const err = validate();
     if (err) { showError(err); return; }
     showError("");
@@ -227,6 +278,10 @@ async function init() {
     $("light-preview").src = `/api/wallpaper/light?t=${Date.now()}`;
   };
   $("refresh-disks").onclick = () => refreshDisks().catch((e) => showError(e.message));
+  $("device").onchange = updateDiskWarn;
+  document.querySelectorAll("input[name=target]").forEach((el) => {
+    el.onchange = updateDiskWarn;
+  });
 }
 
 init().catch((e) => { showError(e.message); });

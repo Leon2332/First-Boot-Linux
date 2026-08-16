@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<labwc_config>
+  <core>
+    <gap>0</gap>
+    <reuseOutputMode>yes</reuseOutputMode>
+    <xwayland>no</xwayland>
+  </core>
+  <focus>
+    <followMouse>no</followMouse>
+    <raiseOnFocus>no</raiseOnFocus>
+  </focus>
+  <windowSwitcher preview="no" outlines="no">
+  </windowSwitcher>
+  <keyboard>
+    <numlock>on</numlock>
+  </keyboard>
+  <mouse>
+    <default />
+  </mouse>
+  <windowRules>
+    <windowRule identifier="org.firstboot.Chooser" serverDecoration="no" skipTaskbar="yes" skipWindowSwitcher="yes">
+      <action name="Maximize" />
+    </windowRule>
+  </windowRules>
+</labwc_config>
+

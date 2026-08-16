@@ -1,0 +1,22 @@
+#!/bin/sh
+echo "firstboot-login: $*" >/dev/kmsg 2>/dev/null || true
+user=firstboot
+while [ $# -gt 0 ]; do
+  case $1 in
+    -f|-- ) shift ;;
+    -*) shift ;;
+    *) user=$1; break ;;
+  esac
+done
+export HOME=/home/firstboot
+export USER="$user"
+export LOGNAME="$user"
+export XDG_RUNTIME_DIR=/tmp/firstboot-runtime
+mkdir -p "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
+chown "$user:$user" "$XDG_RUNTIME_DIR" 2>/dev/null || true
+cd "$HOME" || true
+if command -v runuser >/dev/null 2>&1; then
+  exec runuser -u "$user" -- /usr/bin/firstboot-session
+fi
+exec su -s /usr/bin/firstboot-session "$user"

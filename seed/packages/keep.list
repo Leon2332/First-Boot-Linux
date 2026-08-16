@@ -78,7 +78,7 @@ libdrm2
 libgbm1
 
 # --- kiosk session ---
-cage
+labwc
 python3
 python3-gi
 python3-gi-cairo

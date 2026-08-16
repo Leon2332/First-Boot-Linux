@@ -1,0 +1,3 @@
+#!/bin/sh
+# labwc waits for this script to exit before it processes clients.
+exit 0

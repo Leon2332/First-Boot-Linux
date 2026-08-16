@@ -1,0 +1,23 @@
+[Unit]
+Description=First Boot kiosk
+After=systemd-user-sessions.service systemd-logind.service
+Wants=systemd-logind.service
+Conflicts=getty@tty1.service
+ConditionPathExists=/usr/bin/firstboot-session
+
+[Service]
+Type=simple
+User=firstboot
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+StandardInput=tty
+StandardOutput=journal+console
+StandardError=journal+console
+WorkingDirectory=/home/firstboot
+ExecStart=/usr/bin/firstboot-session
+Restart=no
+
+[Install]
+WantedBy=graphical.target

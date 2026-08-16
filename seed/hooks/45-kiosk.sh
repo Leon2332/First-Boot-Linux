@@ -9,7 +9,7 @@ mkdir -p /home/firstboot
 chown firstboot:firstboot /home/firstboot
 chmod 0755 /home/firstboot
 
-for g in audio video render input plugdev netdev sudo cdrom dip users; do
+for g in audio video render input plugdev netdev sudo cdrom dip users tty dialout; do
   if getent group "$g" >/dev/null; then
     usermod -aG "$g" firstboot
   fi
@@ -20,4 +20,5 @@ passwd -d firstboot >/dev/null
 install -o firstboot -g firstboot -m 0644 /dev/null /home/firstboot/.hushlogin
 
 chmod 440 /etc/sudoers.d/firstboot
-systemctl enable getty@tty1.service
+systemctl enable firstboot-kiosk.service
+systemctl mask getty@tty1.service

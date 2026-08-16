@@ -1,9 +1,11 @@
 package ui
 
 import (
+	"bufio"
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -14,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/Leon2332/First-Boot-Linux/creator/internal/assets"
@@ -40,6 +43,8 @@ type session struct {
 	total    int64
 	done     bool
 	jobErr   string
+	tasks    []jobTask
+	cancel   context.CancelFunc
 }
 
 func Run() error {
@@ -76,6 +81,7 @@ func Run() error {
 	mux.HandleFunc("/api/logo/", s.logo)
 	mux.HandleFunc("/api/icon", s.icon)
 	mux.HandleFunc("/api/start", s.start)
+	mux.HandleFunc("/api/cancel", s.cancelJob)
 	mux.HandleFunc("/api/progress", s.progress)
 
 	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
@@ -306,6 +312,7 @@ func (s *session) start(w http.ResponseWriter, r *http.Request) {
 	s.jobErr = ""
 	s.stage = "Starting…"
 	s.got, s.total = 0, 0
+	s.tasks = nil
 	seed := s.seed
 	off := s.off
 	s.mu.Unlock()
@@ -334,12 +341,39 @@ func (s *session) start(w http.ResponseWriter, r *http.Request) {
 	if req.EmptyPassword {
 		password = ""
 	}
-	go s.run(seed, off, shop, retailer, password, req.Image, req.Device)
+	ctx, cancel := context.WithCancel(context.Background())
+	s.mu.Lock()
+	s.tasks = planTasks(shop, req.Device)
+	s.cancel = cancel
+	s.mu.Unlock()
+	go s.run(ctx, seed, off, shop, retailer, password, req.Image, req.Device)
 	writeJSON(w, map[string]any{"ok": true})
 }
 
-func (s *session) run(seed *seedpath.Seed, off *catalog.Official, shop *catalog.Shop, retailer catalog.Retailer, password, image, device string) {
-	ctx := context.Background()
+func (s *session) cancelJob(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.mu.Lock()
+	cancel := s.cancel
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+func (s *session) setProgress(stage string, got, total int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stage = stage
+	s.got = got
+	s.total = total
+	applyTaskProgress(s.tasks, stage)
+}
+
+func (s *session) run(ctx context.Context, seed *seedpath.Seed, off *catalog.Official, shop *catalog.Shop, retailer catalog.Retailer, password, image, device string) {
 	err := compose.Write(ctx, compose.Request{
 		Retailer: retailer,
 		Shop:     shop,
@@ -348,30 +382,32 @@ func (s *session) run(seed *seedpath.Seed, off *catalog.Official, shop *catalog.
 		Cache:    cache.New(assets.CacheDir()),
 		Out:      image,
 		Password: password,
-		Progress: func(stage string, got, total int64) {
-			s.mu.Lock()
-			s.stage, s.got, s.total = stage, got, total
-			s.mu.Unlock()
-		},
+		Progress: s.setProgress,
 	})
 	if err == nil && device != "" {
-		s.mu.Lock()
-		s.stage = "Writing USB (needs permission)…"
-		s.mu.Unlock()
-		err = writeStick(image, device)
+		s.setProgress("Waiting for permission…", 0, 0)
+		err = writeStick(ctx, image, device, s.setProgress)
 	}
 	s.mu.Lock()
 	s.busy = false
 	s.done = true
-	if err != nil {
+	s.cancel = nil
+	if errors.Is(err, context.Canceled) {
+		s.jobErr = ""
+		s.stage = "Cancelled."
+		markActiveError(s.tasks)
+	} else if err != nil {
 		s.jobErr = err.Error()
 		s.stage = "Stopped."
+		markActiveError(s.tasks)
 	} else if device != "" {
 		s.stage = "Done. You can boot PCs from that stick."
 		s.got, s.total = 1, 1
+		applyTaskProgress(s.tasks, s.stage)
 	} else {
 		s.stage = "Done. Disk image saved to " + image
 		s.got, s.total = 1, 1
+		applyTaskProgress(s.tasks, s.stage)
 	}
 	s.mu.Unlock()
 }
@@ -383,6 +419,7 @@ func (s *session) fail(err error) {
 	if err != nil {
 		s.jobErr = err.Error()
 	}
+	markActiveError(s.tasks)
 	s.mu.Unlock()
 }
 
@@ -393,34 +430,79 @@ func (s *session) progress(w http.ResponseWriter, r *http.Request) {
 	if s.total > 0 {
 		frac = float64(s.got) / float64(s.total)
 	}
+	tasks := append([]jobTask(nil), s.tasks...)
 	writeJSON(w, map[string]any{
 		"stage":    s.stage,
 		"fraction": frac,
 		"done":     s.done,
 		"error":    s.jobErr,
+		"tasks":    tasks,
 	})
 }
 
-func writeStick(image, device string) error {
+func writeStick(ctx context.Context, image, device string, progress func(string, int64, int64)) error {
 	helper := findHelper()
 	if helper == "" {
 		return fmt.Errorf("firstboot-write-usb is not next to this program")
 	}
+	var cmd *exec.Cmd
 	if p, err := exec.LookPath("pkexec"); err == nil {
-		out, err := exec.Command(p, helper, "--image", image, "--device", device).CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("write USB: %w\n%s", err, out)
-		}
-		return nil
+		cmd = exec.Command(p, helper, "--image", image, "--device", device)
+	} else if p, err := exec.LookPath("sudo"); err == nil {
+		cmd = exec.Command(p, helper, "--image", image, "--device", device)
+	} else {
+		return fmt.Errorf("need pkexec or sudo to write %s", device)
 	}
-	if p, err := exec.LookPath("sudo"); err == nil {
-		out, err := exec.Command(p, helper, "--image", image, "--device", device).CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("write USB: %w\n%s", err, out)
-		}
-		return nil
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
 	}
-	return fmt.Errorf("need pkexec or sudo to write %s", device)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("write USB: %w", err)
+	}
+	stop := make(chan struct{})
+	defer close(stop)
+	go func() {
+		select {
+		case <-ctx.Done():
+			if cmd.Process != nil {
+				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+				time.Sleep(300 * time.Millisecond)
+				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			}
+		case <-stop:
+		}
+	}()
+	sc := bufio.NewScanner(stderr)
+	var errBuf strings.Builder
+	for sc.Scan() {
+		line := sc.Text()
+		if got, total, ok := parseWriteProgress(line); ok {
+			if progress != nil {
+				progress("Writing to disk", got, total)
+			}
+			continue
+		}
+		if strings.TrimSpace(line) != "" {
+			errBuf.WriteString(line)
+			errBuf.WriteByte('\n')
+		}
+	}
+	if err := cmd.Wait(); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		msg := strings.TrimSpace(errBuf.String())
+		if msg != "" {
+			return fmt.Errorf("write USB: %w\n%s", err, msg)
+		}
+		return fmt.Errorf("write USB: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func findHelper() string {

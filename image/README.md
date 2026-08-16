@@ -33,7 +33,7 @@ No host `sudo`: the script builds a privileged Ubuntu 26.04 container and writes
 sudo apt-get install qemu-system-x86 qemu-system-gui ovmf
 ```
 
-Otherwise the same QEMU line runs in Docker (`--device /dev/kvm`). Cage needs a DRM node; the VM gets `virtio-vga`, not serial-only.
+Otherwise the same QEMU line runs in Docker (`--device /dev/kvm`). labwc needs a DRM node; the VM gets `virtio-vga`, not serial-only.
 
 ```bash
 ./image/boot-vm.sh --write --display gtk

@@ -799,7 +799,6 @@
         ["Windowing System", "Wayland"],
         ["Kernel Version", "Linux 7.1.8-generic"],
         ["Firmware Version", "1.G0"],
-        ["Configured by", "[Retailer Name]\n[Retailer Contact Details]"],
       ]);
     }
   }

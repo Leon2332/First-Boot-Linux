@@ -21,7 +21,6 @@
   <main>
     <section id="page-0" class="page">
       <h1>Shop details</h1>
-      <p class="lead">This is what the customer sees in the footer, plus the password you will use if you need to support the PC.</p>
       <label>Shop name
         <input id="name" type="text" maxlength="80" placeholder="Example Computers" autocomplete="organization">
       </label>
@@ -40,7 +39,6 @@
         <input id="empty-pw" type="checkbox">
         <span>VM / test image — leave the live user unlocked</span>
       </label>
-      <p class="note">The password is hashed onto the live system at write time. It is not stored in retailer.conf.</p>
     </section>
 
     <section id="page-1" class="page hidden">
@@ -50,24 +48,29 @@
         <figure>
           <figcaption>Dark</figcaption>
           <img id="dark-preview" alt="Dark wallpaper">
-          <label class="btn ghost">Choose photo…
+          <label class="btn ghost">Choose image…
             <input id="dark-file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
           </label>
         </figure>
         <figure>
           <figcaption>Light</figcaption>
           <img id="light-preview" alt="Light wallpaper">
-          <label class="btn ghost">Choose photo…
+          <label class="btn ghost">Choose image…
             <input id="light-file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
           </label>
         </figure>
       </div>
-      <button type="button" class="btn ghost" id="reset-walls">Use First Boot defaults</button>
+      <button type="button" class="btn ghost icon-btn" id="reset-walls">
+        <svg class="btn-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+          <path fill="currentColor" d="m 7.40625 1 c -0.613281 0.007812 -1.234375 0.089844 -1.847656 0.253906 c -3.273438 0.878906 -5.558594 3.855469 -5.558594 7.246094 s 2.285156 6.367188 5.558594 7.242188 c 3.273437 0.878906 6.742187 -0.558594 8.4375 -3.492188 c 0.277344 -0.480469 0.109375 -1.089844 -0.367188 -1.367188 c -0.476562 -0.273437 -1.089844 -0.109374 -1.367187 0.367188 c -1.246094 2.160156 -3.777344 3.207031 -6.1875 2.5625 c -2.40625 -0.644531 -4.074219 -2.820312 -4.074219 -5.3125 c 0 -2.496094 1.667969 -4.667969 4.074219 -5.3125 c 2.410156 -0.644531 4.941406 0.402344 6.1875 2.5625 c 0.058593 0.085938 0.125 0.164062 0.203125 0.226562 l -0.019532 0.015626 l -0.007812 0.007812 h -1.4375 c -0.550781 0 -1 0.449219 -1 1 c 0 0 0 1 1 1 h 5 v -5 s 0.003906 -1 -1 -1 c -0.550781 0 -1 0.449219 -1 1 v 1.6875 l -0.015625 0.011719 l -0.011719 0.011719 c -1.277344 -2.179688 -3.53125 -3.519532 -5.953125 -3.691407 c -0.203125 -0.015625 -0.40625 -0.019531 -0.613281 -0.019531 z"/>
+        </svg>
+        Reset to First Boot defaults
+      </button>
     </section>
 
     <section id="page-2" class="page hidden">
-      <h1>Recommended distros</h1>
-      <p class="lead">Ticked editions are copied onto the USB. The customer sees them first, already on disk.</p>
+      <h1>Recommended options</h1>
+      <p class="lead">Pick up to 5 options to recommend which will also be included on disk. Other options will have to be downloaded by the customer.</p>
       <div id="ready" class="cards"></div>
       <h2>Coming later</h2>
       <p class="note">These stay in the official menu. They cannot go on the stick until an install driver exists.</p>
@@ -92,6 +95,8 @@
           <button type="button" class="btn ghost" id="refresh-disks">Refresh</button>
         </span>
       </label>
+      <p class="warn" id="disk-warn" hidden>Your disk will be formatted. All data will be permanently erased.</p>
+      <ul class="task-list" id="task-list" hidden></ul>
       <div class="progress-wrap">
         <div class="bar"><span id="bar"></span></div>
         <p id="status">Ready.</p>

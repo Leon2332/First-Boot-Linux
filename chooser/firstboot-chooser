@@ -6,9 +6,27 @@ from __future__ import annotations
 import os
 import sys
 
+
+def _reopen_closed_stdio() -> None:
+    # labwc -S closes stdin in the session client. A missing fd 0 makes the
+    # next open() become stdin; GTK/GLib then hang in the main loop.
+    for fd, flags in ((0, os.O_RDONLY), (1, os.O_WRONLY), (2, os.O_WRONLY)):
+        try:
+            os.fstat(fd)
+        except OSError:
+            null = os.open(os.devnull, flags)
+            if null != fd:
+                os.dup2(null, fd)
+                os.close(null)
+
+
+_reopen_closed_stdio()
+
 os.environ.setdefault("GTK_A11Y", "none")
 os.environ.setdefault("NO_AT_BRIDGE", "1")
 os.environ.setdefault("GSK_RENDERER", "cairo")
+os.environ.setdefault("GSETTINGS_BACKEND", "memory")
+os.environ.setdefault("GTK_USE_PORTAL", "0")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CANDIDATES = (
@@ -21,7 +39,18 @@ for path in CANDIDATES:
             sys.path.insert(0, path)
         break
 
+print("firstboot-chooser: starting", file=sys.stderr, flush=True)
+print(f"firstboot-chooser: WAYLAND_DISPLAY={os.environ.get('WAYLAND_DISPLAY')!r}", file=sys.stderr, flush=True)
+
 from firstboot.app import main  # noqa: E402
+print("firstboot-chooser: imported", file=sys.stderr, flush=True)
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except Exception:
+        import traceback
+
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        raise

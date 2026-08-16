@@ -9,7 +9,6 @@ import subprocess
 import sys
 
 from firstboot.assets import find_logo
-from firstboot.dimmer import BlurDimmer
 from firstboot.payload import Distro, Edition, Payload, load_payload
 from firstboot.shell import Shell
 from firstboot.style import CSS
@@ -45,6 +44,7 @@ def run_window(
     open_menu: str | None = None,
     light: bool = False,
 ) -> int:
+    print("firstboot-chooser: run", file=sys.stderr, flush=True)
     import gi
 
     gi.require_version("Gdk", "4.0")
@@ -52,6 +52,7 @@ def run_window(
     gi.require_version("Adw", "1")
 
     from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+    print("firstboot-chooser: gtk ready", file=sys.stderr, flush=True)
 
     class Chooser(Adw.Application):
         def __init__(
@@ -63,7 +64,10 @@ def run_window(
             open_menu: str | None = None,
             light: bool = False,
         ) -> None:
-            super().__init__(application_id="org.firstboot.Chooser")
+            super().__init__(
+                application_id="org.firstboot.Chooser",
+                flags=Gio.ApplicationFlags.NON_UNIQUE,
+            )
             self.payload_root = root
             self.payload = load_payload(root)
             self.dark = not light
@@ -76,6 +80,7 @@ def run_window(
             self.connect("activate", self.on_activate)
 
         def on_activate(self, _app: Adw.Application) -> None:
+            print("firstboot-chooser: activate", file=sys.stderr, flush=True)
             Adw.StyleManager.get_default().set_color_scheme(
                 Adw.ColorScheme.FORCE_LIGHT if not self.dark else Adw.ColorScheme.FORCE_DARK
             )
@@ -90,20 +95,21 @@ def run_window(
 
             self.win = Gtk.ApplicationWindow(application=self, title="First Boot Linux")
             self.win.add_css_class("firstboot")
-            width, height = 1280, 800
-            if display is not None:
-                monitors = display.get_monitors()
-                if monitors.get_n_items() > 0:
-                    geo = monitors.get_item(0).get_geometry()
-                    width = min(1280, max(800, geo.width - 80))
-                    height = min(800, max(600, geo.height - 80))
-            self.win.set_default_size(width, height)
             kiosk = (
                 os.environ.get("FIRSTBOOT_KIOSK") == "1"
                 or os.environ.get("XDG_CURRENT_DESKTOP") == "FirstBoot"
             )
             if kiosk:
                 self.win.set_decorated(False)
+            else:
+                width, height = 1280, 800
+                if display is not None:
+                    monitors = display.get_monitors()
+                    if monitors.get_n_items() > 0:
+                        geo = monitors.get_item(0).get_geometry()
+                        width = min(1280, max(800, geo.width - 80))
+                        height = min(800, max(600, geo.height - 80))
+                self.win.set_default_size(width, height)
 
             self.toasts = Adw.ToastOverlay()
             self.overlay = Gtk.Overlay()
@@ -156,6 +162,8 @@ def run_window(
             scroll.set_child(outer)
             stage.set_child(scroll)
 
+            from firstboot.dimmer import BlurDimmer
+
             self.dimmer = BlurDimmer()
             self.dimmer.add_css_class("dimmer")
             self.dimmer.set_source(scroll)
@@ -190,12 +198,22 @@ def run_window(
             self.shell.tick_clock()
             GLib.timeout_add_seconds(15, self.shell.tick_clock)
             GLib.timeout_add_seconds(5, self.shell.refresh_net)
-            self.win.set_visible(True)
-            GLib.idle_add(self.win.present)
+            self.win.present()
+            self._announce_ready()
             if self.open_menu:
                 GLib.idle_add(lambda: self.shell.show_menu(self.open_menu) or False)
             if self.screenshot:
                 GLib.timeout_add(1200, self._write_screenshot)
+
+        def _announce_ready(self) -> None:
+            print("firstboot-chooser: window presented", file=sys.stderr, flush=True)
+            try:
+                subprocess.run(
+                    ["logger", "-t", "firstboot-chooser", "window presented"],
+                    check=False,
+                )
+            except OSError:
+                pass
 
         def _on_key(self, _c: Gtk.EventControllerKey, keyval: int, *_rest: object) -> bool:
             if self.shell.handle_key(keyval):
@@ -543,6 +561,7 @@ def run_window(
             self.quit()
             return False
 
+    print("firstboot-chooser: creating application", file=sys.stderr, flush=True)
     return int(
         Chooser(
             payload_root,
@@ -606,8 +625,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="start in the light style",
     )
+    print("firstboot-chooser: main", file=sys.stderr, flush=True)
     args = parser.parse_args(argv)
+    print(f"firstboot-chooser: loading payload {args.payload!r}", file=sys.stderr, flush=True)
     payload = load_payload(args.payload)
+    print("firstboot-chooser: payload loaded", file=sys.stderr, flush=True)
     if args.check or args.dump:
         dump_payload(payload)
         return 1 if payload.retailer is None else 0

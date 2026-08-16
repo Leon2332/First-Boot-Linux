@@ -18,10 +18,9 @@ func main() {
 	}
 	err := writeusb.Write(*image, *device, func(got, total int64) {
 		if total > 0 {
-			fmt.Fprintf(os.Stderr, "\rwriting %d%%", got*100/total)
+			fmt.Fprintf(os.Stderr, "PROGRESS %d %d\n", got, total)
 		}
 	})
-	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

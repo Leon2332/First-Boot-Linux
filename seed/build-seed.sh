@@ -176,6 +176,12 @@ copy_overlay() {
   if [[ -f $ROOTFS/usr/libexec/firstboot/print-secureboot ]]; then
     chmod 755 "$ROOTFS/usr/libexec/firstboot/print-secureboot"
   fi
+  if [[ -f $ROOTFS/usr/share/firstboot/labwc/autostart ]]; then
+    chmod 755 "$ROOTFS/usr/share/firstboot/labwc/autostart"
+  fi
+  if [[ -f $ROOTFS/usr/bin/firstboot-login ]]; then
+    chmod 755 "$ROOTFS/usr/bin/firstboot-login"
+  fi
 }
 
 install_chooser() {
@@ -188,6 +194,8 @@ install_chooser() {
     "$ROOTFS/usr/share/firstboot/distros" \
     "$ROOTFS/usr/share/firstboot/status" \
     "$ROOTFS/usr/share/firstboot/apps"
+  # dest must not already exist: `cp -a src dest` then nests dest/firstboot/.
+  rm -rf "$ROOTFS/usr/share/firstboot/python/firstboot"
   cp -a "$REPO_DIR/chooser/firstboot" "$ROOTFS/usr/share/firstboot/python/firstboot"
   find "$ROOTFS/usr/share/firstboot/python" -depth -type d -name __pycache__ -exec rm -rf {} +
   local logo="$REPO_DIR/docs/Logo/First Boot Linux.png"

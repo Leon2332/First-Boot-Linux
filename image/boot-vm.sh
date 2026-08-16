@@ -187,7 +187,9 @@ smoke_ok() {
   text=$(serial_plain)
   grep -Eq 'Unable to find a medium containing a live file system' <<<"$text" && return 1
   grep -Eq '/run/payload' <<<"$text" || return 1
-  grep -Eq 'getty@tty1' <<<"$text" || return 1
+  grep -Eq 'getty@tty1|firstboot-kiosk.service' <<<"$text" || return 1
+  grep -Eq 'firstboot-session: (cage|labwc) exited' <<<"$text" && return 1
+  grep -Eq 'firstboot-chooser: window presented' <<<"$text" || return 1
   if [[ $SECURE_BOOT -eq 1 ]]; then
     grep -Eq 'firstboot-sb: SecureBoot=1' <<<"$text" || return 1
     grep -Eq 'firstboot-sb: SecureBoot=0' <<<"$text" && return 1
@@ -217,7 +219,7 @@ smoke_watch() {
       if [[ $SECURE_BOOT -eq 1 ]]; then
         log "smoke: Secure Boot on, /run/payload mounted, getty@tty1 started"
       else
-        log "smoke: /run/payload mounted and getty@tty1 started"
+        log "smoke: /run/payload mounted, getty@tty1, chooser presented"
       fi
       kill "$qemu_pid" 2>/dev/null || true
       wait "$qemu_pid" || true
@@ -230,7 +232,7 @@ smoke_watch() {
   if [[ $SECURE_BOOT -eq 1 ]]; then
     echo "error: smoke timed out after ${SMOKE_TIMEOUT}s (need /run/payload, getty@tty1, firstboot-sb: SecureBoot=1)" >&2
   else
-    echo "error: smoke timed out after ${SMOKE_TIMEOUT}s (need /run/payload and getty@tty1)" >&2
+    echo "error: smoke timed out after ${SMOKE_TIMEOUT}s (need /run/payload, getty@tty1, firstboot-chooser: window presented)" >&2
   fi
   tail -n 60 "$SERIAL_LOG" >&2 || true
   return 1

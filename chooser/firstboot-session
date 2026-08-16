@@ -1,47 +1,62 @@
 #!/bin/sh
-# Start cage with the First Boot chooser. Used as the tty1 login session.
+# Start the First Boot chooser under labwc. Used as the tty1 login session.
 set -u
 
 export XDG_SESSION_TYPE=wayland
 export XDG_CURRENT_DESKTOP=FirstBoot
 export FIRSTBOOT_KIOSK=1
 export GDK_BACKEND=wayland
-# GTK4 a11y / GSK / wlroots EGL abort on virtio + llvmpipe.
 export GTK_A11Y=none
 export NO_AT_BRIDGE=1
 export GSK_RENDERER="${GSK_RENDERER:-cairo}"
 export WLR_RENDERER="${WLR_RENDERER:-pixman}"
+export GSETTINGS_BACKEND="${GSETTINGS_BACKEND:-memory}"
+export GTK_USE_PORTAL="${GTK_USE_PORTAL:-0}"
+
+LABWC_DIR=/usr/share/firstboot/labwc
+
+note() {
+  echo "firstboot-session: $*" >&2
+  printf '<6>firstboot-session: %s\n' "$*" >/dev/kmsg 2>/dev/null || true
+  logger -t firstboot-session "$*" || true
+}
 
 drop_to_shell() {
-  echo "firstboot-session: $*" >&2
-  logger -t firstboot-session "$*" || true
+  note "$*"
   export FIRSTBOOT_NO_KIOSK=1
   exec /bin/bash
 }
 
-if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "$XDG_RUNTIME_DIR" ]; then
-  drop_to_shell "no usable XDG_RUNTIME_DIR (logind session missing)"
+if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "$XDG_RUNTIME_DIR" ] || [ ! -w "$XDG_RUNTIME_DIR" ]; then
+  XDG_RUNTIME_DIR=/tmp/firstboot-runtime
+  mkdir -p "$XDG_RUNTIME_DIR" || drop_to_shell "cannot create $XDG_RUNTIME_DIR"
+  chmod 700 "$XDG_RUNTIME_DIR"
+  export XDG_RUNTIME_DIR
+  note "using $XDG_RUNTIME_DIR"
 fi
 
-if ! command -v cage >/dev/null 2>&1; then
-  drop_to_shell "cage not found"
+if ! command -v labwc >/dev/null 2>&1; then
+  drop_to_shell "labwc not found"
 fi
 
 if ! command -v firstboot-chooser >/dev/null 2>&1; then
   drop_to_shell "firstboot-chooser not found"
 fi
 
-logger -t firstboot-session "starting cage + chooser" || true
+if [ ! -d "$LABWC_DIR" ]; then
+  drop_to_shell "labwc config missing ($LABWC_DIR)"
+fi
 
-# -s: allow VT switch for field debug (Ctrl+Alt+F2)
-# -d: no client-side decorations
+note "starting labwc + chooser"
+
+note "exec labwc"
 if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && command -v dbus-run-session >/dev/null 2>&1; then
-  dbus-run-session -- cage -s -d -- firstboot-chooser
+  dbus-run-session -- labwc -V -C "$LABWC_DIR" -S /usr/bin/firstboot-chooser
 else
-  cage -s -d -- firstboot-chooser
+  labwc -V -C "$LABWC_DIR" -S /usr/bin/firstboot-chooser
 fi
 status=$?
 if [ "$status" -eq 0 ]; then
   exit 0
 fi
-drop_to_shell "cage exited $status"
+drop_to_shell "labwc exited $status"
