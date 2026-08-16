@@ -280,6 +280,16 @@
     { pct: 100, label: "Ready" },
   ];
 
+  const STEPS_SHOP = [
+    { pct: 12, label: "Preparing the disk…" },
+    { pct: 34, label: "Copying boot files…" },
+    { pct: 58, label: "Copying First Boot…" },
+    { pct: 82, label: "Copying recommended systems…" },
+    { pct: 100, label: "Complete" },
+  ];
+
+  const SHOP_LOGO = "Logo/First%20Boot%20Linux.png";
+
   const state = {
     network: {
       connected: false,
@@ -364,6 +374,7 @@
     startSkipBtn: $("start-skip-btn"),
     appMenuBtn: $("app-menu-btn"),
     appMenu: $("app-menu"),
+    appMenuInstallDevice: $("app-menu-install-device"),
     appMenuEpiphany: $("app-menu-epiphany"),
     appMenuSysinfo: $("app-menu-sysinfo"),
     appMenuTerminal: $("app-menu-terminal"),
@@ -1143,10 +1154,14 @@
     });
   }
 
+  function catalogName(d) {
+    return d.id === "ms-windows" ? "Microsoft Windows" : d.name;
+  }
+
   function renderCatalog() {
     els.catalogList.innerHTML = "";
     const sorted = CATALOG.slice().sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+      catalogName(a).localeCompare(catalogName(b), undefined, { sensitivity: "base" })
     );
     sorted.forEach((d) => {
       const btn = document.createElement("button");
@@ -1155,7 +1170,7 @@
       btn.setAttribute("role", "listitem");
       btn.innerHTML = `
         <img class="distro-logo" src="${d.logo}" alt="" draggable="false" />
-        <h3>${escapeHtml(d.name)}</h3>
+        <h3>${escapeHtml(catalogName(d))}</h3>
         <span class="meta">${escapeHtml(d.version)}</span>
       `;
       btn.addEventListener("click", () => openDetail(d.id, "catalog"));
@@ -1411,6 +1426,7 @@
 
     const deLabel = de.name || d.desktop;
 
+    els.installLogo.classList.remove("install-brand-logo");
     els.installLogo.src = d.logo;
     els.installLogo.alt = d.name;
     els.installTitle.textContent = deLabel
@@ -1479,10 +1495,65 @@
     els.powerModal.hidden = false;
   }
 
+  function requestShopInstall() {
+    closeMenus();
+    state.pendingPower = "shop-install";
+    els.powerModalTitle.textContent = "Install to this device?";
+    els.powerModalBody.textContent =
+      "This will erase the internal disk and copy First Boot Linux onto it.";
+    els.powerModalConfirm.textContent = "Install";
+    els.powerModal.hidden = false;
+  }
+
+  function startShopInstall() {
+    closeMenus();
+    showScreen("install");
+
+    els.installLogo.classList.add("install-brand-logo");
+    els.installLogo.src = SHOP_LOGO;
+    els.installLogo.alt = "First Boot Linux";
+    els.installTitle.textContent = "Installing First Boot Linux";
+    els.installSubtitle.textContent = "";
+    els.progressFill.style.width = "0%";
+    els.progressLabel.textContent = "0%";
+    els.progressStep.textContent = "";
+    els.progressBar.setAttribute("aria-valuenow", "0");
+
+    let i = 0;
+    if (state.installTimer) clearInterval(state.installTimer);
+
+    function tick() {
+      if (i >= STEPS_SHOP.length) {
+        clearInterval(state.installTimer);
+        state.installTimer = null;
+        setTimeout(() => {
+          els.doneMessage.textContent =
+            "First Boot Linux is on this computer. Remove the USB stick and restart.";
+          showScreen("done");
+        }, 350);
+        return;
+      }
+      const step = STEPS_SHOP[i];
+      els.progressFill.style.width = step.pct + "%";
+      els.progressLabel.textContent = step.pct + "%";
+      els.progressStep.textContent = step.label;
+      els.installSubtitle.textContent = step.label;
+      els.progressBar.setAttribute("aria-valuenow", String(step.pct));
+      i += 1;
+    }
+
+    tick();
+    state.installTimer = setInterval(tick, 500);
+  }
+
   function confirmPower() {
     els.powerModal.hidden = true;
     const action = state.pendingPower;
     state.pendingPower = null;
+    if (action === "shop-install") {
+      startShopInstall();
+      return;
+    }
     if (action === "shutdown") {
       document.body.style.transition = "opacity 0.5s";
       document.body.style.opacity = "0";
@@ -1618,6 +1689,9 @@
       e.stopPropagation();
       openAppMenu();
     });
+    if (els.appMenuInstallDevice) {
+      els.appMenuInstallDevice.addEventListener("click", requestShopInstall);
+    }
     els.appMenuEpiphany.addEventListener("click", () => {
       if (els.epiWindow && !els.epiWindow.hidden) {
         closeMenus();
@@ -1660,6 +1734,38 @@
     updateNetworkUI();
     applyVolume();
     bind();
+    applyPreviewQuery();
+  }
+
+  function applyPreviewQuery() {
+    const q = new URLSearchParams(window.location.search);
+    const shop = q.get("shop");
+    const menu = q.get("menu");
+    if (q.get("theme") === "light") {
+      state.darkStyle = false;
+      applyTheme();
+    }
+    if (q.has("skip-start") || menu || shop) dismissStartOverlay();
+    if (menu === "apps") openAppMenu();
+    if (shop === "confirm") requestShopInstall();
+    if (shop === "install") startShopInstall();
+    if (shop === "progress") {
+      showScreen("install");
+      els.installLogo.classList.add("install-brand-logo");
+      els.installLogo.src = SHOP_LOGO;
+      els.installLogo.alt = "First Boot Linux";
+      els.installTitle.textContent = "Installing First Boot Linux";
+      els.installSubtitle.textContent = "Copying First Boot…";
+      els.progressFill.style.width = "58%";
+      els.progressLabel.textContent = "58%";
+      els.progressStep.textContent = "Copying First Boot…";
+      els.progressBar.setAttribute("aria-valuenow", "58");
+    }
+    if (shop === "done") {
+      els.doneMessage.textContent =
+        "First Boot Linux is on this computer. Remove the USB stick and restart.";
+      showScreen("done");
+    }
   }
 
   if (document.readyState === "loading") {

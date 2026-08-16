@@ -800,12 +800,40 @@ html[data-theme="light"] .qs-slider::-moz-range-thumb {
   background-color: var(--surface-muted);
 }
 
+.app-menu-sep {
+  height: 1px;
+  margin: 6px 8px;
+  background: var(--border-strong);
+}
+
 .app-menu-item-icon {
   width: 24px;
   height: 24px;
   object-fit: contain;
   border-radius: 5px;
   flex-shrink: 0;
+}
+
+.app-menu-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.app-menu-item-label {
+  line-height: 1.25;
+}
+
+.app-menu-item-sub {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: rgba(246, 245, 244, 0.42);
+}
+
+html[data-theme="light"] .app-menu-item-sub {
+  color: rgba(28, 28, 28, 0.4);
 }
 
 /* Power menu */
@@ -1434,6 +1462,20 @@ html[data-theme="light"] .detail-progress {
 .install-panel .distro-logo,
 .done-panel .done-check {
   margin: 0 auto 18px;
+}
+
+.install-panel .install-brand-logo {
+  border-radius: 0;
+  background: transparent;
+}
+
+html[data-theme="dark"] .install-panel .install-brand-logo {
+  mix-blend-mode: screen;
+}
+
+html[data-theme="light"] .install-panel .install-brand-logo {
+  filter: invert(1);
+  mix-blend-mode: multiply;
 }
 
 .install-panel h1,
