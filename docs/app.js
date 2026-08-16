@@ -65,7 +65,7 @@
     {
       id: "ms-windows",
       name: "MS Windows",
-      desktop: "Windows 11",
+      desktop: "Windows",
       tagline: "Familiar and widely used",
       desc: "The desktop most people already know. Broad software and hardware support, with a familiar Start menu and settings.",
       version: "11",
@@ -359,6 +359,9 @@
     powerModalCancel: $("power-modal-cancel"),
     powerModalConfirm: $("power-modal-confirm"),
     toast: $("toast"),
+    startOverlay: $("start-overlay"),
+    startFullscreenBtn: $("start-fullscreen-btn"),
+    startSkipBtn: $("start-skip-btn"),
     appMenuBtn: $("app-menu-btn"),
     appMenu: $("app-menu"),
     appMenuEpiphany: $("app-menu-epiphany"),
@@ -424,6 +427,25 @@
     els.systemMenuBtn.setAttribute("aria-expanded", "false");
     els.appMenuBtn.setAttribute("aria-expanded", "false");
     els.backdrop.hidden = true;
+  }
+
+  function startOverlayOpen() {
+    return els.startOverlay && !els.startOverlay.hidden;
+  }
+
+  function dismissStartOverlay() {
+    if (els.startOverlay) els.startOverlay.hidden = true;
+  }
+
+  async function enterFullscreenPreview() {
+    const target = document.documentElement;
+    try {
+      if (target.requestFullscreen) await target.requestFullscreen();
+      else if (target.webkitRequestFullscreen) await target.webkitRequestFullscreen();
+      else if (target.msRequestFullscreen) await target.msRequestFullscreen();
+    } catch {
+    }
+    dismissStartOverlay();
   }
 
   function termPromptHtml() {
@@ -1538,8 +1560,26 @@
       if (e.target === els.screenDetail) showScreen("chooser");
     });
 
+    if (els.startFullscreenBtn) {
+      els.startFullscreenBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        enterFullscreenPreview();
+      });
+    }
+    if (els.startSkipBtn) {
+      els.startSkipBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        dismissStartOverlay();
+      });
+    }
+    if (els.startOverlay) {
+      els.startOverlay.addEventListener("click", (e) => e.stopPropagation());
+      els.startOverlay.querySelector(".start-overlay-card")?.addEventListener("click", (e) => e.stopPropagation());
+    }
+
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
+        if (startOverlayOpen()) return;
         if (!els.powerModal.hidden) {
           els.powerModal.hidden = true;
           state.pendingPower = null;

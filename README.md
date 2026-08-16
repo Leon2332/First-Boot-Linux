@@ -22,7 +22,7 @@ When someone unboxes a machine, they should not be locked into an operating syst
 
 
 MS Windows acquired unnatural levels of popularity through pre-installs on new hardware. This alternative should have existed ~20 years ago.
-By all means, a retailer may configure their FBL intall to provide Linux distros, BSD or even MS Windows (if possible).
+By all means, a retailer may configure their FBL install to provide Linux distros, BSD or even MS Windows (if possible).
 
 <i>"It's not for us to tell people what they should want to use. It's for us to provide a choice."</i>
 
