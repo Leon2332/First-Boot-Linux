@@ -31,23 +31,26 @@ import (
 var webFS embed.FS
 
 type session struct {
-	off      *catalog.Official
-	seed     *seedpath.Seed
-	seedErr  error
-	dark     string
-	light    string
-	mu       sync.Mutex
-	busy     bool
-	stage    string
-	got      int64
-	total    int64
-	done     bool
-	jobErr   string
-	tasks    []jobTask
-	cancel   context.CancelFunc
+	off     *catalog.Official
+	seed    *seedpath.Seed
+	seedErr error
+	dark    string
+	light   string
+	mu      sync.Mutex
+	busy    bool
+	stage   string
+	got     int64
+	total   int64
+	done    bool
+	jobErr  string
+	tasks   []jobTask
+	cancel  context.CancelFunc
 }
 
 func Run() error {
+	if os.Geteuid() == 0 {
+		return fmt.Errorf("do not run the shop GUI as root; writing a USB will ask for permission")
+	}
 	off, err := catalog.LoadOfficial("")
 	if err != nil {
 		return err
@@ -109,7 +112,7 @@ func (s *session) state(w http.ResponseWriter, r *http.Request) {
 			Tagline: d.Tagline, Description: d.Description,
 			Stageable: d.Stageable(), Redistributable: d.Redistributable,
 			SuggestedDefault: d.SuggestedDefault,
-			Logo: assets.DistroLogo(d.ID) != "",
+			Logo:             assets.DistroLogo(d.ID) != "",
 		}
 		if ed := d.DefaultEdition(); ed != nil {
 			item.Edition = ed.Name
@@ -125,10 +128,10 @@ func (s *session) state(w http.ResponseWriter, r *http.Request) {
 		seedErr = s.seedErr.Error()
 	}
 	writeJSON(w, map[string]any{
-		"distros":        list,
-		"seed_ok":        seedOK,
-		"seed_error":     seedErr,
-		"default_image":  defaultImagePath(),
+		"distros":       list,
+		"seed_ok":       seedOK,
+		"seed_error":    seedErr,
+		"default_image": defaultImagePath(),
 	})
 }
 
@@ -155,8 +158,8 @@ func (s *session) estimate(w http.ResponseWriter, r *http.Request) {
 		names = append(names, d.Name+" "+d.Version)
 	}
 	writeJSON(w, map[string]any{
-		"summary": est.Summary,
-		"hint":    "On this stick: " + strings.Join(names, ", ") + ".",
+		"summary":  est.Summary,
+		"hint":     "On this stick: " + strings.Join(names, ", ") + ".",
 		"stick_gb": est.StickGB,
 		"disk_gb":  est.DiskGB,
 	})
@@ -441,9 +444,9 @@ func (s *session) progress(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeStick(ctx context.Context, image, device string, progress func(string, int64, int64)) error {
-	helper := findHelper()
-	if helper == "" {
-		return fmt.Errorf("firstboot-write-usb is not next to this program")
+	helper, err := materializeHelper()
+	if err != nil {
+		return err
 	}
 	var cmd *exec.Cmd
 	if p, err := exec.LookPath("pkexec"); err == nil {
@@ -503,25 +506,6 @@ func writeStick(ctx context.Context, image, device string, progress func(string,
 		return err
 	}
 	return nil
-}
-
-func findHelper() string {
-	exe, err := os.Executable()
-	if err == nil {
-		dir := filepath.Dir(exe)
-		for _, p := range []string{
-			filepath.Join(dir, "firstboot-write-usb"),
-			filepath.Join(dir, "bin", "firstboot-write-usb"),
-		} {
-			if assets.FileExists(p) {
-				return p
-			}
-		}
-	}
-	if p, err := exec.LookPath("firstboot-write-usb"); err == nil {
-		return p
-	}
-	return ""
 }
 
 func defaultImagePath() string {

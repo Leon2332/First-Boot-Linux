@@ -25,9 +25,10 @@ usage() {
   cat <<EOF
 Usage: $(basename "$0") [--seed DIR] [--out DIR]
 
-Pack firstboot-seed-\$VERSION.tar and firstboot-creator-\$VERSION-linux-amd64.tar.gz
-into build/release/ (gitignored). Upload those files plus SHA256SUMS as the
-GitHub Release assets. Version comes from seed/VERSION.
+Pack firstboot-seed-\$VERSION.tar, firstboot-creator-\$VERSION-linux-amd64.tar.gz,
+and firstboot-creator-\$VERSION-x86_64.AppImage into build/release/ (gitignored).
+Upload those files plus SHA256SUMS and README.md as the GitHub Release assets.
+Version comes from seed/VERSION.
 
 Does not run the seed builder. Rebuild the squashfs first when VERSION changes.
 EOF
@@ -73,26 +74,54 @@ make -C "$REPO_DIR/creator" all
 [[ -x $REPO_DIR/creator/bin/firstboot-creator ]] || die "creator binary missing"
 [[ -x $REPO_DIR/creator/bin/firstboot-write-usb ]] || die "write-usb binary missing"
 
+readme_src=$REPO_DIR/scripts/release-README.md
+[[ -f $readme_src ]] || die "missing $readme_src"
+
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
 seed_tar=firstboot-seed-$VERSION.tar
 creator_tar=firstboot-creator-$VERSION-linux-amd64.tar.gz
 
+log "README.md"
+sed "s/@VERSION@/$VERSION/g" "$readme_src" > "$OUT/README.md"
+
 log "pack $seed_tar"
 tar -C "$SEED" -cf "$OUT/$seed_tar" \
   "${SEED_FILES[@]}" \
   efi
 
+stage=$(mktemp -d)
+trap 'rm -rf "$stage"' EXIT
+mkdir -p "$stage/boot" "$stage/wallpapers"
+cp -a "$REPO_DIR/creator/bin/firstboot-creator" "$stage/"
+cp -a "$REPO_DIR/creator/bin/firstboot-write-usb" "$stage/"
+cp -a "$REPO_DIR/schemas/official-catalog.json" "$stage/"
+cp -a "$REPO_DIR/image/grub.cfg" "$stage/boot/"
+cp -a "$REPO_DIR/image/efi-grub.cfg" "$stage/boot/"
+cp -a "$REPO_DIR/docs/assets/Wallpaper/annie-spratt-nJGaLopCqJk-unsplash.jpg" \
+  "$stage/wallpapers/dark.jpg"
+cp -a "$REPO_DIR/docs/assets/Wallpaper/ands-mahardika--MRPyzpWsh0-unsplash.jpg" \
+  "$stage/wallpapers/light.jpg"
+cp -a "$OUT/README.md" "$stage/"
+
 log "pack $creator_tar"
-tar -C "$REPO_DIR/creator/bin" -czf "$OUT/$creator_tar" \
+tar -C "$stage" -czf "$OUT/$creator_tar" \
   firstboot-creator \
-  firstboot-write-usb
+  firstboot-write-usb \
+  official-catalog.json \
+  boot \
+  wallpapers \
+  README.md
+
+creator_appimage=firstboot-creator-$VERSION-x86_64.AppImage
+log "AppImage $creator_appimage"
+bash "$REPO_DIR/scripts/package-appimage.sh" --out "$OUT/$creator_appimage"
 
 log "checksums"
 (
   cd "$OUT"
-  sha256sum "$seed_tar" "$creator_tar" > SHA256SUMS
+  sha256sum "$seed_tar" "$creator_tar" "$creator_appimage" > SHA256SUMS
 )
 
 log "release assets in $OUT"

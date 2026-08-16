@@ -34,6 +34,12 @@ func Locate(explicit string) (*Seed, error) {
 	if env := os.Getenv("FIRSTBOOT_SEED"); env != "" {
 		candidates = append(candidates, env)
 	}
+	if imgDir := assets.AppImageDir(); imgDir != "" {
+		candidates = append(candidates, filepath.Join(imgDir, "seed"))
+	} else if appDir := assets.AppDir(); appDir != "" {
+		// Extracted AppDir (no APPIMAGE): seed/ sits next to squashfs-root/.
+		candidates = append(candidates, filepath.Join(filepath.Dir(appDir), "seed"))
+	}
 	exe := assets.ExecutableDir()
 	candidates = append(candidates,
 		filepath.Join(exe, "seed"),
@@ -53,7 +59,11 @@ func Locate(explicit string) (*Seed, error) {
 			return s, nil
 		}
 	}
-	return nil, fmt.Errorf("no First Boot seed found (looked in %s). Build it with ./seed/build-in-docker.sh", join(tried))
+	hint := "Unpack firstboot-seed-*.tar into a seed/ directory next to this program, or set FIRSTBOOT_SEED"
+	if _, err := assets.RepoRoot(""); err == nil {
+		hint = "Build it with ./seed/build-in-docker.sh"
+	}
+	return nil, fmt.Errorf("no First Boot seed found (looked in %s). %s", join(tried), hint)
 }
 
 func Open(dir string) (*Seed, error) {

@@ -96,6 +96,38 @@ func FirstExisting(paths ...string) (string, error) {
 	return "", fmt.Errorf("none of the paths exist")
 }
 
+// AppDir is the mounted or extracted AppImage directory (APPDIR).
+func AppDir() string {
+	d := os.Getenv("APPDIR")
+	if d == "" || !dirExists(d) {
+		return ""
+	}
+	return d
+}
+
+// AppImageFile is the path of the running AppImage (APPIMAGE), if any.
+func AppImageFile() string {
+	return os.Getenv("APPIMAGE")
+}
+
+// AppImageDir is the directory that contains the AppImage file.
+func AppImageDir() string {
+	p := AppImageFile()
+	if p == "" {
+		return ""
+	}
+	return filepath.Dir(p)
+}
+
+func sharePath(elem ...string) []string {
+	var out []string
+	if d := AppDir(); d != "" {
+		out = append(out, filepath.Join(append([]string{d, "usr", "share", "firstboot"}, elem...)...))
+		out = append(out, filepath.Join(append([]string{d, "usr", "bin"}, elem...)...))
+	}
+	return out
+}
+
 func OfficialCatalog() (string, error) {
 	if env := os.Getenv("FIRSTBOOT_OFFICIAL_CATALOG"); env != "" {
 		if fileExists(env) {
@@ -104,11 +136,12 @@ func OfficialCatalog() (string, error) {
 		return "", fmt.Errorf("FIRSTBOOT_OFFICIAL_CATALOG: %s not found", env)
 	}
 	exe := ExecutableDir()
-	candidates := []string{
+	candidates := sharePath("official-catalog.json")
+	candidates = append(candidates,
 		filepath.Join(exe, "official-catalog.json"),
 		filepath.Join(exe, "data", "official-catalog.json"),
 		filepath.Join(exe, "embed", "official-catalog.json"),
-	}
+	)
 	if repo, err := RepoRoot(""); err == nil {
 		candidates = append(candidates, filepath.Join(repo, "schemas", "official-catalog.json"))
 	}
@@ -117,11 +150,12 @@ func OfficialCatalog() (string, error) {
 
 func GrubCFG() (string, error) {
 	exe := ExecutableDir()
-	candidates := []string{
+	candidates := sharePath("boot", "grub.cfg")
+	candidates = append(candidates,
 		filepath.Join(exe, "boot", "grub.cfg"),
 		filepath.Join(exe, "data", "boot", "grub.cfg"),
 		filepath.Join(exe, "embed", "boot", "grub.cfg"),
-	}
+	)
 	if repo, err := RepoRoot(""); err == nil {
 		candidates = append(candidates, filepath.Join(repo, "image", "grub.cfg"))
 	}
@@ -130,11 +164,12 @@ func GrubCFG() (string, error) {
 
 func EFIGrubCFG() (string, error) {
 	exe := ExecutableDir()
-	candidates := []string{
+	candidates := sharePath("boot", "efi-grub.cfg")
+	candidates = append(candidates,
 		filepath.Join(exe, "boot", "efi-grub.cfg"),
 		filepath.Join(exe, "data", "boot", "efi-grub.cfg"),
 		filepath.Join(exe, "embed", "boot", "efi-grub.cfg"),
-	}
+	)
 	if repo, err := RepoRoot(""); err == nil {
 		candidates = append(candidates, filepath.Join(repo, "image", "efi-grub.cfg"))
 	}
@@ -154,11 +189,12 @@ func DefaultWallpaper(which string) (string, error) {
 		return "", fmt.Errorf("wallpaper must be dark or light")
 	}
 	exe := ExecutableDir()
-	candidates := []string{
+	candidates := sharePath("wallpapers", name)
+	candidates = append(candidates,
 		filepath.Join(exe, "wallpapers", name),
 		filepath.Join(exe, "data", "wallpapers", name),
 		filepath.Join(exe, "embed", "wallpapers", name),
-	}
+	)
 	if repo, err := RepoRoot(""); err == nil {
 		candidates = append(candidates,
 			filepath.Join(repo, "docs", "assets", "Wallpaper", unsplash),
@@ -170,11 +206,12 @@ func DefaultWallpaper(which string) (string, error) {
 func DistroLogo(id string) string {
 	name := id + ".png"
 	exe := ExecutableDir()
-	candidates := []string{
+	candidates := sharePath("logos", name)
+	candidates = append(candidates,
 		filepath.Join(exe, "logos", name),
 		filepath.Join(exe, "data", "logos", name),
 		filepath.Join(exe, "embed", "logos", name),
-	}
+	)
 	if repo, err := RepoRoot(""); err == nil {
 		candidates = append(candidates, filepath.Join(repo, "docs", "assets", "distros", name))
 	}
@@ -187,10 +224,14 @@ func DistroLogo(id string) string {
 
 func AppIcon() string {
 	exe := ExecutableDir()
-	candidates := []string{
+	candidates := sharePath("icon.png")
+	candidates = append(candidates,
 		filepath.Join(exe, "icon.png"),
 		filepath.Join(exe, "data", "icon.png"),
 		filepath.Join(exe, "embed", "icon.png"),
+	)
+	if d := AppDir(); d != "" {
+		candidates = append(candidates, filepath.Join(d, "firstboot-creator.png"))
 	}
 	if repo, err := RepoRoot(""); err == nil {
 		candidates = append(candidates, filepath.Join(repo, "docs", "Logo", "First Boot Linux.png"))
@@ -213,5 +254,5 @@ func CacheDir() string {
 	return filepath.Join(home, ".cache", "firstboot", "images")
 }
 
-func DirExists(path string) bool { return dirExists(path) }
+func DirExists(path string) bool  { return dirExists(path) }
 func FileExists(path string) bool { return fileExists(path) }

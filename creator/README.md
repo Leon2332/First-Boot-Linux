@@ -15,7 +15,7 @@ Needs a built seed (`../seed/build-in-docker.sh`) and `mke2fs` from e2fsprogs. O
 
 The GUI never runs as root. It writes a disk image first. Putting that image on `/dev/sdX` is `bin/firstboot-write-usb`, via `pkexec` or `sudo`.
 
-v1 ships as one AppImage later. The binaries here are already one file each, no GTK.
+Shop wrap is one AppImage (`../scripts/package-appimage.sh`). The binaries here are already one file each, no GTK. The seed is not inside the AppImage.
 
 ## Same repository
 
