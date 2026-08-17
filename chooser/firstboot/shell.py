@@ -1,7 +1,7 @@
 """GNOME-like kiosk chrome: top bar, quick settings, network, power.
 
-The three mockup apps (browser, system details, terminal) are listed in
-the grid menu and do not launch.
+Browser and system details are listed and do not launch. Terminal opens
+the in-kiosk VTE window.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from firstboot.net import (
     set_wifi_radio,
     snapshot,
 )
+from firstboot.brightness import BrightnessState, get_brightness_backend
 from firstboot.volume import VolumeState, get_volume_backend
 
 if TYPE_CHECKING:
@@ -36,10 +37,15 @@ QS_FG_LIGHT = "#1c1c1c"
 QS_FG_ACTIVE = "#ffffff"
 
 APP_ITEMS = (
-    ("epiphany.png", "Web browser", "Web browser is not on this image yet."),
-    ("cog", "System details", "System details is not on this image yet."),
-    ("org.gnome.Terminal.png", "Terminal", "Terminal is not on this image yet."),
+    ("epiphany.png", "Web browser", "browser"),
+    ("cog", "System details", "sysinfo"),
+    ("org.gnome.Terminal.png", "Terminal", "terminal"),
 )
+
+APP_TOASTS = {
+    "browser": "Web browser is not on this image yet.",
+    "sysinfo": "System details is not on this image yet.",
+}
 
 
 def format_clock(now: dt.datetime) -> str:
@@ -75,18 +81,27 @@ class Shell:
         on_toast: Callable[[str], None],
         on_power: Callable[[str], None],
         get_window: Callable,
+        on_shop_install: Callable[[], None] | None = None,
+        on_terminal: Callable[[], None] | None = None,
+        show_shop_install: bool = False,
     ) -> None:
         self.on_theme = on_theme
         self.on_toast = on_toast
         self.on_power = on_power
         self.get_window = get_window
+        self.on_shop_install = on_shop_install
+        self.on_terminal = on_terminal
+        self.show_shop_install = show_shop_install
         self.dark = True
         self.volume = get_volume_backend()
+        self.brightness = get_brightness_backend()
         self.net: NetSnapshot = empty_snapshot()
         self.open_menu: str | None = None
         self.allow_scan = True
+        self.locked = False
         self._busy = False
         self._built = False
+        self._app_download = None
 
     def build(self) -> tuple[Gtk.Widget, list[Gtk.Widget]]:
         from gi.repository import Gtk
@@ -151,6 +166,13 @@ class Shell:
             pass
         return True
 
+    def refresh_brightness(self) -> bool:
+        try:
+            self._paint_brightness(self.brightness.get())
+        except Exception:
+            pass
+        return True
+
     def handle_key(self, keyval: int) -> bool:
         from gi.repository import Gdk
 
@@ -163,6 +185,8 @@ class Shell:
         return True
 
     def show_menu(self, name: str | None) -> None:
+        if self.locked and name is not None:
+            return
         if name == self.open_menu:
             self.close_menus()
             return
@@ -188,6 +212,7 @@ class Shell:
                 GLib.timeout_add(400, self._scan_async)
         if name == "qs":
             self.refresh_volume()
+            self.refresh_brightness()
             self.refresh_net()
 
     def close_menus(self) -> None:
@@ -314,6 +339,23 @@ class Shell:
         slider_row.append(self.mute_btn)
         slider_row.append(self.vol_scale)
         panel.append(slider_row)
+
+        bri_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.bri_btn = Gtk.Button()
+        self.bri_btn.add_css_class("qs-slider-icon")
+        self.bri_btn.set_has_frame(False)
+        self.bri_btn.set_tooltip_text("Brightness")
+        self.qs_bri_img = Gtk.Image()
+        self.bri_btn.set_child(self.qs_bri_img)
+        self.bri_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+        self.bri_scale.add_css_class("qs-slider")
+        self.bri_scale.set_draw_value(False)
+        self.bri_scale.set_hexpand(True)
+        self.bri_scale.set_value(100)
+        self.bri_scale.connect("value-changed", self._on_brightness)
+        bri_row.append(self.bri_btn)
+        bri_row.append(self.bri_scale)
+        panel.append(bri_row)
         return panel
 
     def _qs_tile(
@@ -470,9 +512,15 @@ class Shell:
         panel.set_valign(Gtk.Align.START)
         panel.set_margin_top(40)
         panel.set_margin_start(10)
-        panel.set_size_request(240, -1)
+        panel.set_size_request(260, -1)
 
-        for icon, label, msg in APP_ITEMS:
+        if self.show_shop_install:
+            panel.append(self._shop_install_row())
+            sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+            sep.add_css_class("app-menu-sep")
+            panel.append(sep)
+
+        for icon, label, action in APP_ITEMS:
             btn = Gtk.Button()
             btn.add_css_class("app-menu-item")
             btn.set_has_frame(False)
@@ -495,13 +543,56 @@ class Shell:
             row.append(img)
             row.append(Gtk.Label(label=label, xalign=0))
             btn.set_child(row)
-            btn.connect("clicked", lambda *_a, m=msg: self._app_clicked(m))
+            btn.connect("clicked", lambda *_a, a=action: self._app_clicked(a))
             panel.append(btn)
         return panel
 
-    def _app_clicked(self, msg: str) -> None:
+    def _shop_install_row(self) -> Gtk.Widget:
+        from gi.repository import Gtk
+
+        btn = Gtk.Button()
+        btn.add_css_class("app-menu-item")
+        btn.set_has_frame(False)
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        img = Gtk.Image()
+        img.set_pixel_size(24)
+        img.set_valign(Gtk.Align.CENTER)
+        path = find_status("folder-download-symbolic.svg")
+        if path:
+            tex = _texture(path, self._fg(), 24)
+            if tex is not None:
+                img.set_from_paintable(tex)
+            else:
+                img.set_from_file(path)
+        self._app_download = img
+        text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+        text.set_valign(Gtk.Align.CENTER)
+        lab = Gtk.Label(label="Install to this device", xalign=0)
+        lab.add_css_class("app-menu-item-label")
+        sub = Gtk.Label(label="First Boot Linux", xalign=0)
+        sub.add_css_class("app-menu-item-sub")
+        text.append(lab)
+        text.append(sub)
+        row.append(img)
+        row.append(text)
+        btn.set_child(row)
+        btn.connect("clicked", lambda *_: self._shop_clicked())
+        return btn
+
+    def _shop_clicked(self) -> None:
         self.close_menus()
-        self.on_toast(msg)
+        if self.on_shop_install is not None:
+            self.on_shop_install()
+
+    def _app_clicked(self, action: str) -> None:
+        self.close_menus()
+        if action == "terminal":
+            if self.on_terminal is not None:
+                self.on_terminal()
+            else:
+                self.on_toast("Terminal is not on this image yet.")
+            return
+        self.on_toast(APP_TOASTS.get(action, f"{action} is not on this image yet."))
 
     def _power(self, action: str) -> None:
         self.close_menus()
@@ -526,6 +617,15 @@ class Shell:
             return
         self._paint_volume(st)
 
+    def _on_brightness(self, scale) -> None:
+        if getattr(self, "_bri_lock", False):
+            return
+        try:
+            st = self.brightness.set_level(int(scale.get_value()))
+        except Exception:
+            return
+        self._paint_brightness(st, move_scale=False)
+
     def _paint_volume(self, st: VolumeState, *, move_scale: bool = True) -> None:
         if not self._built:
             return
@@ -537,6 +637,16 @@ class Shell:
         set_symbolic(self.vol_img, st.icon, PANEL_FG, 16)
         set_symbolic(self.qs_vol_img, st.icon, color, 16)
         self.mute_btn.set_tooltip_text("Unmute" if st.output == 0 else "Mute")
+
+    def _paint_brightness(self, st: BrightnessState, *, move_scale: bool = True) -> None:
+        if not self._built:
+            return
+        if move_scale:
+            self._bri_lock = True
+            self.bri_scale.set_value(st.level)
+            self._bri_lock = False
+        self.bri_scale.set_sensitive(st.available)
+        set_symbolic(self.qs_bri_img, st.icon, self._fg(), 16)
 
     def _paint_net(self) -> None:
         if not self._built:
@@ -660,9 +770,19 @@ class Shell:
                 tex = _texture(path, fg, 24)
                 if tex is not None:
                     self._app_cog.set_from_paintable(tex)
+        if self._app_download is not None:
+            path = find_status("folder-download-symbolic.svg")
+            if path:
+                tex = _texture(path, fg, 24)
+                if tex is not None:
+                    self._app_download.set_from_paintable(tex)
         self._paint_net()
         try:
             self._paint_volume(self.volume.get())
+        except Exception:
+            pass
+        try:
+            self._paint_brightness(self.brightness.get())
         except Exception:
             pass
 

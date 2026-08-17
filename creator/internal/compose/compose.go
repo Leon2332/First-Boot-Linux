@@ -3,6 +3,7 @@ package compose
 import (
 	"context"
 	"crypto/md5"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -150,9 +151,13 @@ func Write(ctx context.Context, req Request) error {
 	}
 	defer os.RemoveAll(work)
 
+	sysUUID, err := newSysUUID()
+	if err != nil {
+		return err
+	}
 	sysTree := filepath.Join(work, "sys")
 	dataTree := filepath.Join(work, "data")
-	if err := buildSYS(req, sysTree); err != nil {
+	if err := buildSYS(req, sysTree, sysUUID); err != nil {
 		return err
 	}
 	if err := buildDATA(req, dataTree, isoPaths); err != nil {
@@ -161,17 +166,17 @@ func Write(ctx context.Context, req Request) error {
 
 	report(req, "format FBL-SYS", 0, 1)
 	sysImg := filepath.Join(work, "sys.ext4")
-	if err := makeExt4(sysImg, est.SYSBytes, "FBL-SYS", sysTree); err != nil {
+	if err := makeExt4(sysImg, est.SYSBytes, "FBL-SYS", sysTree, sysUUID); err != nil {
 		return err
 	}
 	report(req, "format FBL-DATA", 0, 1)
 	dataImg := filepath.Join(work, "data.ext4")
-	if err := makeExt4(dataImg, est.DataBytes, "FBL-DATA", dataTree); err != nil {
+	if err := makeExt4(dataImg, est.DataBytes, "FBL-DATA", dataTree, ""); err != nil {
 		return err
 	}
 	report(req, "format FBL-ESP", 0, 1)
 	espImg := filepath.Join(work, "esp.fat")
-	if err := makeESP(espImg, est.ESPBytes, req.Seed); err != nil {
+	if err := makeESP(espImg, est.ESPBytes, req.Seed, sysUUID); err != nil {
 		return err
 	}
 
@@ -207,7 +212,7 @@ func officialEdition(off *catalog.Official, filename string) *catalog.Edition {
 	return nil
 }
 
-func buildSYS(req Request, root string) error {
+func buildSYS(req Request, root, sysUUID string) error {
 	s := req.Seed
 	for _, d := range []string{
 		filepath.Join(root, ".disk"),
@@ -229,7 +234,7 @@ func buildSYS(req Request, root string) error {
 	if err != nil {
 		return err
 	}
-	if err := copyFile(grub, filepath.Join(root, "boot", "grub", "grub.cfg"), 0o644); err != nil {
+	if err := writeFilled(grub, filepath.Join(root, "boot", "grub", "grub.cfg"), sysUUID); err != nil {
 		return err
 	}
 	if err := linkOrCopy(s.Vmlinuz, filepath.Join(root, "casper", "vmlinuz")); err != nil {
@@ -344,7 +349,7 @@ func copyAsJPEG(src, dest string) error {
 	return copyFile(src, dest, 0o644)
 }
 
-func makeExt4(img string, size int64, label, tree string) error {
+func makeExt4(img string, size int64, label, tree, uuid string) error {
 	if err := truncate(img, size); err != nil {
 		return err
 	}
@@ -352,7 +357,12 @@ func makeExt4(img string, size int64, label, tree string) error {
 	if err != nil {
 		return fmt.Errorf("mke2fs not found (install e2fsprogs)")
 	}
-	cmd := exec.Command(mke2fs, "-t", "ext4", "-F", "-q", "-L", label, "-m", "0", "-d", tree, img)
+	args := []string{"-t", "ext4", "-F", "-q", "-L", label, "-m", "0"}
+	if uuid != "" {
+		args = append(args, "-U", uuid)
+	}
+	args = append(args, "-d", tree, img)
+	cmd := exec.Command(mke2fs, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("mke2fs %s: %w\n%s", label, err, out)
@@ -360,7 +370,7 @@ func makeExt4(img string, size int64, label, tree string) error {
 	return nil
 }
 
-func makeESP(img string, size int64, seed *seedpath.Seed) error {
+func makeESP(img string, size int64, seed *seedpath.Seed, sysUUID string) error {
 	_ = os.Remove(img)
 	dev, err := diskfs.Create(img, size, diskfs.SectorSize512)
 	if err != nil {
@@ -375,10 +385,20 @@ func makeESP(img string, size int64, seed *seedpath.Seed) error {
 	if err != nil {
 		return fmt.Errorf("esp fat32: %w", err)
 	}
-	stub, err := assets.EFIGrubCFG()
+	stubPath, err := assets.EFIGrubCFG()
 	if err != nil {
 		return err
 	}
+	stubBytes, err := os.ReadFile(stubPath)
+	if err != nil {
+		return err
+	}
+	stub := fillSysUUID(string(stubBytes), sysUUID)
+	stubFile := filepath.Join(filepath.Dir(img), "efi-grub.filled.cfg")
+	if err := os.WriteFile(stubFile, []byte(stub), 0o644); err != nil {
+		return err
+	}
+	stub = stubFile
 	type file struct {
 		dest, src string
 	}
@@ -515,6 +535,28 @@ func copyAt(ctx context.Context, dst *os.File, off int64, srcPath string, progre
 		progress(stage, base+got, all)
 	}
 	return nil
+}
+
+func newSysUUID() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:]), nil
+}
+
+func fillSysUUID(s, uuid string) string {
+	return strings.ReplaceAll(s, "@SYS_UUID@", uuid)
+}
+
+func writeFilled(src, dest, uuid string) error {
+	raw, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dest, []byte(fillSysUUID(string(raw), uuid)), 0o644)
 }
 
 func truncate(path string, size int64) error {

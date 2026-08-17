@@ -58,6 +58,13 @@ def find_app_icon(name: str) -> str | None:
     )
 
 
+def find_brand_logo() -> str | None:
+    return find_asset(
+        "logo.png",
+        os.path.join("Logo", "First Boot Linux.png"),
+    )
+
+
 def recolor_svg(text: str, color: str) -> str:
     """Force a symbolic SVG onto one fill color (panel / QS icons)."""
     text = re.sub(r'fill="(?!none)[^"]*"', f'fill="{color}"', text)
@@ -91,3 +98,59 @@ def symbolic_pixbuf(path: str, color: str, size: int):
         return loader.get_pixbuf()
     except Exception:
         return None
+
+
+def brand_logo_pixbuf(path: str, dark: bool, size: int):
+    """White boot-print on black → transparent; invert for the light style."""
+    try:
+        import gi
+
+        gi.require_version("GdkPixbuf", "2.0")
+        from gi.repository import GdkPixbuf
+    except (ImportError, ValueError):
+        return None
+    try:
+        src = GdkPixbuf.Pixbuf.new_from_file_at_size(path, size, size)
+    except Exception:
+        return None
+    if src is None:
+        return None
+    if src.get_n_channels() < 4:
+        src = src.add_alpha(True, 0, 0, 0)
+    else:
+        src = src.copy()
+    w, h = src.get_width(), src.get_height()
+    n = src.get_n_channels()
+    stride = src.get_rowstride()
+    src_px = src.get_pixels()
+    dest_stride = w * 4
+    dest_px = bytearray(dest_stride * h)
+    for y in range(h):
+        row = y * stride
+        for x in range(w):
+            i = row + x * n
+            r, g, b = src_px[i], src_px[i + 1], src_px[i + 2]
+            a = src_px[i + 3] if n >= 4 else 255
+            dest = y * dest_stride + x * 4
+            if r < 24 and g < 24 and b < 24:
+                dest_px[dest : dest + 4] = b"\x00\x00\x00\x00"
+                continue
+            if not dark:
+                r, g, b = 255 - r, 255 - g, 255 - b
+            dest_px[dest] = r
+            dest_px[dest + 1] = g
+            dest_px[dest + 2] = b
+            dest_px[dest + 3] = a
+    try:
+        from gi.repository import GLib
+    except ImportError:
+        return src
+    return GdkPixbuf.Pixbuf.new_from_bytes(
+        GLib.Bytes.new(bytes(dest_px)),
+        GdkPixbuf.Colorspace.RGB,
+        True,
+        8,
+        w,
+        h,
+        dest_stride,
+    )

@@ -14,6 +14,7 @@ if CHOOSER_DIR not in sys.path:
 
 from firstboot.assets import (  # noqa: E402
     find_app_icon,
+    find_brand_logo,
     find_logo,
     find_status,
     recolor_svg,
@@ -29,6 +30,9 @@ class AssetTests(unittest.TestCase):
         self.assertTrue(find_status("network-wired-symbolic.svg"))
         self.assertTrue(find_status("view-app-grid-symbolic.svg"))
         self.assertTrue(find_app_icon("epiphany.png"))
+        self.assertTrue(find_status("folder-download-symbolic.svg"))
+        self.assertTrue(find_status("display-brightness-symbolic.svg"))
+        self.assertTrue(find_brand_logo())
 
     def test_recolor_replaces_fill(self) -> None:
         src = '<svg><g fill="#808080"><circle /></g></svg>'

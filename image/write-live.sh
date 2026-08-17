@@ -226,8 +226,13 @@ LOOP_DATA=$(attach_part 3)
   || die "loop devices missing ($LOOP_ESP $LOOP_SYS $LOOP_DATA)"
 
 mkfs.vfat -F 32 -n FBL-ESP "$LOOP_ESP" >/dev/null
-mkfs.ext4 -F -q -L FBL-SYS -m 0 "$LOOP_SYS"
+mkfs.ext4 -F -q -L FBL-SYS -m 0 -O ^orphan_file,^metadata_csum_seed "$LOOP_SYS"
 mkfs.ext4 -F -q -L FBL-DATA -m 0 "$LOOP_DATA"
+SYS_UUID=$(blkid -s UUID -o value "$LOOP_SYS")
+[[ -n $SYS_UUID ]] || die "no FBL-SYS UUID after mkfs"
+fill_sys_uuid() {
+  sed "s/@SYS_UUID@/$SYS_UUID/g" "$1"
+}
 
 MNT=$(mktemp -d)
 mkdir -p "$MNT"/{esp,sys,data}
@@ -245,11 +250,11 @@ install -m 0644 "$EFI_GRUB" "$MNT/esp/EFI/BOOT/grubx64.efi"
 if [[ -n ${EFI_MOK:-} && -f $EFI_MOK ]]; then
   install -m 0644 "$EFI_MOK" "$MNT/esp/EFI/BOOT/mmx64.efi"
 fi
-install -m 0644 "$IMAGE_DIR/efi-grub.cfg" "$MNT/esp/EFI/BOOT/grub.cfg"
+fill_sys_uuid "$IMAGE_DIR/efi-grub.cfg" > "$MNT/esp/EFI/BOOT/grub.cfg"
 install -m 0644 "$EFI_SHIM" "$MNT/esp/EFI/firstboot/shimx64.efi"
 install -m 0644 "$EFI_GRUB" "$MNT/esp/EFI/firstboot/grubx64.efi"
-install -m 0644 "$IMAGE_DIR/efi-grub.cfg" "$MNT/esp/EFI/firstboot/grub.cfg"
-install -m 0644 "$IMAGE_DIR/efi-grub.cfg" "$MNT/esp/EFI/ubuntu/grub.cfg"
+fill_sys_uuid "$IMAGE_DIR/efi-grub.cfg" > "$MNT/esp/EFI/firstboot/grub.cfg"
+fill_sys_uuid "$IMAGE_DIR/efi-grub.cfg" > "$MNT/esp/EFI/ubuntu/grub.cfg"
 
 log "FBL-SYS (casper $VERSION)"
 install -d -m 0755 \
@@ -258,7 +263,7 @@ install -d -m 0755 \
   "$MNT/sys/boot/grub"
 printf 'First Boot Linux %s\n' "$VERSION" > "$MNT/sys/.disk/info"
 printf 'firstboot\n' > "$MNT/sys/.disk/ubuntu_dist_channel"
-install -m 0644 "$IMAGE_DIR/grub.cfg" "$MNT/sys/boot/grub/grub.cfg"
+fill_sys_uuid "$IMAGE_DIR/grub.cfg" > "$MNT/sys/boot/grub/grub.cfg"
 install -m 0644 "$SEED/vmlinuz" "$MNT/sys/casper/vmlinuz"
 install -m 0644 "$SEED/initrd" "$MNT/sys/casper/initrd"
 cp -a "$SEED/filesystem.squashfs" "$MNT/sys/casper/filesystem.squashfs"

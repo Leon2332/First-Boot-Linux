@@ -323,6 +323,31 @@ window.firstboot.light .wifi-item:hover {
   opacity: 0.7;
 }
 
+.app-menu-sep {
+  min-height: 1px;
+  margin: 6px 8px;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+window.firstboot.light .app-menu-sep {
+  background-color: rgba(0, 0, 0, 0.14);
+}
+
+.app-menu-item-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.app-menu-item-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(246, 245, 244, 0.42);
+}
+
+window.firstboot.light .app-menu-item-sub {
+  color: rgba(28, 28, 28, 0.4);
+}
+
 .app-menu-item, .power-menu-item {
   padding: 10px 12px;
   border-radius: 12px;
@@ -572,6 +597,76 @@ window.firstboot.light .detail-desc {
   border: none;
 }
 
+.install-panel, .done-panel {
+  background-color: rgba(36, 36, 36, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 28px 28px 24px;
+  min-width: 360px;
+}
+
+window.firstboot.light .install-panel,
+window.firstboot.light .done-panel {
+  background-color: rgba(255, 255, 255, 0.96);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.install-title, .done-title {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+window.firstboot.light .install-title,
+window.firstboot.light .done-title {
+  color: #1c1c1c;
+}
+
+.install-sub, .done-msg {
+  font-size: 14px;
+  color: #9aa3b2;
+}
+
+window.firstboot.light .install-sub,
+window.firstboot.light .done-msg {
+  color: #5e6772;
+}
+
+.progress-meta {
+  font-size: 12px;
+  font-weight: 500;
+  color: #9aa3b2;
+}
+
+window.firstboot.light .progress-meta {
+  color: #5e6772;
+}
+
+progressbar.shop-progress trough {
+  min-height: 8px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+window.firstboot.light progressbar.shop-progress trough {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+progressbar.shop-progress progress {
+  min-height: 8px;
+  border-radius: 999px;
+  background-image: linear-gradient(90deg, #3584e4, #57e389);
+}
+
+.done-check {
+  min-width: 64px;
+  min-height: 64px;
+  border-radius: 999px;
+  background-color: rgba(87, 227, 137, 0.14);
+  color: #57e389;
+  font-size: 28px;
+  font-weight: 700;
+}
+
 .empty-note, .error-note {
   font-size: 14px;
   color: #9aa3b2;
@@ -586,5 +681,86 @@ window.firstboot.light .detail-desc {
 
 window.firstboot.light .net-empty {
   color: rgba(28, 28, 28, 0.7);
+}
+
+/* ===== In-kiosk terminal ===== */
+
+.term-window {
+  background-color: #242424;
+  color: #e8e6e3;
+  border: 1px solid #3d3d3d;
+  border-radius: 12px;
+  min-width: 480px;
+  min-height: 280px;
+}
+
+.term-window.maximized {
+  border-radius: 0;
+  border: none;
+}
+
+.term-headerbar {
+  min-height: 42px;
+  padding: 0 8px 0 12px;
+  background-color: #303030;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+window.firstboot.light .term-headerbar {
+  background-color: #ebebeb;
+}
+
+.term-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f6f5f4;
+}
+
+window.firstboot.light .term-title {
+  color: #1c1c1c;
+}
+
+button.term-wc {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+}
+
+button.term-wc:hover {
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+window.firstboot.light button.term-wc:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+button.term-close:hover {
+  background-color: #e01b24;
+}
+
+.term-max-mark {
+  min-width: 10px;
+  min-height: 10px;
+  border: 1.5px solid rgba(246, 245, 244, 0.85);
+  border-radius: 2px;
+}
+
+window.firstboot.light .term-max-mark {
+  border-color: rgba(28, 28, 28, 0.75);
+}
+
+.term-window.maximized .term-max-mark {
+  min-width: 8px;
+  min-height: 8px;
+}
+
+.term-missing {
+  font-size: 14px;
+  color: #c0bfbc;
+  padding: 24px;
+  background-color: #1e1e1e;
 }
 """.encode("utf-8")

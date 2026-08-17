@@ -306,6 +306,7 @@
     pendingPower: null,
     volume: 70,
     muted: false,
+    brightness: 100,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -328,6 +329,8 @@
     qsVolume: $("qs-volume"),
     qsVolumeIcon: $("qs-volume-icon"),
     qsVolumeMute: $("qs-volume-mute"),
+    qsBrightness: $("qs-brightness"),
+    qsBrightnessImg: $("qs-brightness-img"),
     ethernetDetail: $("ethernet-detail"),
     ethernetToggle: $("ethernet-toggle"),
     wifiList: $("wifi-list"),
@@ -1083,6 +1086,15 @@
     applyVolume();
   }
 
+  function applyBrightness() {
+    const level = Math.max(0, Math.min(100, Number(state.brightness) || 0));
+    state.brightness = level;
+    if (els.qsBrightness) {
+      els.qsBrightness.value = String(level);
+      els.qsBrightness.style.setProperty("--qs-vol", level + "%");
+    }
+  }
+
   function toggleMute() {
     if (outputVolume() === 0) {
       state.muted = false;
@@ -1602,6 +1614,12 @@
       setVolumeFromSlider(els.qsVolume.value);
     });
     els.qsVolumeMute.addEventListener("click", toggleMute);
+    if (els.qsBrightness) {
+      els.qsBrightness.addEventListener("input", () => {
+        state.brightness = Number(els.qsBrightness.value);
+        applyBrightness();
+      });
+    }
 
     els.ethernetToggle.addEventListener("click", toggleEthernet);
 
@@ -1733,6 +1751,7 @@
     renderCatalog();
     updateNetworkUI();
     applyVolume();
+    applyBrightness();
     bind();
     applyPreviewQuery();
   }
@@ -1747,6 +1766,7 @@
     }
     if (q.has("skip-start") || menu || shop) dismissStartOverlay();
     if (menu === "apps") openAppMenu();
+    if (menu === "terminal") openTerminal();
     if (shop === "confirm") requestShopInstall();
     if (shop === "install") startShopInstall();
     if (shop === "progress") {

@@ -168,6 +168,12 @@ SHA-256 of `retailer.conf`, `catalog.json`, wallpapers, and every file in `image
 
 ## Shop install onto a PC
 
-The USB installer copies the three partitions onto the internal disk (same labels, same trees). After that, the machine first-boots from its own disk with the same payload already present.
+The USB installer **recreates the GPT** on the internal disk (same labels, same trees) and copies the three filesystems. `FBL-DATA` grows to fill the rest of the disk. A whole-disk `dd` is not used — shop PCs are larger than the stick.
+
+The chooser offers this only when the live session was booted from USB and there is a large enough non-USB disk. Confirm, then `firstboot-install-disk` (root via sudoers / pkexec) wipes the target, formats ESP + SYS + DATA, and rsyncs the trees from the USB mounts. Source and target are device paths, never `/dev/disk/by-label` (those names collide while the stick is still plugged in).
+
+The copy written to the PC rewrites GRUB to find `FBL-SYS` by filesystem UUID first, then by label. `FBL-SYS` is formatted without `orphan_file` / `metadata_csum_seed` so gcdx64 can read it (the live image’s default `mkfs.ext4` is not GRUB-safe). Firmware that prefers the USB will boot the stick again; the done screen says to remove it.
+
+After that, the machine first-boots from its own disk with the same payload already present.
 
 When the customer picks a distro, the install backend uses the matching file under `payload/images/` (or a download), then **deletes First Boot and leftover ISOs** so the disk is a normal install of the chosen OS.

@@ -8,16 +8,17 @@ export FIRSTBOOT_KIOSK=1
 export GDK_BACKEND=wayland
 export GTK_A11Y=none
 export NO_AT_BRIDGE=1
-export GSK_RENDERER="${GSK_RENDERER:-cairo}"
-export WLR_RENDERER="${WLR_RENDERER:-pixman}"
 export GSETTINGS_BACKEND="${GSETTINGS_BACKEND:-memory}"
 export GTK_USE_PORTAL="${GTK_USE_PORTAL:-0}"
 
 LABWC_DIR=/usr/share/firstboot/labwc
+PYDIR=/usr/share/firstboot/python
 
 note() {
   echo "firstboot-session: $*" >&2
-  printf '<6>firstboot-session: %s\n' "$*" >/dev/kmsg 2>/dev/null || true
+  if [ -w /dev/kmsg ]; then
+    printf '<6>firstboot-session: %s\n' "$*" >/dev/kmsg
+  fi
   logger -t firstboot-session "$*" || true
 }
 
@@ -34,6 +35,13 @@ if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "$XDG_RUNTIME_DIR" ] || [ ! -w "$XDG_
   export XDG_RUNTIME_DIR
   note "using $XDG_RUNTIME_DIR"
 fi
+
+if [ -f "$PYDIR/firstboot/render.py" ] && command -v python3 >/dev/null 2>&1; then
+  eval "$(PYTHONPATH="$PYDIR" python3 -c 'from firstboot.render import emit_session_env; emit_session_env()')"
+fi
+export GSK_RENDERER="${GSK_RENDERER:-cairo}"
+export WLR_RENDERER="${WLR_RENDERER:-pixman}"
+note "GSK_RENDERER=$GSK_RENDERER WLR_RENDERER=$WLR_RENDERER"
 
 if ! command -v labwc >/dev/null 2>&1; then
   drop_to_shell "labwc not found"

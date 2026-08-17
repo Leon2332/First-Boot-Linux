@@ -1,0 +1,3 @@
+# firstboot is in group video. Let the kiosk write the backlight node.
+ACTION=="add", SUBSYSTEM=="backlight", TEST=="brightness", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness"
+ACTION=="add", SUBSYSTEM=="backlight", TEST=="brightness", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"

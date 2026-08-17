@@ -1,6 +1,6 @@
 #!/bin/sh
 # Casper overwrites /etc/fstab in 12fstab. Append the payload mount after that.
-# Mount by label so the live system does not care about vda vs sda.
+# Prefer FBL-DATA on the same disk as the live SYS (item 19: two LABEL=FBL-DATA).
 
 PREREQ="12fstab"
 DESCRIPTION="Mounting First Boot payload (FBL-DATA)..."
@@ -20,13 +20,58 @@ esac
 
 . /scripts/casper-functions
 
+parent_disk() {
+  base=$(basename "$1")
+  case $base in
+    nvme*p[0-9]*|mmcblk*p[0-9]*|loop*p[0-9]*|nbd*p[0-9]*)
+      echo "${base%p*}"
+      ;;
+    *[0-9])
+      echo "$base" | sed 's/[0-9]*$//'
+      ;;
+    *)
+      echo "$base"
+      ;;
+  esac
+}
+
+payload_spec() {
+  media=
+  for tok in $(cat /proc/cmdline); do
+    case $tok in
+      live-media=*) media=${tok#live-media=} ;;
+    esac
+  done
+  [ -n "$media" ] || { echo "LABEL=FBL-DATA"; return; }
+  sysdev=$media
+  if [ -e "$sysdev" ]; then
+    sysdev=$(readlink -f "$sysdev" 2>/dev/null || echo "$sysdev")
+  fi
+  parent=$(parent_disk "$sysdev")
+  [ -n "$parent" ] || { echo "LABEL=FBL-DATA"; return; }
+  if command -v blkid >/dev/null 2>&1; then
+    for dev in $(blkid -o device); do
+      label=$(blkid -s LABEL -o value "$dev" 2>/dev/null || true)
+      [ "$label" = "FBL-DATA" ] || continue
+      [ "$(parent_disk "$dev")" = "$parent" ] || continue
+      uuid=$(blkid -s UUID -o value "$dev" 2>/dev/null || true)
+      if [ -n "$uuid" ]; then
+        echo "UUID=$uuid"
+        return
+      fi
+    done
+  fi
+  echo "LABEL=FBL-DATA"
+}
+
 log_begin_msg "$DESCRIPTION"
 
 mkdir -p /root/run/payload
 
 if ! grep -q ' /run/payload ' "$FSTAB" 2>/dev/null; then
+    spec=$(payload_spec)
     cat >> "$FSTAB" <<EOF
-LABEL=FBL-DATA /run/payload ext4 defaults,nofail,x-systemd.device-timeout=15s 0 0
+${spec} /run/payload ext4 defaults,nofail,x-systemd.device-timeout=15s 0 0
 EOF
 fi
 

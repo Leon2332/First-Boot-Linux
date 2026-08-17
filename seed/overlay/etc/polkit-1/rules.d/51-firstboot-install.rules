@@ -1,0 +1,9 @@
+// Live user may copy First Boot from the USB onto the internal disk.
+polkit.addRule(function (action, subject) {
+    if (subject.user !== "firstboot") {
+        return;
+    }
+    if (action.id === "org.firstboot.install-disk") {
+        return polkit.Result.YES;
+    }
+});

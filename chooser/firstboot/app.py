@@ -1,4 +1,4 @@
-"""Fullscreen GTK4 chooser. Reads /run/payload. Does not install."""
+"""Fullscreen GTK4 chooser. Reads /run/payload. Shop-installs USB → disk."""
 
 from __future__ import annotations
 
@@ -7,11 +7,15 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 
-from firstboot.assets import find_logo
+from firstboot.assets import brand_logo_pixbuf, find_brand_logo, find_logo
+from firstboot.disk import HelperEvent, live_plan
+from firstboot.install import InstallError, run_apply
 from firstboot.payload import Distro, Edition, Payload, load_payload
 from firstboot.shell import Shell
 from firstboot.style import CSS
+from firstboot.term import TermWindow
 
 PAYLOAD_DEFAULT = "/run/payload"
 
@@ -43,6 +47,7 @@ def run_window(
     open_catalog: bool = False,
     open_menu: str | None = None,
     light: bool = False,
+    shop: str | None = None,
 ) -> int:
     print("firstboot-chooser: run", file=sys.stderr, flush=True)
     import gi
@@ -63,6 +68,7 @@ def run_window(
             open_catalog: bool = False,
             open_menu: str | None = None,
             light: bool = False,
+            shop: str | None = None,
         ) -> None:
             super().__init__(
                 application_id="org.firstboot.Chooser",
@@ -75,8 +81,11 @@ def run_window(
             self.open_id = open_id
             self.open_catalog = open_catalog
             self.open_menu = open_menu
+            self.shop = shop
+            self.shop_plan = live_plan(root)
             self.detail_distro: Distro | None = None
             self.detail_from_catalog = False
+            self._installing = False
             self.connect("activate", self.on_activate)
 
         def on_activate(self, _app: Adw.Application) -> None:
@@ -131,11 +140,24 @@ def run_window(
             column.set_valign(Gtk.Align.FILL)
             self.overlay.add_overlay(column)
 
+            show_shop = (
+                self.shop_plan.available
+                or bool(self.shop)
+                or os.environ.get("FIRSTBOOT_SHOP_INSTALL") == "1"
+                or (bool(self.screenshot) and self.open_menu == "apps")
+            )
+            self.term = TermWindow(
+                get_window=lambda: self.win,
+                on_toast=self._toast,
+            )
             self.shell = Shell(
                 on_theme=self._set_dark,
                 on_toast=self._toast,
                 on_power=self._confirm_power,
                 get_window=lambda: self.win,
+                on_shop_install=self._confirm_shop_install,
+                on_terminal=self.term.open,
+                show_shop_install=show_shop,
             )
             self.shell.allow_scan = not bool(self.screenshot)
             topbar, menus = self.shell.build()
@@ -181,6 +203,12 @@ def run_window(
             self.detail_host.set_visible(False)
             stage.add_overlay(self.detail_host)
 
+            self.install_host = self._build_install_overlay()
+            self.done_host = self._build_done_overlay()
+            stage.add_overlay(self.install_host)
+            stage.add_overlay(self.done_host)
+            stage.add_overlay(self.term.build())
+
             for widget in menus:
                 self.overlay.add_overlay(widget)
 
@@ -200,10 +228,19 @@ def run_window(
             GLib.timeout_add_seconds(5, self.shell.refresh_net)
             self.win.present()
             self._announce_ready()
-            if self.open_menu:
+            if self.open_menu == "terminal":
+                GLib.idle_add(lambda: self.term.open() or False)
+            elif self.open_menu:
                 GLib.idle_add(lambda: self.shell.show_menu(self.open_menu) or False)
+            if self.shop == "confirm":
+                GLib.timeout_add(250, self._confirm_shop_install)
+            elif self.shop == "progress":
+                GLib.idle_add(self._preview_shop_progress)
+            elif self.shop == "done":
+                GLib.idle_add(self._show_shop_done)
             if self.screenshot:
-                GLib.timeout_add(1200, self._write_screenshot)
+                delay = 1800 if self.shop == "confirm" or self.open_menu == "terminal" else 1200
+                GLib.timeout_add(delay, self._write_screenshot)
 
         def _announce_ready(self) -> None:
             print("firstboot-chooser: window presented", file=sys.stderr, flush=True)
@@ -216,6 +253,8 @@ def run_window(
                 pass
 
         def _on_key(self, _c: Gtk.EventControllerKey, keyval: int, *_rest: object) -> bool:
+            if self._installing:
+                return True
             if self.shell.handle_key(keyval):
                 return True
             if keyval == Gdk.KEY_Escape and self.detail_host.get_visible():
@@ -244,6 +283,10 @@ def run_window(
             else:
                 self.wallpaper.set_filename(None)
             self.dimmer.set_dark(self.dark)
+            if hasattr(self, "term"):
+                self.term.apply_theme(self.dark)
+            if hasattr(self, "install_logo"):
+                self._paint_brand_logo()
 
         def _clear(self, box: Gtk.Box) -> None:
             child = box.get_first_child()
@@ -494,6 +537,235 @@ def run_window(
         def _toast(self, text: str) -> None:
             self.toasts.add_toast(Adw.Toast.new(text))
 
+        def _build_install_overlay(self) -> Gtk.Widget:
+            host = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            host.set_halign(Gtk.Align.CENTER)
+            host.set_valign(Gtk.Align.CENTER)
+            host.set_visible(False)
+
+            panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            panel.add_css_class("install-panel")
+            panel.set_halign(Gtk.Align.CENTER)
+
+            self.install_logo = Gtk.Image()
+            self.install_logo.set_pixel_size(80)
+            self.install_logo.set_halign(Gtk.Align.CENTER)
+            self._paint_brand_logo()
+            panel.append(self.install_logo)
+
+            title = Gtk.Label(label="Installing First Boot Linux")
+            title.add_css_class("install-title")
+            panel.append(title)
+
+            self.install_sub = Gtk.Label(label="")
+            self.install_sub.add_css_class("install-sub")
+            panel.append(self.install_sub)
+
+            self.install_bar = Gtk.ProgressBar()
+            self.install_bar.add_css_class("shop-progress")
+            self.install_bar.set_fraction(0)
+            self.install_bar.set_margin_top(10)
+            panel.append(self.install_bar)
+
+            meta = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            meta.add_css_class("progress-meta")
+            self.install_pct = Gtk.Label(label="0%", xalign=0)
+            self.install_pct.set_hexpand(True)
+            self.install_step = Gtk.Label(label="", xalign=1)
+            meta.append(self.install_pct)
+            meta.append(self.install_step)
+            panel.append(meta)
+
+            host.append(panel)
+            return host
+
+        def _build_done_overlay(self) -> Gtk.Widget:
+            host = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            host.set_halign(Gtk.Align.CENTER)
+            host.set_valign(Gtk.Align.CENTER)
+            host.set_visible(False)
+
+            panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            panel.add_css_class("done-panel")
+            panel.set_halign(Gtk.Align.CENTER)
+
+            check = Gtk.Label(label="✓")
+            check.add_css_class("done-check")
+            check.set_halign(Gtk.Align.CENTER)
+            panel.append(check)
+
+            title = Gtk.Label(label="You're all set")
+            title.add_css_class("done-title")
+            panel.append(title)
+
+            msg = Gtk.Label(
+                label="First Boot Linux is on this computer. Remove the USB stick and restart."
+            )
+            msg.add_css_class("done-msg")
+            msg.set_wrap(True)
+            msg.set_justify(Gtk.Justification.CENTER)
+            msg.set_max_width_chars(36)
+            panel.append(msg)
+
+            reboot = Gtk.Button(label="Restart now")
+            reboot.add_css_class("btn-primary")
+            reboot.set_halign(Gtk.Align.CENTER)
+            reboot.set_margin_top(8)
+            reboot.connect("clicked", lambda *_: _power("reboot"))
+            panel.append(reboot)
+
+            host.append(panel)
+            return host
+
+        def _paint_brand_logo(self) -> None:
+            path = find_brand_logo()
+            if not path:
+                return
+            try:
+                pb = brand_logo_pixbuf(path, self.dark, 80)
+            except Exception:
+                pb = None
+            if pb is not None:
+                from gi.repository import Gdk
+
+                self.install_logo.set_from_paintable(Gdk.Texture.new_for_pixbuf(pb))
+            else:
+                self.install_logo.set_from_file(path)
+
+        def _set_shop_progress(self, pct: int, step: str | None = None) -> None:
+            pct = max(0, min(100, pct))
+            self.install_bar.set_fraction(pct / 100.0)
+            self.install_pct.set_label(f"{pct}%")
+            if step is not None:
+                self.install_sub.set_label(step)
+                self.install_step.set_label(step)
+
+        def _show_install_overlay(self) -> None:
+            self.close_detail()
+            self.shell.close_menus()
+            self.term.close()
+            self.shell.locked = True
+            self._installing = True
+            self.dimmer.set_visible(True)
+            self.dimmer.queue_draw()
+            self.done_host.set_visible(False)
+            self.install_host.set_visible(True)
+            self._set_shop_progress(0, "")
+
+        def _hide_shop_overlays(self) -> None:
+            self._installing = False
+            self.shell.locked = False
+            self.install_host.set_visible(False)
+            self.done_host.set_visible(False)
+            self.dimmer.set_visible(False)
+
+        def _confirm_shop_install(self) -> bool:
+            self.shell.close_menus()
+            dialog = Adw.AlertDialog(
+                heading="Install to this device?",
+                body="This will erase the internal disk and copy First Boot Linux onto it.",
+            )
+            dialog.add_response("cancel", "Cancel")
+            dialog.add_response("ok", "Install")
+            dialog.set_response_appearance("ok", Adw.ResponseAppearance.DESTRUCTIVE)
+            dialog.set_default_response("cancel")
+            dialog.set_close_response("cancel")
+
+            def done(_d: Adw.AlertDialog, result: Gio.AsyncResult) -> None:
+                try:
+                    resp = dialog.choose_finish(result)
+                except GLib.Error:
+                    return
+                if resp == "ok":
+                    self._start_shop_install()
+
+            dialog.choose(self.win, None, done)
+            return False
+
+        def _start_shop_install(self) -> None:
+            self._show_install_overlay()
+            if self.shop or self.screenshot:
+                self._preview_shop_progress()
+                return
+            plan = live_plan(self.payload_root)
+            if not plan.available or plan.target is None:
+                self._hide_shop_overlays()
+                self._toast(plan.reason or "No internal disk to install to.")
+                return
+
+            def work() -> None:
+                err: str | None = None
+                try:
+                    run_apply(plan.target.path, on_event=self._shop_event)
+                except InstallError as exc:
+                    err = str(exc)
+                except Exception as exc:
+                    err = str(exc)
+                GLib.idle_add(self._shop_finished, err)
+
+            threading.Thread(target=work, daemon=True).start()
+
+        def _shop_event(self, event: HelperEvent) -> None:
+            def paint() -> bool:
+                if event.kind == "step":
+                    if event.progress is not None:
+                        self._set_shop_progress(event.progress, event.text)
+                    else:
+                        self.install_sub.set_label(event.text)
+                        self.install_step.set_label(event.text)
+                elif event.kind == "progress" and event.progress is not None:
+                    self._set_shop_progress(event.progress)
+                return False
+
+            from gi.repository import GLib
+
+            GLib.idle_add(paint)
+
+        def _shop_finished(self, err: str | None) -> bool:
+            if err:
+                self._hide_shop_overlays()
+                self._toast(err)
+                return False
+            self._show_shop_done()
+            return False
+
+        def _preview_shop_progress(self) -> bool:
+            self._show_install_overlay()
+            steps = (
+                (12, "Preparing the disk…"),
+                (34, "Copying boot files…"),
+                (58, "Copying First Boot…"),
+                (82, "Copying recommended systems…"),
+                (100, "Complete"),
+            )
+            state = {"i": 0}
+
+            def tick() -> bool:
+                if state["i"] >= len(steps):
+                    GLib.timeout_add(350, self._show_shop_done)
+                    return False
+                pct, label = steps[state["i"]]
+                self._set_shop_progress(pct, label)
+                state["i"] += 1
+                return True
+
+            tick()
+            if self.screenshot and self.shop == "progress":
+                self._set_shop_progress(58, "Copying First Boot…")
+                return False
+            GLib.timeout_add(500, tick)
+            return False
+
+        def _show_shop_done(self) -> bool:
+            self.shell.close_menus()
+            self.shell.locked = True
+            self._installing = False
+            self.install_host.set_visible(False)
+            self.dimmer.set_visible(True)
+            self.dimmer.queue_draw()
+            self.done_host.set_visible(True)
+            return False
+
         def _confirm_power(self, action: str) -> None:
             title = "Restart?" if action == "restart" else "Power Off?"
             body = (
@@ -570,12 +842,16 @@ def run_window(
             open_catalog,
             open_menu,
             light,
+            shop,
         ).run(None)
     )
 
 
 def _power(action: str) -> None:
-    cmd = ["systemctl", action]
+    verb = {"restart": "reboot", "poweroff": "poweroff", "reboot": "reboot"}.get(
+        action, action
+    )
+    cmd = ["systemctl", verb]
     if shutil.which("systemctl"):
         try:
             subprocess.run(cmd, check=False)
@@ -617,13 +893,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--menu",
-        choices=("qs", "network", "apps", "power"),
-        help="open a shell menu (host/CI screenshots)",
+        choices=("qs", "network", "apps", "power", "terminal"),
+        help="open a shell menu or the terminal (host/CI screenshots)",
     )
     parser.add_argument(
         "--light",
         action="store_true",
         help="start in the light style",
+    )
+    parser.add_argument(
+        "--shop",
+        choices=("confirm", "progress", "done"),
+        help="open the shop-install UI (host/CI screenshots)",
     )
     print("firstboot-chooser: main", file=sys.stderr, flush=True)
     args = parser.parse_args(argv)
@@ -640,6 +921,7 @@ def main(argv: list[str] | None = None) -> int:
         open_catalog=args.catalog_detail,
         open_menu=args.menu,
         light=args.light,
+        shop=args.shop,
     )
 
 

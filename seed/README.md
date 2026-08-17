@@ -12,7 +12,7 @@ It is not a desktop and not a shop remaster. The squashfs is the live root on `F
 | systemd, udev, casper, initramfs | snapd (apt-pinned out) |
 | NetworkManager, `wpasupplicant`, systemd-resolved | unattended-upgrades, update-notifier |
 | Mesa libraries | Ubuntu Pro / `cloud-init` / apport |
-| labwc + GTK4 chooser (tty1 autologin; GNOME-like panel / QS, not a desktop) | App Center, ubiquity |
+| labwc + GTK4 chooser (tty1 autologin; GNOME-like panel / QS, not a desktop) + VTE terminal | App Center, ubiquity |
 | Disk tools: parted, gdisk, ntfs-3g, lvm2, cryptsetup, rsync | |
 | `apt` / `dpkg` (hidden from the future UI) | |
 
@@ -20,7 +20,7 @@ It is not a desktop and not a shop remaster. The squashfs is the live root on `F
 
 Retailer files (`catalog.json`, wallpapers, staged ISOs) are **not** here. They go on `FBL-DATA`.
 
-The live session is not a desktop. `firstboot-kiosk.service` runs `firstboot-session` as `firstboot` on tty1 (`getty@tty1` is masked). That starts `labwc -S firstboot-chooser`. Ctrl+Alt+F2 is a debug TTY. The chooser paints the mockup chrome (top bar, quick settings, NetworkManager Ethernet/Wi-Fi, power) and reads `/run/payload/catalog.json`, `retailer.conf`, and the two wallpapers. Local vs download is whether the edition file exists under `images/`. It does not install yet. The optional mockup apps (browser, terminal, system details) are listed in the grid menu and do not launch.
+The live session is not a desktop. `firstboot-kiosk.service` runs `firstboot-session` as `firstboot` on tty1 (`getty@tty1` is masked). That starts `labwc -S firstboot-chooser`. Ctrl+Alt+F2 is a debug TTY. The chooser paints the mockup chrome (top bar, quick settings, NetworkManager Ethernet/Wi-Fi, power) and reads `/run/payload/catalog.json`, `retailer.conf`, and the two wallpapers. Local vs download is whether the edition file exists under `images/`. USB-boot only: the app grid offers **Install to this device**, which copies ESP + `fbl` + payload onto the internal disk (`firstboot-install-disk`). Customer distro install is not in this seed yet. The app-grid **Terminal** opens an in-kiosk VTE window (login shell). Browser and system details are listed and do not launch.
 
 Casper overwrites `/etc/fstab`. `casper-bottom/27payload` appends `LABEL=FBL-DATA` → `/run/payload` so the shop partition is mounted by label after live boot. `28livepass` reads `firstboot/live-user.hash` from FBL-SYS (written by the creator) and applies it to the `firstboot` account. Missing file keeps the empty VM password.
 
