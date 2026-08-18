@@ -20,11 +20,22 @@ When someone unboxes a machine, they should not be locked into an operating syst
 3. Offer other distros to download.
 4. Install the chosen system and replace this environment.
 
+## Linux desktop needs a pre-install solution
 
-MS Windows acquired unnatural levels of popularity through pre-installs on new hardware. This alternative should have existed ~20 years ago.
-By all means, a retailer may configure their FBL install to provide Linux distros, BSD or even MS Windows (if possible).
+<i>"MS Windows acquired unnatural levels of popularity through pre-installs on new hardware. And I believe this alternative should have existed ~20 years ago.
+By all means, a retailer may configure their FBL install to provide Linux distros, BSD or even MS Windows (if possible). It's not for us to tell people what they should want to use. It's for us to provide a choice."</i>
 
-<i>"It's not for us to tell people what they should want to use. It's for us to provide a choice."</i>
+~ Leon de Klerk
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=xQMujWFUDSg">
+    <img src="docs/screenshots/YouTube%20Thumbnail.jpeg" alt="Linus Torvalds on pre-installs" style="max-width: 500px; width: 100%; border-radius: 10px;" />
+  </a>
+</p>
+
+<i>"The reason the desktop is so hard to crack is most consumers do not want to install an operating system on their machine." ... "The reason Linux is successful on cell phones is not because you have 900,000 people downloading disk images and installing them on their cell phone every day. No, it's because it comes on the cell phone pre-installed. And that has never happened in the desktop market."</i>
+
+~ Linus Torvals
 
 
 ## Who it is for

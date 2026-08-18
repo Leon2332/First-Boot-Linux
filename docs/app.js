@@ -1766,6 +1766,7 @@
     }
     if (q.has("skip-start") || menu || shop) dismissStartOverlay();
     if (menu === "apps") openAppMenu();
+    if (menu === "qs") openQuickSettings();
     if (menu === "terminal") openTerminal();
     if (shop === "confirm") requestShopInstall();
     if (shop === "install") startShopInstall();

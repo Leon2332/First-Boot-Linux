@@ -1,6 +1,13 @@
 <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
  <g fill="gray">
-  <path d="M8 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm0 1a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/>
-  <path d="M7.5 0h1v2.2h-1zm0 13.8h1V16h-1zM0 7.5h2.2v1H0zm13.8 0H16v1h-2.2zM2.04 1.33l.71-.7 1.56 1.55-.71.71zm9.65 9.65.71-.71 1.55 1.56-.7.71zM1.33 13.96l1.55-1.56.71.71-1.56 1.55zm9.65-9.65 1.56-1.55.7.71-1.55 1.55z"/>
+  <circle cx="8" cy="8" r="4"/>
+  <rect x="7" y="0" width="2" height="3" rx="1"/>
+  <rect x="13" y="7" width="3" height="2" rx="1"/>
+  <rect x="7" y="13" width="2" height="3" rx="1"/>
+  <rect x="0" y="7" width="3" height="2" rx="1"/>
+  <rect x="7" y="0" width="2" height="3" rx="1" transform="rotate(45 8 8)"/>
+  <rect x="7" y="0" width="2" height="3" rx="1" transform="rotate(-45 8 8)"/>
+  <rect x="7" y="0" width="2" height="3" rx="1" transform="rotate(135 8 8)"/>
+  <rect x="7" y="0" width="2" height="3" rx="1" transform="rotate(-135 8 8)"/>
  </g>
 </svg>
