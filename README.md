@@ -32,18 +32,13 @@ By all means, a retailer may configure their FBL install to provide Linux distro
     <img src="docs/screenshots/YouTube%20Thumbnail.jpeg" alt="Linus Torvalds on pre-installs" width="500" />
   </a>
 </p>
+<p align="center"><i>Video: Linus Torvalds on pre-installs</i></p>
 
 <i>"The reason the desktop is so hard to crack is most consumers do not want to install an operating system on their machine." ... "The reason Linux is successful on cell phones is not because you have 900,000 people downloading disk images and installing them on their cell phone every day. No, it's because it comes on the cell phone pre-installed. And that has never happened in the desktop market."</i>
 
 ~ Linus Torvals
 
-
-## Who it is for
-
-| Audience | Justification |
-|----------|---------------|
-| **PC / laptop retailers** | Ship hardware with real distro choice without imaging one OS per order. |
-| **Independent refurbishers & shops** | Offer a clean Linux path out of the box without forcing any single distro on every customer. |
+___
 
 
 <img src="docs/Logo/First%20Boot%20Linux.png" alt="First Boot Linux" width="128" height="128" />
