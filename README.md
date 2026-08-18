@@ -29,7 +29,7 @@ By all means, a retailer may configure their FBL install to provide Linux distro
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=xQMujWFUDSg">
-    <img src="docs/screenshots/YouTube%20Thumbnail.jpeg" alt="Linus Torvalds on pre-installs" style="max-width: 500px; width: 100%; border-radius: 10px;" />
+    <img src="docs/screenshots/YouTube%20Thumbnail.jpeg" alt="Linus Torvalds on pre-installs" width="500" />
   </a>
 </p>
 
