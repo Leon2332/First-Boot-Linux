@@ -57,6 +57,7 @@ e2fsprogs
 ntfs-3g
 rsync
 squashfs-tools
+cpio
 fdisk
 lvm2
 cryptsetup

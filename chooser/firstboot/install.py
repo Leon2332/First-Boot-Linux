@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -437,9 +438,65 @@ def _apply_formatted(plan: InstallPlan, source: Disk, target: Disk) -> None:
         shutil.rmtree(work, ignore_errors=True)
 
 
+EFI_LABEL = "First Boot Linux"
+# Ghost NVRAM labels from OSes this disk used to hold. Firmware keeps them
+# after wipefs. Do not delete hardware entries (ATA HDD, PXE, CD).
+STALE_EFI_LABELS = (
+    EFI_LABEL,
+    "Ubuntu",
+    "Fedora",
+    "fedora",
+    "Windows Boot Manager",
+    "debian",
+    "Linux Mint",
+    "linuxmint",
+)
+EFI_BOOT_RE = re.compile(r"^Boot([0-9A-Fa-f]{4})\*?\s+(.*)$")
+
+
+def efi_ids_for_label(text: str, label: str) -> list[str]:
+    """Boot#### ids whose description equals label (before the HD() path)."""
+    found: list[str] = []
+    for line in text.splitlines():
+        match = EFI_BOOT_RE.match(line)
+        if not match:
+            continue
+        desc = match.group(2).split("\t", 1)[0].strip()
+        if desc == label:
+            found.append(match.group(1).upper())
+    return found
+
+
+def _efibootmgr_output() -> str:
+    proc = subprocess.run(
+        ["efibootmgr"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return proc.stdout or ""
+
+
+def _delete_efi_labels(*labels: str) -> None:
+    text = _efibootmgr_output()
+    seen: set[str] = set()
+    for label in labels:
+        for bootnum in efi_ids_for_label(text, label):
+            if bootnum in seen:
+                continue
+            seen.add(bootnum)
+            subprocess.run(
+                ["efibootmgr", "--bootnum", bootnum, "--delete-bootnum"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+
 def _register_efi(disk: str) -> None:
     if not shutil.which("efibootmgr"):
         return
+    _delete_efi_labels(*STALE_EFI_LABELS)
     subprocess.run(
         [
             "efibootmgr",
@@ -449,7 +506,7 @@ def _register_efi(disk: str) -> None:
             "--part",
             "1",
             "--label",
-            "First Boot Linux",
+            EFI_LABEL,
             "--loader",
             r"\EFI\BOOT\BOOTX64.EFI",
         ],

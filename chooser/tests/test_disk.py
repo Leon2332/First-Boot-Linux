@@ -32,7 +32,13 @@ from firstboot.disk import (  # noqa: E402
     rsync_percent,
     skip_name,
 )
-from firstboot.install import ESP_GRUB, SYS_GRUB, rewrite_grub, unmount_error  # noqa: E402
+from firstboot.install import (  # noqa: E402
+    ESP_GRUB,
+    SYS_GRUB,
+    efi_ids_for_label,
+    rewrite_grub,
+    unmount_error,
+)
 
 
 def disk(
@@ -302,6 +308,30 @@ class UnmountPolicyTests(unittest.TestCase):
         self.assertIn("refusing", unmount_error("/cdrom", "/dev/sda") or "")
         self.assertIn("refusing", unmount_error("/", "/dev/sda") or "")
         self.assertIn("refusing", unmount_error("/run/live/medium", "/dev/sdb") or "")
+
+
+class EfiNvramTests(unittest.TestCase):
+    SAMPLE = """\
+BootCurrent: 0001
+Timeout: 1 seconds
+BootOrder: 0001,0002,0003,0006,0007
+Boot0001* First Boot Linux\tHD(1,GPT,aaa,0x800,0x100000)/File(\\EFI\\BOOT\\BOOTX64.EFI)
+Boot0002* First Boot Linux\tHD(1,GPT,bbb,0x800,0x100000)/File(\\EFI\\BOOT\\BOOTX64.EFI)
+Boot0003* First Boot Linux
+Boot0005* Fedora\tHD(1,GPT,ccc,0x800,0x100000)/File(\\EFI\\fedora\\shimx64.efi)
+Boot0006* Ubuntu\tHD(1,GPT,ddd,0x800,0x100000)/File(\\EFI\\ubuntu\\shimx64.efi)
+Boot0007* Windows Boot Manager\tHD(1,GPT,eee,0x800,0x100000)/File(\\EFI\\Microsoft\\Boot\\bootmgfw.efi)
+"""
+
+    def test_collects_duplicate_firstboot(self) -> None:
+        ids = efi_ids_for_label(self.SAMPLE, "First Boot Linux")
+        self.assertEqual(ids, ["0001", "0002", "0003"])
+
+    def test_other_labels(self) -> None:
+        self.assertEqual(efi_ids_for_label(self.SAMPLE, "Ubuntu"), ["0006"])
+        self.assertEqual(efi_ids_for_label(self.SAMPLE, "Fedora"), ["0005"])
+        self.assertEqual(efi_ids_for_label(self.SAMPLE, "Windows Boot Manager"), ["0007"])
+        self.assertEqual(efi_ids_for_label(self.SAMPLE, "missing"), [])
 
 
 class ProtocolTests(unittest.TestCase):

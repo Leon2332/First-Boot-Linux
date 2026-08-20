@@ -479,6 +479,8 @@ def parse_helper_line(line: str) -> HelperEvent | None:
         return None
     if text == "DONE":
         return HelperEvent("done", progress=100)
+    if text == "REBOOT":
+        return HelperEvent("reboot", progress=100)
     if text.startswith("ERROR"):
         msg = text[5:].lstrip(" :")
         return HelperEvent("error", text=msg or "Install failed.")

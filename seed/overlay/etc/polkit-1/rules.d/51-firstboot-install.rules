@@ -3,7 +3,10 @@ polkit.addRule(function (action, subject) {
     if (subject.user !== "firstboot") {
         return;
     }
-    if (action.id === "org.firstboot.install-disk") {
+    if (
+        action.id === "org.firstboot.install-disk" ||
+        action.id === "org.firstboot.install-os"
+    ) {
         return polkit.Result.YES;
     }
 });

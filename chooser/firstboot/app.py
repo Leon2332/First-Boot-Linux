@@ -1,4 +1,4 @@
-"""Fullscreen GTK4 chooser. Reads /run/payload. Shop-installs USB → disk."""
+"""Fullscreen GTK4 chooser. Reads /run/payload. Shop USB→disk. Ubuntu autoinstall."""
 
 from __future__ import annotations
 
@@ -12,6 +12,17 @@ import threading
 from firstboot.assets import brand_logo_pixbuf, find_brand_logo, find_logo
 from firstboot.disk import HelperEvent, live_plan
 from firstboot.install import InstallError, run_apply
+from firstboot.osinstall import (
+    DRIVER_UBUNTU,
+    OsIdentity,
+    OsInstallError,
+    live_os_plan,
+    run_os_install,
+    sha512_crypt,
+    suggest_hostname,
+    suggest_username,
+    validate_identity,
+)
 from firstboot.payload import Distro, Edition, Payload, load_payload
 from firstboot.shell import Shell
 from firstboot.style import CSS
@@ -48,6 +59,7 @@ def run_window(
     open_menu: str | None = None,
     light: bool = False,
     shop: str | None = None,
+    osinstall: str | None = None,
 ) -> int:
     print("firstboot-chooser: run", file=sys.stderr, flush=True)
     import gi
@@ -69,6 +81,7 @@ def run_window(
             open_menu: str | None = None,
             light: bool = False,
             shop: str | None = None,
+            osinstall: str | None = None,
         ) -> None:
             super().__init__(
                 application_id="org.firstboot.Chooser",
@@ -82,10 +95,12 @@ def run_window(
             self.open_catalog = open_catalog
             self.open_menu = open_menu
             self.shop = shop
+            self.osinstall = osinstall
             self.shop_plan = live_plan(root)
             self.detail_distro: Distro | None = None
             self.detail_from_catalog = False
             self._installing = False
+            self._os_logo = False
             self.connect("activate", self.on_activate)
 
         def on_activate(self, _app: Adw.Application) -> None:
@@ -238,8 +253,20 @@ def run_window(
                 GLib.idle_add(self._preview_shop_progress)
             elif self.shop == "done":
                 GLib.idle_add(self._show_shop_done)
+            if self.osinstall == "confirm":
+                GLib.timeout_add(250, self._preview_os_confirm)
+            elif self.osinstall == "progress":
+                GLib.idle_add(self._preview_os_progress)
+            elif self.osinstall == "done":
+                GLib.idle_add(self._preview_os_done)
             if self.screenshot:
-                delay = 1800 if self.shop == "confirm" or self.open_menu == "terminal" else 1200
+                delay = (
+                    1800
+                    if self.shop == "confirm"
+                    or self.osinstall == "confirm"
+                    or self.open_menu == "terminal"
+                    else 1200
+                )
                 GLib.timeout_add(delay, self._write_screenshot)
 
         def _announce_ready(self) -> None:
@@ -525,14 +552,17 @@ def run_window(
             self._clear(self.detail_host)
 
         def _act(self, distro: Distro, ed: Edition) -> None:
-            if ed.on_disk:
-                self._toast(
-                    f"Install is not available yet ({distro.name} {ed.name})."
-                )
-            else:
+            if not ed.on_disk:
                 self._toast(
                     f"Download is not available yet ({distro.name} {ed.name})."
                 )
+                return
+            if distro.install != DRIVER_UBUNTU:
+                self._toast(
+                    f"{distro.name} install is not available yet."
+                )
+                return
+            self._confirm_os_install(distro, ed)
 
         def _toast(self, text: str) -> None:
             self.toasts.add_toast(Adw.Toast.new(text))
@@ -553,9 +583,9 @@ def run_window(
             self._paint_brand_logo()
             panel.append(self.install_logo)
 
-            title = Gtk.Label(label="Installing First Boot Linux")
-            title.add_css_class("install-title")
-            panel.append(title)
+            self.install_title = Gtk.Label(label="Installing First Boot Linux")
+            self.install_title.add_css_class("install-title")
+            panel.append(self.install_title)
 
             self.install_sub = Gtk.Label(label="")
             self.install_sub.add_css_class("install-sub")
@@ -598,14 +628,14 @@ def run_window(
             title.add_css_class("done-title")
             panel.append(title)
 
-            msg = Gtk.Label(
+            self.done_msg = Gtk.Label(
                 label="First Boot Linux is on this computer. Remove the USB stick and restart."
             )
-            msg.add_css_class("done-msg")
-            msg.set_wrap(True)
-            msg.set_justify(Gtk.Justification.CENTER)
-            msg.set_max_width_chars(36)
-            panel.append(msg)
+            self.done_msg.add_css_class("done-msg")
+            self.done_msg.set_wrap(True)
+            self.done_msg.set_justify(Gtk.Justification.CENTER)
+            self.done_msg.set_max_width_chars(36)
+            panel.append(self.done_msg)
 
             reboot = Gtk.Button(label="Restart now")
             reboot.add_css_class("btn-primary")
@@ -618,6 +648,8 @@ def run_window(
             return host
 
         def _paint_brand_logo(self) -> None:
+            if self._os_logo:
+                return
             path = find_brand_logo()
             if not path:
                 return
@@ -652,12 +684,29 @@ def run_window(
             self.install_host.set_visible(True)
             self._set_shop_progress(0, "")
 
+        def _set_os_brand(self, distro: Distro, ed: Edition | None = None) -> None:
+            self._os_logo = True
+            de = f" ({ed.name})" if ed and ed.name else ""
+            self.install_title.set_label(f"Installing {distro.name}{de}")
+            path = find_logo(distro.id)
+            if path:
+                self.install_logo.set_from_file(path)
+            else:
+                self._os_logo = False
+                self._paint_brand_logo()
+
         def _hide_shop_overlays(self) -> None:
             self._installing = False
+            self._os_logo = False
             self.shell.locked = False
             self.install_host.set_visible(False)
             self.done_host.set_visible(False)
             self.dimmer.set_visible(False)
+            self._paint_brand_logo()
+            self.install_title.set_label("Installing First Boot Linux")
+            self.done_msg.set_label(
+                "First Boot Linux is on this computer. Remove the USB stick and restart."
+            )
 
         def _confirm_shop_install(self) -> bool:
             self.shell.close_menus()
@@ -766,6 +815,184 @@ def run_window(
             self.done_host.set_visible(True)
             return False
 
+        def _preview_os_distro(self) -> Distro | None:
+            for distro in self.payload.recommended:
+                if distro.install == DRIVER_UBUNTU:
+                    return distro
+            return None
+
+        def _preview_os_confirm(self) -> bool:
+            distro = self._preview_os_distro()
+            if distro is None:
+                return False
+            self._confirm_os_install(distro, distro.default_edition)
+            return False
+
+        def _preview_os_progress(self) -> bool:
+            distro = self._preview_os_distro()
+            self._show_install_overlay()
+            if distro is not None:
+                self._set_os_brand(distro, distro.default_edition)
+            self._set_shop_progress(58, "Checking the image…")
+            return False
+
+        def _preview_os_done(self) -> bool:
+            distro = self._preview_os_distro()
+            name = distro.name if distro else "Ubuntu"
+            de = ""
+            if distro is not None:
+                de = f" ({distro.default_edition.name})"
+            self.done_msg.set_label(
+                f"{name}{de} will install after restart. This computer will be erased."
+            )
+            self._show_shop_done()
+            return False
+
+        def _confirm_os_install(self, distro: Distro, ed: Edition) -> None:
+            self.shell.close_menus()
+            de = f" ({ed.name})" if ed.name else ""
+            dialog = Adw.AlertDialog(
+                heading=f"Install {distro.name}{de}?",
+                body="This will erase this computer and install Ubuntu. Create the account you will use after restart.",
+            )
+            dialog.add_response("cancel", "Cancel")
+            dialog.add_response("ok", "Install")
+            dialog.set_response_appearance("ok", Adw.ResponseAppearance.DESTRUCTIVE)
+            dialog.set_default_response("cancel")
+            dialog.set_close_response("cancel")
+
+            grid = Gtk.Grid(row_spacing=8, column_spacing=10)
+            grid.set_margin_top(8)
+
+            def labeled(row: int, title: str, widget: Gtk.Widget) -> None:
+                lab = Gtk.Label(label=title, xalign=0)
+                lab.add_css_class("row-meta")
+                grid.attach(lab, 0, row, 1, 1)
+                widget.set_hexpand(True)
+                grid.attach(widget, 1, row, 1, 1)
+
+            name_e = Gtk.Entry()
+            name_e.set_placeholder_text("Your name")
+            user_e = Gtk.Entry()
+            user_e.set_placeholder_text("username")
+            host_e = Gtk.Entry()
+            host_e.set_text("ubuntu")
+            pw_e = Gtk.Entry()
+            pw_e.set_visibility(False)
+            pw_e.set_input_purpose(Gtk.InputPurpose.PASSWORD)
+            pw2_e = Gtk.Entry()
+            pw2_e.set_visibility(False)
+            pw2_e.set_input_purpose(Gtk.InputPurpose.PASSWORD)
+            labeled(0, "Name", name_e)
+            labeled(1, "Username", user_e)
+            labeled(2, "Computer", host_e)
+            labeled(3, "Password", pw_e)
+            labeled(4, "Confirm", pw2_e)
+            dialog.set_extra_child(grid)
+            dialog.set_response_enabled("ok", False)
+
+            def on_name(*_a: object) -> None:
+                user_e.set_text(suggest_username(name_e.get_text()))
+                suggested = suggest_hostname(user_e.get_text())
+                if host_e.get_text() in ("", "ubuntu") and suggested:
+                    host_e.set_text(suggested)
+
+            def refresh(*_a: object) -> None:
+                password = pw_e.get_text()
+                match = password == pw2_e.get_text()
+                err = validate_identity(
+                    host_e.get_text().strip().lower(),
+                    user_e.get_text().strip(),
+                    name_e.get_text(),
+                    password,
+                )
+                dialog.set_response_enabled("ok", err is None and match)
+
+            name_e.connect("changed", on_name)
+            for w in (name_e, user_e, host_e, pw_e, pw2_e):
+                w.connect("changed", refresh)
+
+            def done(_d: Adw.AlertDialog, result: Gio.AsyncResult) -> None:
+                try:
+                    resp = dialog.choose_finish(result)
+                except GLib.Error:
+                    return
+                if resp != "ok":
+                    return
+                realname = name_e.get_text()
+                username = user_e.get_text().strip()
+                hostname = host_e.get_text().strip().lower()
+                password = pw_e.get_text()
+                if password != pw2_e.get_text():
+                    self._toast("Passwords do not match.")
+                    return
+                err = validate_identity(hostname, username, realname, password)
+                if err:
+                    self._toast(err)
+                    return
+                ident = OsIdentity(
+                    hostname=hostname,
+                    username=username,
+                    realname=realname.strip(),
+                    password_hash=sha512_crypt(password),
+                )
+                self._start_os_install(distro, ed, ident)
+
+            dialog.choose(self.win, None, done)
+
+        def _start_os_install(self, distro: Distro, ed: Edition, ident: OsIdentity) -> None:
+            self._show_install_overlay()
+            self._set_os_brand(distro, ed)
+            if self.osinstall or self.screenshot:
+                self._preview_os_progress()
+                return
+            plan = live_os_plan(self.payload_root, distro, ed)
+            if not plan.available:
+                self._hide_shop_overlays()
+                self._toast(plan.reason or "Cannot install.")
+                return
+
+            def work() -> None:
+                err: str | None = None
+                reboot = False
+                try:
+                    def on_event(event: HelperEvent) -> None:
+                        nonlocal reboot
+                        if event.kind == "reboot":
+                            reboot = True
+                        self._shop_event(event)
+
+                    run_os_install(plan, ident, on_event=on_event)
+                except (OsInstallError, InstallError) as exc:
+                    err = str(exc)
+                except Exception as exc:
+                    err = str(exc)
+                GLib.idle_add(self._os_finished, err, reboot, distro, ed)
+
+            threading.Thread(target=work, daemon=True).start()
+
+        def _os_finished(
+            self, err: str | None, reboot: bool, distro: Distro, ed: Edition
+        ) -> bool:
+            if err:
+                self._hide_shop_overlays()
+                self._toast(err)
+                return False
+            de = f" ({ed.name})" if ed.name else ""
+            self.done_msg.set_label(
+                f"{distro.name}{de} will install after restart. This computer will be erased."
+            )
+            if reboot and not self.screenshot:
+                self._set_shop_progress(100, "Restarting to install Ubuntu…")
+                GLib.timeout_add(1200, self._reboot_now)
+                return False
+            self._show_shop_done()
+            return False
+
+        def _reboot_now(self) -> bool:
+            _power("reboot")
+            return False
+
         def _confirm_power(self, action: str) -> None:
             title = "Restart?" if action == "restart" else "Power Off?"
             body = (
@@ -843,6 +1070,7 @@ def run_window(
             open_menu,
             light,
             shop,
+            osinstall,
         ).run(None)
     )
 
@@ -906,6 +1134,11 @@ def main(argv: list[str] | None = None) -> int:
         choices=("confirm", "progress", "done"),
         help="open the shop-install UI (host/CI screenshots)",
     )
+    parser.add_argument(
+        "--osinstall",
+        choices=("confirm", "progress", "done"),
+        help="open the Ubuntu install UI (host/CI screenshots)",
+    )
     print("firstboot-chooser: main", file=sys.stderr, flush=True)
     args = parser.parse_args(argv)
     print(f"firstboot-chooser: loading payload {args.payload!r}", file=sys.stderr, flush=True)
@@ -922,6 +1155,7 @@ def main(argv: list[str] | None = None) -> int:
         open_menu=args.menu,
         light=args.light,
         shop=args.shop,
+        osinstall=args.osinstall,
     )
 
 

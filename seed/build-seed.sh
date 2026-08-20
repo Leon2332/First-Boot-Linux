@@ -172,6 +172,9 @@ copy_overlay() {
   if [[ -f $ROOTFS/etc/sudoers.d/firstboot-install ]]; then
     chmod 440 "$ROOTFS/etc/sudoers.d/firstboot-install"
   fi
+  if [[ -f $ROOTFS/etc/sudoers.d/firstboot-osinstall ]]; then
+    chmod 440 "$ROOTFS/etc/sudoers.d/firstboot-osinstall"
+  fi
   chmod 755 "$ROOTFS/usr/share/initramfs-tools/scripts/casper-bottom/27payload"
   if [[ -f $ROOTFS/usr/share/initramfs-tools/scripts/casper-bottom/28livepass ]]; then
     chmod 755 "$ROOTFS/usr/share/initramfs-tools/scripts/casper-bottom/28livepass"
@@ -181,6 +184,9 @@ copy_overlay() {
   fi
   if [[ -f $ROOTFS/usr/libexec/firstboot/install-disk ]]; then
     chmod 755 "$ROOTFS/usr/libexec/firstboot/install-disk"
+  fi
+  if [[ -f $ROOTFS/usr/libexec/firstboot/install-os ]]; then
+    chmod 755 "$ROOTFS/usr/libexec/firstboot/install-os"
   fi
   if [[ -f $ROOTFS/usr/share/firstboot/labwc/autostart ]]; then
     chmod 755 "$ROOTFS/usr/share/firstboot/labwc/autostart"
@@ -197,6 +203,8 @@ install_chooser() {
     "$ROOTFS/usr/bin/firstboot-session"
   install -D -m 0755 "$REPO_DIR/chooser/firstboot-install-disk" \
     "$ROOTFS/usr/libexec/firstboot/install-disk"
+  install -D -m 0755 "$REPO_DIR/chooser/firstboot-install-os" \
+    "$ROOTFS/usr/libexec/firstboot/install-os"
   install -d -m 0755 \
     "$ROOTFS/usr/share/firstboot/python" \
     "$ROOTFS/usr/share/firstboot/distros" \

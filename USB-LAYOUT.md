@@ -176,4 +176,4 @@ The copy written to the PC rewrites GRUB to find `FBL-SYS` by filesystem UUID fi
 
 After that, the machine first-boots from its own disk with the same payload already present.
 
-When the customer picks a distro, the install backend uses the matching file under `payload/images/` (or a download), then **deletes First Boot and leftover ISOs** so the disk is a normal install of the chosen OS.
+When the customer picks Ubuntu, `firstboot-install-os` verifies the staged ISO, copies Ubuntu’s kernel and initrd onto **FBL-SYS** `/boot/osinstall/`, injects autoinstall.yaml into that initrd’s main archive, and rewrites `boot/grub/grub.cfg` so the next boot is Ubuntu autoinstall (`iso-scan/filename=` + `autoinstall`, `toram` when the ISO is on the same disk). Casper’s `/isodevice` mount of FBL-DATA is dropped after toram so curtin can take the disk. Subiquity then wipes the disk (ESP + root) and reboots into Ubuntu. Mint and other drivers are not implemented.
