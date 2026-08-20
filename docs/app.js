@@ -336,10 +336,16 @@
     wifiList: $("wifi-list"),
     backdrop: $("backdrop"),
     recommendedGrid: $("recommended-grid"),
-    catalog: $("catalog"),
+    catalogScroll: $("catalog-scroll"),
     catalogList: $("catalog-list"),
+    catalogBack: $("catalog-back"),
+    catalogPopover: $("catalog-popover"),
+    detailPopover: $("detail-popover"),
+    popoverStage: $("popover-stage"),
+    popoverTrack: $("popover-track"),
     screenChooser: $("screen-chooser"),
-    screenDetail: $("screen-detail"),
+    screenOverlay: $("screen-overlay"),
+    screenDetail: $("screen-overlay"),
     screenInstall: $("screen-install"),
     screenDone: $("screen-done"),
     detailBack: $("detail-back"),
@@ -933,18 +939,91 @@
   function showScreen(name) {
     const showChooser =
       name === "chooser" ||
+      name === "catalog" ||
       name === "detail" ||
       name === "install" ||
       name === "done";
     els.screenChooser.hidden = !showChooser;
-    els.screenDetail.hidden = name !== "detail";
     els.screenInstall.hidden = name !== "install";
     els.screenDone.hidden = name !== "done";
-    document.body.classList.toggle("detail-open", name === "detail");
+    document.body.classList.toggle(
+      "detail-open",
+      name === "detail" || name === "catalog"
+    );
     document.body.classList.toggle("install-open", name === "install");
     document.body.classList.toggle("done-open", name === "done");
+    if (name === "catalog" || name === "detail") {
+      openOverlay(name);
+    } else if (els.screenOverlay) {
+      els.screenOverlay.hidden = true;
+      els.screenOverlay.classList.remove("is-opening");
+      if (els.popoverTrack) els.popoverTrack.classList.remove("is-detail");
+    }
     if (name === "chooser") {
       window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  function syncPopoverHeight() {
+    const track = els.popoverTrack;
+    const stage = els.popoverStage;
+    if (!track || !stage) return;
+    const panel = track.classList.contains("is-detail")
+      ? els.detailPopover
+      : els.catalogPopover;
+    if (!panel) return;
+    stage.style.height = panel.offsetHeight + "px";
+  }
+
+  function openOverlay(panel) {
+    const overlay = els.screenOverlay;
+    const track = els.popoverTrack;
+    const stage = els.popoverStage;
+    if (!overlay || !track) return;
+
+    const wasOpen = !overlay.hidden;
+    const slide =
+      wasOpen &&
+      ((panel === "detail" && state.detailMode === "catalog") ||
+        panel === "catalog");
+
+    overlay.hidden = false;
+
+    if (!slide) {
+      track.classList.add("no-slide");
+      if (stage) stage.classList.add("no-slide");
+      track.classList.toggle("is-detail", panel === "detail");
+      overlay.classList.remove("is-opening");
+      void overlay.offsetWidth;
+      overlay.classList.add("is-opening");
+      requestAnimationFrame(() => {
+        syncPopoverHeight();
+        requestAnimationFrame(() => {
+          track.classList.remove("no-slide");
+          if (stage) stage.classList.remove("no-slide");
+        });
+      });
+    } else {
+      overlay.classList.remove("is-opening");
+      const nextPanel =
+        panel === "detail" ? els.detailPopover : els.catalogPopover;
+      const nextH = nextPanel ? nextPanel.offsetHeight : 0;
+      const curH = stage ? stage.getBoundingClientRect().height : 0;
+      track.classList.toggle("is-detail", panel === "detail");
+      if (nextH >= curH) syncPopoverHeight();
+    }
+
+    if (els.catalogPopover) {
+      els.catalogPopover.setAttribute(
+        "aria-hidden",
+        panel === "detail" ? "true" : "false"
+      );
+    }
+    if (els.detailPopover) {
+      els.detailPopover.setAttribute(
+        "aria-hidden",
+        panel === "detail" ? "false" : "true"
+      );
     }
   }
 
@@ -1164,10 +1243,37 @@
       btn.addEventListener("click", () => openDetail(d.id, "recommended"));
       els.recommendedGrid.appendChild(btn);
     });
+
+    const other = document.createElement("button");
+    other.type = "button";
+    other.className = "distro-card other-option-card";
+    other.setAttribute("role", "listitem");
+    other.setAttribute("aria-haspopup", "dialog");
+    other.innerHTML = `
+      <img class="distro-logo logo-dark" src="assets/apps/other-option-dark.png" alt="" draggable="false" />
+      <img class="distro-logo logo-light" src="assets/apps/other-option-light.png" alt="" draggable="false" />
+      <div class="card-text">
+        <h3>Other options</h3>
+        <p class="card-desktop">...</p>
+        <p class="card-version">&nbsp;</p>
+      </div>
+    `;
+    other.addEventListener("click", openCatalog);
+    els.recommendedGrid.appendChild(other);
   }
 
   function catalogName(d) {
     return d.id === "ms-windows" ? "Microsoft Windows" : d.name;
+  }
+
+  function openCatalog() {
+    closeMenus();
+    renderCatalog();
+    showScreen("catalog");
+  }
+
+  function closeDetail() {
+    showScreen(state.detailMode === "catalog" ? "catalog" : "chooser");
   }
 
   function renderCatalog() {
@@ -1640,13 +1746,32 @@
     });
     els.powerModalConfirm.addEventListener("click", confirmPower);
 
-    els.detailBack.addEventListener("click", () => showScreen("chooser"));
+    els.detailBack.addEventListener("click", closeDetail);
     els.installBtn.addEventListener("click", () => startInstall(null));
     els.rebootBtn.addEventListener("click", resetChooser);
 
-    els.screenDetail.addEventListener("click", (e) => {
-      if (e.target === els.screenDetail) showScreen("chooser");
-    });
+    if (els.screenOverlay) {
+      els.screenOverlay.addEventListener("click", (e) => {
+        if (e.target !== els.screenOverlay) return;
+        if (
+          els.popoverTrack &&
+          els.popoverTrack.classList.contains("is-detail")
+        ) {
+          closeDetail();
+        } else {
+          showScreen("chooser");
+        }
+      });
+    }
+    if (els.catalogBack) {
+      els.catalogBack.addEventListener("click", () => showScreen("chooser"));
+    }
+    if (els.popoverTrack) {
+      els.popoverTrack.addEventListener("transitionend", (e) => {
+        if (e.propertyName !== "transform") return;
+        syncPopoverHeight();
+      });
+    }
 
     if (els.startFullscreenBtn) {
       els.startFullscreenBtn.addEventListener("click", (e) => {
@@ -1692,7 +1817,18 @@
           return;
         }
         closeMenus();
-        if (!els.screenDetail.hidden) showScreen("chooser");
+        if (els.screenOverlay && !els.screenOverlay.hidden) {
+          if (
+            els.popoverTrack &&
+            els.popoverTrack.classList.contains("is-detail") &&
+            state.detailMode === "catalog"
+          ) {
+            closeDetail();
+          } else {
+            showScreen("chooser");
+          }
+          return;
+        }
         return;
       }
       onTermKeydown(e);
@@ -1764,7 +1900,10 @@
       state.darkStyle = false;
       applyTheme();
     }
-    if (q.has("skip-start") || menu || shop) dismissStartOverlay();
+    if (q.has("skip-start") || menu || shop || q.get("catalog") === "open") {
+      dismissStartOverlay();
+    }
+    if (q.get("catalog") === "open") openCatalog();
     if (menu === "apps") openAppMenu();
     if (menu === "qs") openQuickSettings();
     if (menu === "terminal") openTerminal();

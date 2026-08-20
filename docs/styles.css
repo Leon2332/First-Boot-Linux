@@ -29,6 +29,7 @@ html[data-theme="dark"] {
   --text-muted: #9aa3b2;
   --danger: #e01b24;
   --bg-glow: rgba(53, 132, 228, 0.16);
+  --footer-fg: rgba(154, 163, 178, 0.7);
   --wallpaper: url("assets/Wallpaper/annie-spratt-nJGaLopCqJk-unsplash.jpg");
 
   --term-win-bg: #242424;
@@ -110,6 +111,7 @@ html[data-theme="light"] {
   --text: #1c1c1c;
   --text-muted: #5e6772;
   --bg-glow: rgba(53, 132, 228, 0.1);
+  --footer-fg: rgba(94, 103, 114, 0.75);
   --wallpaper: url("assets/Wallpaper/ands-mahardika--MRPyzpWsh0-unsplash.jpg");
 
   --term-header-bg: #ebebeb;
@@ -906,43 +908,11 @@ html[data-theme="light"] .app-menu-item-sub {
   letter-spacing: -0.01em;
 }
 
-.chooser-heading {
-  margin: 0 0 12px;
-  padding: 10px 16px;
-  text-align: left;
-  border-radius: 0;
-  background: linear-gradient(90deg, var(--card-glass) 0%, transparent 50%);
-}
-
-.chooser-heading h2,
-.chooser-heading p {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-  line-height: 1.15;
-  color: var(--text);
-}
-
-.chooser-heading p {
-  font-size: 0.8rem;
-  font-weight: 300;
-  color: #5e6772;
-}
-
-html[data-theme="dark"] .chooser-heading h2 {
-  color: #797979;
-}
-
-html[data-theme="dark"] .chooser-heading p {
-  color: #5a5a5a;
-}
-
 .distro-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 12px;
-  margin-bottom: 28px;
+  margin-bottom: 0;
 }
 
 .distro-card {
@@ -1022,6 +992,22 @@ html[data-theme="dark"] .chooser-heading p {
   line-height: 1.15;
 }
 
+.other-option-card h3 {
+  color: var(--text-muted);
+}
+
+.other-option-card .logo-light {
+  display: none;
+}
+
+html[data-theme="light"] .other-option-card .logo-dark {
+  display: none;
+}
+
+html[data-theme="light"] .other-option-card .logo-light {
+  display: block;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -1083,9 +1069,19 @@ html[data-theme="dark"] .chooser-heading p {
   border-radius: 999px;
 }
 
-.catalog {
-  margin-top: 0;
-  padding-top: 0;
+.detail-popover.catalog-popover {
+  width: 50%;
+}
+
+.catalog-popover .detail-card > h1 {
+  margin: 0 0 16px;
+  text-align: left;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.catalog-popover .catalog-scroll {
+  max-height: min(480px, 56vh);
 }
 
 @keyframes fade-up {
@@ -1145,6 +1141,17 @@ html[data-theme="dark"] .chooser-heading p {
   outline: none;
 }
 
+html[data-theme="light"] .catalog-row {
+  background-color: rgba(0, 0, 0, 0.03);
+  box-shadow: none;
+}
+
+html[data-theme="light"] .catalog-row:hover,
+html[data-theme="light"] .catalog-row:focus-visible {
+  background-color: rgba(0, 0, 0, 0.055);
+  box-shadow: none;
+}
+
 .catalog-row .distro-logo {
   width: 40px;
   height: 40px;
@@ -1176,10 +1183,14 @@ html[data-theme="dark"] .chooser-heading p {
   align-items: flex-start;
   justify-content: center;
   padding: 40px 24px 48px;
+  overflow-x: hidden;
   overflow-y: auto;
   background: rgba(14, 16, 20, 0.35);
   backdrop-filter: blur(28px) saturate(1.15);
   -webkit-backdrop-filter: blur(28px) saturate(1.15);
+}
+
+.screen-detail.is-opening {
   animation: pop-in 160ms ease;
 }
 
@@ -1193,6 +1204,39 @@ html[data-theme="light"] .screen-detail,
 html[data-theme="light"] .screen-install,
 html[data-theme="light"] .screen-done {
   background: rgba(240, 242, 245, 0.4);
+}
+
+.popover-stage {
+  width: min(560px, 100%);
+  margin: 0 auto;
+  overflow: hidden;
+  transition: height 320ms var(--ease);
+}
+
+.popover-track {
+  display: flex;
+  align-items: flex-start;
+  width: 200%;
+  transition: transform 320ms var(--ease);
+}
+
+.popover-track.is-detail {
+  transform: translateX(-50%);
+}
+
+.popover-track.no-slide {
+  transition: none;
+}
+
+.popover-stage.no-slide {
+  transition: none;
+}
+
+.popover-track > .detail-popover {
+  flex: 0 0 50%;
+  width: 50%;
+  margin: 0;
+  box-sizing: border-box;
 }
 
 .detail-popover {
@@ -1226,7 +1270,9 @@ html[data-theme="light"] .screen-done {
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 28px;
-  box-shadow: var(--shadow);
+}
+
+.screen-detail.is-opening .detail-card {
   animation: fade-up 0.25s var(--ease);
 }
 
@@ -2006,6 +2052,22 @@ html[data-theme="light"] .info-sw-brand .logo-light {
   .term-cursor {
     animation: none;
   }
+}
+
+.brand-footer {
+  position: fixed;
+  right: 16px;
+  bottom: 12px;
+  z-index: 50;
+  margin: 0;
+  padding: 0;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--footer-fg);
+  text-align: right;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* Responsive */

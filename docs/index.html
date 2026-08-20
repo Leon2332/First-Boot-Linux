@@ -285,67 +285,86 @@
   </div>
 
   <main class="main" id="main">
-    <section class="screen" id="screen-chooser" aria-labelledby="chooser-title">
-      <div class="chooser-heading">
-        <h2 id="chooser-title">Recommended by [Retailer Name]</h2>
-        <p>Install support: [Retailer Contact Details]</p>
-      </div>
+    <section class="screen" id="screen-chooser" aria-label="Recommended systems">
       <div class="distro-grid" id="recommended-grid" role="list"></div>
-
-      <section class="catalog" id="catalog" aria-labelledby="catalog-title">
-        <div class="chooser-heading">
-          <h2 id="catalog-title">Other options</h2>
-        </div>
-        <div class="catalog-scroll" id="catalog-scroll">
-          <div class="catalog-list" id="catalog-list" role="list"></div>
-        </div>
-      </section>
     </section>
 
-    <section class="screen screen-detail" id="screen-detail" hidden aria-labelledby="detail-title">
-      <div class="detail-popover" role="dialog" aria-modal="true" aria-labelledby="detail-title">
-        <button type="button" class="back-link" id="detail-back">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Back
-        </button>
+    <section class="screen screen-detail" id="screen-overlay" hidden>
+      <div class="popover-stage" id="popover-stage">
+        <div class="popover-track" id="popover-track">
+          <div
+            class="detail-popover catalog-popover"
+            id="catalog-popover"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="catalog-title"
+          >
+            <button type="button" class="back-link" id="catalog-back">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+              Back
+            </button>
 
-        <div class="detail-card">
-          <div class="detail-hero">
-            <img class="distro-logo large" id="detail-logo" src="" alt="" />
-            <div>
-              <h1 id="detail-title">Distro</h1>
-              <p class="detail-desktop" id="detail-desktop" hidden></p>
-              <p class="detail-version" id="detail-version"></p>
-              <p class="detail-tagline" id="detail-tagline"></p>
+            <div class="detail-card">
+              <h1 id="catalog-title">Other options</h1>
+              <div class="catalog-scroll" id="catalog-scroll">
+                <div class="catalog-list" id="catalog-list" role="list"></div>
+              </div>
             </div>
           </div>
 
-          <p class="detail-desc" id="detail-desc"></p>
+          <div
+            class="detail-popover"
+            id="detail-popover"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="detail-title"
+          >
+            <button type="button" class="back-link" id="detail-back">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+              Back
+            </button>
 
-          <div class="de-options" id="de-options" hidden>
-            <div class="de-options-label">Desktop environment</div>
-            <div class="de-options-list" id="de-options-list" role="list" aria-label="Desktop environments"></div>
-          </div>
+            <div class="detail-card">
+              <div class="detail-hero">
+                <img class="distro-logo large" id="detail-logo" src="" alt="" />
+                <div>
+                  <h1 id="detail-title">Distro</h1>
+                  <p class="detail-desktop" id="detail-desktop" hidden></p>
+                  <p class="detail-version" id="detail-version"></p>
+                  <p class="detail-tagline" id="detail-tagline"></p>
+                </div>
+              </div>
 
-          <div class="detail-warn" id="detail-warn" hidden>
-            <span id="detail-warn-text"></span>
-          </div>
+              <p class="detail-desc" id="detail-desc"></p>
 
-          <div class="detail-actions" id="detail-actions">
-            <button type="button" class="btn btn-primary" id="install-btn">Install</button>
-            <div
-              class="detail-progress"
-              id="detail-progress"
-              hidden
-              role="progressbar"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              aria-valuenow="0"
-              aria-label="Download progress"
-            >
-              <div class="detail-progress-fill" id="detail-progress-fill"></div>
+              <div class="de-options" id="de-options" hidden>
+                <div class="de-options-label">Desktop environment</div>
+                <div class="de-options-list" id="de-options-list" role="list" aria-label="Desktop environments"></div>
+              </div>
+
+              <div class="detail-warn" id="detail-warn" hidden>
+                <span id="detail-warn-text"></span>
+              </div>
+
+              <div class="detail-actions" id="detail-actions">
+                <button type="button" class="btn btn-primary" id="install-btn">Install</button>
+                <div
+                  class="detail-progress"
+                  id="detail-progress"
+                  hidden
+                  role="progressbar"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  aria-valuenow="0"
+                  aria-label="Download progress"
+                >
+                  <div class="detail-progress-fill" id="detail-progress-fill"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -396,6 +415,11 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <footer class="brand-footer" id="brand-footer">
+    Configured by <span class="retailer-name">[Retailer Name]</span><br />
+    Support: <span class="retailer-name">[Retailer Contact Details]</span>
+  </footer>
 
   <script src="app.js"></script>
 </body>
