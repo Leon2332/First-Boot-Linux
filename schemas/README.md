@@ -77,7 +77,7 @@ Self-contained shop catalog. Schema: [`catalog.schema.json`](catalog.schema.json
 }
 ```
 
-The chooser grid is `recommended`. The “other distros” list is `recommended` followed by `catalog` (do not duplicate ids in the JSON).
+The chooser grid is `recommended`. **Other options** (the last card) opens `recommended` followed by `catalog`, sorted by name (do not duplicate ids in the JSON). `ms-windows` stays **MS Windows** on the card and **Microsoft Windows** in that list.
 
 Each distro copies display fields from the official catalog (`id`, `name`, `version`, `tagline`, `description`, `family`, `install`) plus `editions`. Do not copy official edition objects through: they have `filename` and nullable hashes, which this schema rejects (`additionalProperties: false`).
 

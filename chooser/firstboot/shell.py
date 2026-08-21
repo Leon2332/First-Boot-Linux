@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from firstboot.assets import find_app_icon, find_status, symbolic_pixbuf
 from firstboot.net import (
+    WIFI_LIST_LIMIT,
     NmError,
     NetSnapshot,
     WifiAP,
@@ -21,9 +22,12 @@ from firstboot.net import (
     disconnect_device,
     empty_snapshot,
     ethernet_detail,
+    forget_wifi,
     request_scan,
     set_wifi_radio,
     snapshot,
+    uuid_for_ssid,
+    wifi_row_actions,
 )
 from firstboot.brightness import BrightnessState, get_brightness_backend
 from firstboot.volume import VolumeState, get_volume_backend
@@ -73,6 +77,196 @@ def set_symbolic(image: Gtk.Image, name: str, color: str, size: int = 16) -> Non
     image.set_pixel_size(size)
 
 
+class _WifiRow:
+    def __init__(self, shell: Shell, ap: WifiAP, saved: bool) -> None:
+        from gi.repository import Gtk, Pango
+
+        self.shell = shell
+        self.ssid = ap.ssid
+        self.ap = ap
+        self.saved = saved
+        self.expanded = False
+        self._revealed = False
+        self._icon_color: str | None = None
+        self.entry = None
+        self.unhide = None
+        self.forget_btn = None
+        self.connect_btn = None
+        self.expand = None
+        self.password_wrap = None
+        self.actions = None
+
+        self.root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.root.add_css_class("wifi-row")
+
+        self.header = Gtk.Button()
+        self.header.add_css_class("wifi-item")
+        self.header.set_has_frame(False)
+        self.header.set_hexpand(True)
+        head = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        self.icon = Gtk.Image()
+        self.icon.set_pixel_size(16)
+        left = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        left.set_hexpand(True)
+        left.append(self.icon)
+        self.ssid_lab = Gtk.Label(label=ap.ssid, xalign=0)
+        self.ssid_lab.add_css_class("wifi-ssid")
+        self.ssid_lab.set_ellipsize(Pango.EllipsizeMode.END)
+        self.ssid_lab.set_hexpand(True)
+        left.append(self.ssid_lab)
+        self.meta = Gtk.Label(label="", xalign=1)
+        self.meta.add_css_class("wifi-meta")
+        head.append(left)
+        head.append(self.meta)
+        self.header.set_child(head)
+        self.header.connect("clicked", lambda *_: self.shell._toggle_wifi(self.ssid))
+        self.root.append(self.header)
+        self.update(ap, saved, shell._busy)
+
+    def update(self, ap: WifiAP, saved: bool, busy: bool) -> None:
+        self.ap = ap
+        self.saved = saved
+        if ap.in_use:
+            self.root.add_css_class("active")
+            self.header.add_css_class("active")
+            self.meta.set_label("Connected")
+        else:
+            self.root.remove_css_class("active")
+            self.header.remove_css_class("active")
+            self.meta.set_label("")
+        color = self.shell._fg(active=ap.in_use)
+        if color != self._icon_color:
+            set_symbolic(
+                self.icon,
+                "network-wireless-signal-excellent-symbolic.svg",
+                color,
+                16,
+            )
+            self._icon_color = color
+        self.header.set_sensitive(not busy)
+        self._sync_expand(busy)
+
+    def password(self) -> str:
+        if self.entry is None:
+            return ""
+        return self.entry.get_text()
+
+    def set_expanded(self, expanded: bool) -> None:
+        if expanded == self.expanded:
+            if expanded and self.entry is not None:
+                self.entry.grab_focus()
+            return
+        self.expanded = expanded
+        if expanded:
+            self.root.add_css_class("expanded")
+            self._ensure_expand()
+            if self.expand is not None:
+                self.expand.set_visible(True)
+            self._sync_expand(self.shell._busy)
+            if self.entry is not None:
+                self.entry.grab_focus()
+        else:
+            self.hide_password()
+            self.root.remove_css_class("expanded")
+            if self.expand is not None:
+                self.expand.set_visible(False)
+
+    def hide_password(self) -> None:
+        self._revealed = False
+        if self.entry is not None:
+            self.entry.set_visibility(False)
+        if self.unhide is not None:
+            self.unhide.set_label("Unhide")
+
+    def _ensure_expand(self) -> None:
+        from gi.repository import Gtk
+
+        if self.expand is not None:
+            return
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        box.add_css_class("wifi-expand")
+
+        wrap = Gtk.Overlay()
+        wrap.add_css_class("wifi-password-field")
+        entry = Gtk.Entry()
+        entry.add_css_class("wifi-password")
+        entry.set_placeholder_text("Password")
+        entry.set_visibility(False)
+        entry.set_hexpand(True)
+        entry.set_input_purpose(Gtk.InputPurpose.PASSWORD)
+        entry.set_input_hints(Gtk.InputHints.PRIVATE)
+        entry.connect("activate", lambda *_: self.shell._connect_wifi_row(self))
+        unhide = Gtk.Button(label="Unhide")
+        unhide.add_css_class("wifi-unhide")
+        unhide.set_has_frame(False)
+        unhide.set_focus_on_click(False)
+        unhide.set_halign(Gtk.Align.END)
+        unhide.set_valign(Gtk.Align.CENTER)
+        unhide.set_margin_end(4)
+        unhide.connect("clicked", lambda *_: self._toggle_reveal())
+        wrap.set_child(entry)
+        wrap.add_overlay(unhide)
+        box.append(wrap)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        actions.add_css_class("wifi-expand-actions")
+        forget = Gtk.Button(label="Forget")
+        forget.add_css_class("btn-pill")
+        forget.add_css_class("wifi-forget")
+        forget.set_has_frame(False)
+        forget.connect("clicked", lambda *_: self.shell._forget_wifi_row(self))
+        spacer = Gtk.Box()
+        spacer.set_hexpand(True)
+        connect = Gtk.Button(label="Connect")
+        connect.add_css_class("btn-pill")
+        connect.add_css_class("wifi-connect")
+        connect.set_has_frame(False)
+        connect.connect("clicked", lambda *_: self.shell._connect_wifi_row(self))
+        actions.append(forget)
+        actions.append(spacer)
+        actions.append(connect)
+        box.append(actions)
+
+        self.entry = entry
+        self.unhide = unhide
+        self.forget_btn = forget
+        self.connect_btn = connect
+        self.password_wrap = wrap
+        self.actions = actions
+        self.expand = box
+        self.root.append(box)
+
+    def _toggle_reveal(self) -> None:
+        if self.entry is None or self.unhide is None:
+            return
+        self._revealed = not self._revealed
+        self.entry.set_visibility(self._revealed)
+        self.unhide.set_label("Hide" if self._revealed else "Unhide")
+
+    def _sync_expand(self, busy: bool) -> None:
+        if self.expand is None:
+            return
+        show_password, show_connect, show_forget = wifi_row_actions(
+            secure=not self.ap.open,
+            in_use=self.ap.in_use,
+            saved=self.saved,
+        )
+        if self.password_wrap is not None:
+            self.password_wrap.set_visible(show_password)
+        if self.forget_btn is not None:
+            self.forget_btn.set_visible(show_forget)
+            self.forget_btn.set_sensitive(not busy)
+        if self.connect_btn is not None:
+            self.connect_btn.set_visible(show_connect)
+            self.connect_btn.set_sensitive(not busy)
+            self.connect_btn.set_label("Connecting…" if busy and show_connect else "Connect")
+        if self.unhide is not None:
+            self.unhide.set_sensitive(not busy)
+        if self.entry is not None:
+            self.entry.set_sensitive(not busy)
+        self.expand.set_visible(self.expanded)
+
+
 class Shell:
     def __init__(
         self,
@@ -102,6 +296,13 @@ class Shell:
         self._busy = False
         self._built = False
         self._app_download = None
+        self._wifi_rows: dict[str, _WifiRow] = {}
+        self._wifi_mode: str | None = None
+        self._wifi_expanded: str | None = None
+        self._net_inflight = False
+        self._net_again = False
+        self._net_again_scan = False
+        self._net_gen = 0
 
     def build(self) -> tuple[Gtk.Widget, list[Gtk.Widget]]:
         from gi.repository import Gtk
@@ -124,7 +325,11 @@ class Shell:
         for panel in (self.qs, self.net_panel, self.power_menu, self.app_menu):
             panel.set_visible(False)
         self._built = True
-        self.refresh_net()
+        try:
+            self.net = snapshot()
+        except Exception:
+            self.net = empty_snapshot(available=False)
+        self._paint_net()
         self.refresh_volume()
         self.refresh_icons()
         return self.topbar, [
@@ -152,12 +357,46 @@ class Shell:
         return True
 
     def refresh_net(self) -> bool:
-        try:
-            self.net = snapshot()
-        except Exception:
-            self.net = empty_snapshot(available=False)
-        self._paint_net()
+        self._request_net(scan=False)
         return True
+
+    def _request_net(self, *, scan: bool = False) -> None:
+        if self._wifi_expanded:
+            scan = False
+        if self._net_inflight:
+            self._net_again = True
+            self._net_again_scan = self._net_again_scan or scan
+            return
+        self._net_inflight = True
+        self._net_gen += 1
+        gen = self._net_gen
+        do_scan = scan
+
+        def work() -> None:
+            from gi.repository import GLib
+
+            try:
+                if do_scan:
+                    request_scan()
+                snap = snapshot()
+            except Exception:
+                snap = empty_snapshot(available=False)
+            GLib.idle_add(self._apply_net, gen, snap)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _apply_net(self, gen: int, snap: NetSnapshot) -> bool:
+        if gen != self._net_gen:
+            return False
+        self._net_inflight = False
+        self.net = snap
+        self._paint_net()
+        if self._net_again:
+            again_scan = self._net_again_scan
+            self._net_again = False
+            self._net_again_scan = False
+            self._request_net(scan=again_scan)
+        return False
 
     def refresh_volume(self) -> bool:
         try:
@@ -190,6 +429,8 @@ class Shell:
         if name == self.open_menu:
             self.close_menus()
             return
+        if name not in {"network", "qs"}:
+            self._set_expanded(None)
         self.open_menu = name
         self.backdrop.set_visible(name is not None)
         self.qs.set_visible(name == "qs")
@@ -205,15 +446,13 @@ class Shell:
         else:
             self.app_btn.remove_css_class("open")
         if name == "network":
-            self.refresh_net()
             if self.allow_scan:
-                from gi.repository import GLib
-
-                GLib.timeout_add(400, self._scan_async)
+                self._request_net(scan=not self._wifi_expanded)
         if name == "qs":
             self.refresh_volume()
             self.refresh_brightness()
-            self.refresh_net()
+            if self.allow_scan:
+                self._request_net(scan=False)
 
     def close_menus(self) -> None:
         if self.open_menu is None:
@@ -423,6 +662,9 @@ class Shell:
         panel.set_margin_top(40)
         panel.set_margin_end(10)
         panel.set_size_request(340, -1)
+        steal = Gtk.GestureClick()
+        steal.connect("pressed", lambda *a: True)
+        panel.add_controller(steal)
 
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         header.add_css_class("menu-header")
@@ -462,8 +704,15 @@ class Shell:
         wifi_lab.add_css_class("net-section")
         panel.append(wifi_lab)
 
+        scroll = Gtk.ScrolledWindow()
+        scroll.add_css_class("wifi-scroll")
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_max_content_height(320)
+        scroll.set_propagate_natural_height(True)
+        scroll.set_hexpand(True)
         self.wifi_host = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        panel.append(self.wifi_host)
+        scroll.set_child(self.wifi_host)
+        panel.append(scroll)
         return panel
 
     def _build_power(self) -> Gtk.Widget:
@@ -674,17 +923,7 @@ class Shell:
         else:
             self.eth_btn.set_visible(False)
 
-        self._clear(self.wifi_host)
-        if not n.wifi.hardware and n.wifi.device is None:
-            self.wifi_host.append(self._note("No Wi-Fi adapter"))
-        elif not n.wifi.enabled:
-            row = self._wifi_off_row()
-            self.wifi_host.append(row)
-        elif not n.access_points:
-            self.wifi_host.append(self._note("No networks found"))
-        else:
-            for ap in n.access_points[:8]:
-                self.wifi_host.append(self._wifi_row(ap))
+        self._sync_wifi_list()
 
     def _note(self, text: str):
         from gi.repository import Gtk
@@ -715,33 +954,122 @@ class Shell:
         row.append(btn)
         return row
 
-    def _wifi_row(self, ap: WifiAP):
-        from gi.repository import Gtk
+    def _sync_wifi_list(self) -> None:
+        n = self.net
+        if not n.wifi.hardware and n.wifi.device is None:
+            mode, aps = "no-hw", ()
+        elif not n.wifi.enabled:
+            mode, aps = "off", ()
+        elif not n.access_points:
+            mode, aps = "empty", ()
+        else:
+            mode, aps = "aps", n.access_points[:WIFI_LIST_LIMIT]
 
-        btn = Gtk.Button()
-        btn.add_css_class("wifi-item")
+        ids = tuple(ap.ssid for ap in aps)
+        if self._wifi_expanded and ids and self._wifi_expanded not in ids:
+            self._set_expanded(None)
+
+        if self._wifi_expanded and self._wifi_mode == "aps" and self._wifi_rows:
+            by_ssid = {ap.ssid: ap for ap in n.access_points}
+            for ssid, row in self._wifi_rows.items():
+                ap = by_ssid.get(ssid)
+                if ap is not None:
+                    row.update(ap, ssid in n.saved_ssids, self._busy)
+            return
+
+        if mode == "aps" and self._wifi_mode == "aps" and ids == tuple(self._wifi_rows):
+            by_ssid = {ap.ssid: ap for ap in aps}
+            for ssid, row in self._wifi_rows.items():
+                ap = by_ssid.get(ssid)
+                if ap is not None:
+                    row.update(ap, ssid in n.saved_ssids, self._busy)
+            return
+
+        self._rebuild_wifi_list(mode, aps)
+
+    def _rebuild_wifi_list(self, mode: str, aps: tuple[WifiAP, ...]) -> None:
+        keep = self._wifi_expanded
+        keep_row = self._wifi_rows.get(keep) if keep else None
+        self._clear(self.wifi_host)
+        self._wifi_rows = {}
+        self._wifi_mode = mode
+        if mode == "no-hw":
+            self.wifi_host.append(self._note("No Wi-Fi adapter"))
+            if keep:
+                self._set_expanded(None)
+            return
+        if mode == "off":
+            self.wifi_host.append(self._wifi_off_row())
+            if keep:
+                self._set_expanded(None)
+            return
+        if mode == "empty":
+            self.wifi_host.append(self._note("No networks found"))
+            if keep:
+                self._set_expanded(None)
+            return
+        saved = self.net.saved_ssids
+        for ap in aps:
+            if keep_row is not None and keep_row.ssid == ap.ssid:
+                row = keep_row
+                row.update(ap, ap.ssid in saved, self._busy)
+            else:
+                row = _WifiRow(self, ap, ap.ssid in saved)
+            self._wifi_rows[ap.ssid] = row
+            self.wifi_host.append(row.root)
+        if keep and keep not in self._wifi_rows:
+            self._wifi_expanded = None
+        elif keep_row is not None and keep == keep_row.ssid:
+            keep_row.set_expanded(True)
+
+    def _toggle_wifi(self, ssid: str) -> None:
+        if self._busy:
+            return
+        self._set_expanded(None if self._wifi_expanded == ssid else ssid)
+
+    def _set_expanded(self, ssid: str | None) -> None:
+        prev = self._wifi_expanded
+        if prev == ssid:
+            return
+        if prev and prev in self._wifi_rows:
+            self._wifi_rows[prev].set_expanded(False)
+        self._wifi_expanded = ssid
+        if ssid and ssid in self._wifi_rows:
+            self._wifi_rows[ssid].set_expanded(True)
+
+    def _connect_wifi_row(self, row: _WifiRow) -> None:
+        if self._busy:
+            return
+        ap = row.ap
         if ap.in_use:
-            btn.add_css_class("active")
-        btn.set_has_frame(False)
-        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        icon = Gtk.Image()
-        set_symbolic(
-            icon,
-            "network-wireless-signal-excellent-symbolic.svg",
-            self._fg(active=ap.in_use),
-            16,
+            return
+        secret = row.password().strip()
+        saved = ap.ssid in self.net.saved_ssids
+        if not ap.open and not saved and not secret:
+            self.on_toast("Password required")
+            return
+        pw = secret or None
+        uuid = uuid_for_ssid(self.net.saved_uuids, ap.ssid)
+        device = self.net.wifi.device
+        sec = ap.security
+        self._run(
+            lambda: connect_wifi(
+                ap.ssid, pw, security=sec, uuid=uuid, device=device
+            ),
+            f"Connected to {ap.ssid}",
+            collapse=ap.ssid,
         )
-        left = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        left.set_hexpand(True)
-        left.append(icon)
-        left.append(Gtk.Label(label=ap.ssid, xalign=0))
-        meta = Gtk.Label(label="Connected" if ap.in_use else "", xalign=1)
-        meta.add_css_class("wifi-meta")
-        row.append(left)
-        row.append(meta)
-        btn.set_child(row)
-        btn.connect("clicked", lambda *_a, a=ap: self._on_wifi(a))
-        return btn
+
+    def _forget_wifi_row(self, row: _WifiRow) -> None:
+        if self._busy:
+            return
+        ssid = row.ssid
+        uuid = uuid_for_ssid(self.net.saved_uuids, ssid)
+        self._run(
+            lambda: forget_wifi(ssid, uuid),
+            f"Forgot {ssid}",
+            collapse=ssid,
+        )
 
     def refresh_icons(self) -> None:
         if not self._built:
@@ -798,72 +1126,22 @@ class Shell:
     def _wifi_radio(self, enabled: bool) -> None:
         self._run(lambda: set_wifi_radio(enabled), "Wi-Fi on" if enabled else "Wi-Fi off")
 
-    def _on_wifi(self, ap: WifiAP) -> None:
-        if self._busy:
-            return
-        if ap.in_use:
-            if self.net.wifi.device:
-                self._run(
-                    lambda: disconnect_device(self.net.wifi.device),
-                    f"Disconnected {ap.ssid}",
-                )
-            return
-        if ap.open:
-            self._run(lambda: connect_wifi(ap.ssid), f"Connected to {ap.ssid}")
-            return
-        self._ask_wifi_password(ap)
+    def _set_busy_widgets(self, busy: bool) -> None:
+        self.eth_btn.set_sensitive(not busy)
+        for row in self._wifi_rows.values():
+            row.update(row.ap, row.saved, busy)
 
-    def _ask_wifi_password(self, ap: WifiAP) -> None:
-        from gi.repository import Adw, GLib, Gtk
-
-        win = self.get_window()
-        dialog = Adw.AlertDialog(
-            heading=ap.ssid,
-            body="Enter the network password.",
-        )
-        entry = Gtk.PasswordEntry()
-        entry.set_show_peek_icon(True)
-        entry.set_hexpand(True)
-        dialog.set_extra_child(entry)
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("ok", "Connect")
-        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
-        dialog.set_default_response("ok")
-        dialog.set_close_response("cancel")
-
-        def done(_d: Adw.AlertDialog, result) -> None:
-            try:
-                resp = dialog.choose_finish(result)
-            except GLib.Error:
-                return
-            if resp != "ok":
-                return
-            secret = entry.get_text()
-            if not secret:
-                self.on_toast("Password required")
-                return
-            self._run(lambda: connect_wifi(ap.ssid, secret), f"Connected to {ap.ssid}")
-
-        dialog.choose(win, None, done)
-
-    def _scan_async(self) -> bool:
-        if self.open_menu != "network":
-            return False
-
-        def work() -> None:
-            request_scan()
-            from gi.repository import GLib
-
-            GLib.idle_add(self.refresh_net)
-
-        threading.Thread(target=work, daemon=True).start()
-        return False
-
-    def _run(self, fn: Callable[[], None], ok_msg: str) -> None:
+    def _run(
+        self,
+        fn: Callable[[], None],
+        ok_msg: str,
+        *,
+        collapse: str | None = None,
+    ) -> None:
         if self._busy:
             return
         self._busy = True
-        self._paint_net()
+        self._set_busy_widgets(True)
 
         def work() -> None:
             from gi.repository import GLib
@@ -875,13 +1153,16 @@ class Shell:
                 err = str(exc)
             except Exception as exc:
                 err = str(exc)
-            GLib.idle_add(self._done, ok_msg, err)
+            GLib.idle_add(self._done, ok_msg, err, collapse)
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _done(self, ok_msg: str, err: str | None) -> bool:
+    def _done(self, ok_msg: str, err: str | None, collapse: str | None = None) -> bool:
         self._busy = False
-        self.refresh_net()
+        if collapse and not err:
+            self._set_expanded(None)
+        self._set_busy_widgets(False)
+        self._request_net(scan=False)
         if err:
             self.on_toast(err)
         else:

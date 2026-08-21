@@ -295,6 +295,26 @@ window.firstboot.light .btn-pill {
   background-color: rgba(0, 0, 0, 0.06);
 }
 
+.wifi-scroll {
+  min-height: 0;
+}
+
+.wifi-row {
+  border-radius: 12px;
+}
+
+.wifi-row.expanded {
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+.wifi-row.active {
+  background-color: rgba(53, 132, 228, 0.25);
+}
+
+window.firstboot.light .wifi-row.expanded {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
 .wifi-item {
   padding: 10px 12px;
   border-radius: 12px;
@@ -302,15 +322,11 @@ window.firstboot.light .btn-pill {
   border: none;
 }
 
-.wifi-item:hover {
+.wifi-row:not(.expanded):not(.active) .wifi-item:hover {
   background-color: rgba(255, 255, 255, 0.10);
 }
 
-.wifi-item.active {
-  background-color: rgba(53, 132, 228, 0.25);
-}
-
-window.firstboot.light .wifi-item:hover {
+window.firstboot.light .wifi-row:not(.expanded):not(.active) .wifi-item:hover {
   background-color: rgba(0, 0, 0, 0.06);
 }
 
@@ -321,6 +337,93 @@ window.firstboot.light .wifi-item:hover {
 .wifi-meta {
   font-size: 12px;
   opacity: 0.7;
+}
+
+.wifi-expand {
+  padding: 0 12px 12px;
+}
+
+.wifi-password-field {
+  min-height: 36px;
+}
+
+entry.wifi-password {
+  min-height: 36px;
+  padding-left: 12px;
+  padding-right: 76px;
+  border-radius: 10px;
+  background-color: rgba(0, 0, 0, 0.28);
+  color: #f6f5f4;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+  outline: none;
+}
+
+entry.wifi-password:focus {
+  border-color: #3584e4;
+}
+
+window.firstboot.light entry.wifi-password {
+  background-color: #ffffff;
+  color: #1c1c1c;
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+button.wifi-unhide {
+  min-height: 28px;
+  min-width: 0;
+  padding: 0 10px;
+  margin: 4px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  color: rgba(246, 245, 244, 0.75);
+}
+
+button.wifi-unhide:hover {
+  background-color: rgba(255, 255, 255, 0.14);
+  color: #f6f5f4;
+}
+
+window.firstboot.light button.wifi-unhide {
+  color: rgba(28, 28, 28, 0.7);
+}
+
+window.firstboot.light button.wifi-unhide:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+  color: #1c1c1c;
+}
+
+.wifi-expand-actions {
+  padding: 0;
+}
+
+button.wifi-connect {
+  background-color: #3584e4;
+  color: #ffffff;
+}
+
+button.wifi-connect:hover {
+  background-color: #62a0ea;
+}
+
+.wifi-row.active button.btn-pill {
+  background-color: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.wifi-row.active button.btn-pill:hover {
+  background-color: rgba(255, 255, 255, 0.24);
+}
+
+.wifi-row.active button.wifi-connect {
+  background-color: #3584e4;
+}
+
+.wifi-row.active button.wifi-connect:hover {
+  background-color: #62a0ea;
 }
 
 .app-menu-sep {
@@ -383,39 +486,15 @@ window.firstboot.light .power-menu-header {
   padding: 48px 24px 72px;
 }
 
-.chooser-heading {
-  padding: 10px 16px;
-  margin-bottom: 12px;
-  background-image: linear-gradient(90deg, rgba(18, 20, 26, 0.78), transparent 50%);
-}
-
-.chooser-heading.catalog-heading {
-  margin-top: 24px;
-}
-
-window.firstboot.light .chooser-heading {
-  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.78), transparent 50%);
-}
-
-.heading-title {
-  font-size: 16px;
+.brand-footer {
+  font-size: 12px;
   font-weight: 400;
-  color: #797979;
+  line-height: 1.4;
+  color: rgba(154, 163, 178, 0.7);
 }
 
-window.firstboot.light .heading-title {
-  color: #1c1c1c;
-}
-
-.heading-sub {
-  font-size: 13px;
-  font-weight: 300;
-  color: #5a5a5a;
-  margin-top: 2px;
-}
-
-window.firstboot.light .heading-sub {
-  color: #5e6772;
+window.firstboot.light .brand-footer {
+  color: rgba(94, 103, 114, 0.75);
 }
 
 .distro-card {
@@ -462,20 +541,44 @@ window.firstboot.light .card-version {
   color: #5e6772;
 }
 
+.other-option-card .card-name {
+  color: #9aa3b2;
+}
+
+window.firstboot.light .other-option-card .card-name {
+  color: #5e6772;
+}
+
+.catalog-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #eef1f6;
+  margin-bottom: 10px;
+}
+
+window.firstboot.light .catalog-title {
+  color: #1c1c1c;
+}
+
 .catalog-row {
   padding: 10px 14px;
   border-radius: 12px;
-  background-color: rgba(18, 20, 26, 0.72);
+  background-color: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .catalog-row:hover {
-  background-color: rgba(28, 32, 40, 0.86);
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 window.firstboot.light .catalog-row {
-  background-color: rgba(255, 255, 255, 0.78);
+  background-color: rgba(0, 0, 0, 0.03);
   border-color: rgba(0, 0, 0, 0.08);
+}
+
+window.firstboot.light .catalog-row:hover {
+  background-color: rgba(0, 0, 0, 0.055);
 }
 
 .row-name {

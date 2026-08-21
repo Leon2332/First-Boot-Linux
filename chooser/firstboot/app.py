@@ -9,7 +9,12 @@ import subprocess
 import sys
 import threading
 
-from firstboot.assets import brand_logo_pixbuf, find_brand_logo, find_logo
+from firstboot.assets import (
+    brand_logo_pixbuf,
+    find_app_icon,
+    find_brand_logo,
+    find_logo,
+)
 from firstboot.disk import HelperEvent, live_plan
 from firstboot.install import InstallError, run_apply
 from firstboot.osinstall import (
@@ -55,7 +60,8 @@ def run_window(
     payload_root: str,
     screenshot: str | None = None,
     open_id: str | None = None,
-    open_catalog: bool = False,
+    open_as_catalog: bool = False,
+    open_catalog_list: bool = False,
     open_menu: str | None = None,
     light: bool = False,
     shop: str | None = None,
@@ -77,7 +83,8 @@ def run_window(
             root: str,
             screenshot: str | None = None,
             open_id: str | None = None,
-            open_catalog: bool = False,
+            open_as_catalog: bool = False,
+            open_catalog_list: bool = False,
             open_menu: str | None = None,
             light: bool = False,
             shop: str | None = None,
@@ -92,13 +99,16 @@ def run_window(
             self.dark = not light
             self.screenshot = screenshot
             self.open_id = open_id
-            self.open_catalog = open_catalog
+            self.open_as_catalog = open_as_catalog
+            self.open_catalog_list = open_catalog_list
             self.open_menu = open_menu
             self.shop = shop
             self.osinstall = osinstall
             self.shop_plan = live_plan(root)
             self.detail_distro: Distro | None = None
             self.detail_from_catalog = False
+            self.overlay_mode: str | None = None
+            self.other_logo = None
             self._installing = False
             self._os_logo = False
             self.connect("activate", self.on_activate)
@@ -194,7 +204,7 @@ def run_window(
             outer.set_vexpand(True)
             self.main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
             self.main_box.add_css_class("content")
-            self.main_box.set_size_request(980, -1)
+            self.main_box.set_halign(Gtk.Align.CENTER)
             outer.append(self.main_box)
             scroll.set_child(outer)
             stage.set_child(scroll)
@@ -207,8 +217,11 @@ def run_window(
             self.dimmer.set_wallpaper(self.wallpaper)
             self.dimmer.set_visible(False)
             click = Gtk.GestureClick()
-            click.connect("pressed", lambda *_: self.close_detail())
+            click.connect("pressed", lambda *_: self._overlay_back())
             self.dimmer.add_controller(click)
+
+            self.footer = self._build_footer()
+            stage.add_overlay(self.footer)
             stage.add_overlay(self.dimmer)
 
             self.detail_host = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -216,6 +229,19 @@ def run_window(
             self.detail_host.set_valign(Gtk.Align.START)
             self.detail_host.set_margin_top(40)
             self.detail_host.set_visible(False)
+            self.overlay_stack = Gtk.Stack()
+            self.overlay_stack.set_halign(Gtk.Align.CENTER)
+            self.overlay_stack.set_hhomogeneous(True)
+            self.overlay_stack.set_vhomogeneous(False)
+            self.overlay_stack.set_interpolate_size(True)
+            self.overlay_stack.set_transition_duration(320)
+            self.catalog_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            self.catalog_page.set_halign(Gtk.Align.CENTER)
+            self.detail_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            self.detail_page.set_halign(Gtk.Align.CENTER)
+            self.overlay_stack.add_named(self.catalog_page, "catalog")
+            self.overlay_stack.add_named(self.detail_page, "detail")
+            self.detail_host.append(self.overlay_stack)
             stage.add_overlay(self.detail_host)
 
             self.install_host = self._build_install_overlay()
@@ -233,10 +259,16 @@ def run_window(
 
             self._apply_theme()
             self._render_main()
+            if self.open_catalog_list and not self.open_id:
+                self.open_catalog()
             if self.open_id:
                 for distro in [*self.payload.recommended, *self.payload.catalog]:
                     if distro.id == self.open_id:
-                        self.open_detail(distro, from_catalog=self.open_catalog)
+                        self.open_detail(
+                            distro,
+                            from_catalog=self.open_as_catalog
+                            or self.open_catalog_list,
+                        )
                         break
             self.shell.tick_clock()
             GLib.timeout_add_seconds(15, self.shell.tick_clock)
@@ -285,7 +317,7 @@ def run_window(
             if self.shell.handle_key(keyval):
                 return True
             if keyval == Gdk.KEY_Escape and self.detail_host.get_visible():
-                self.close_detail()
+                self._overlay_back()
                 return True
             return False
 
@@ -314,6 +346,7 @@ def run_window(
                 self.term.apply_theme(self.dark)
             if hasattr(self, "install_logo"):
                 self._paint_brand_logo()
+            self._paint_other_logo()
 
         def _clear(self, box: Gtk.Box) -> None:
             child = box.get_first_child()
@@ -322,23 +355,27 @@ def run_window(
                 box.remove(child)
                 child = nxt
 
-        def _heading(self, title: str, sub: str | None = None) -> Gtk.Widget:
-            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-            box.add_css_class("chooser-heading")
-            t = Gtk.Label(label=title, xalign=0)
-            t.add_css_class("heading-title")
-            box.append(t)
-            if sub:
-                s = Gtk.Label(label=sub, xalign=0)
-                s.add_css_class("heading-sub")
-                box.append(s)
-            return box
+        def _build_footer(self) -> Gtk.Widget:
+            lab = Gtk.Label(xalign=1)
+            lab.add_css_class("brand-footer")
+            lab.set_halign(Gtk.Align.END)
+            lab.set_valign(Gtk.Align.END)
+            lab.set_margin_end(16)
+            lab.set_margin_bottom(12)
+            retailer = self.payload.retailer
+            if retailer is None:
+                lab.set_visible(False)
+                return lab
+            text = f"Configured by {retailer.name}"
+            if retailer.support:
+                text += f"\nSupport: {retailer.support}"
+            lab.set_label(text)
+            return lab
 
         def _render_main(self) -> None:
             self._clear(self.main_box)
+            self.other_logo = None
             p = self.payload
-            shop = p.retailer.name if p.retailer else "this device"
-            support = p.retailer.support if p.retailer else None
 
             if p.errors and p.retailer is None and not p.recommended and not p.catalog:
                 note = Gtk.Label(
@@ -350,15 +387,11 @@ def run_window(
                 self.main_box.append(note)
                 return
 
-            self.main_box.append(
-                self._heading(
-                    f"Recommended by {shop}",
-                    f"Install support: {support}" if support else None,
-                )
-            )
-
-            if p.recommended:
-                self.main_box.append(self._card_rows(p.recommended))
+            cards: list[Gtk.Widget] = [self._card(d) for d in p.recommended]
+            if p.others:
+                cards.append(self._other_card())
+            if cards:
+                self.main_box.append(self._card_rows(cards))
             else:
                 empty = Gtk.Label(
                     label="No recommended distributions are listed on this image.",
@@ -366,24 +399,6 @@ def run_window(
                 )
                 empty.add_css_class("empty-note")
                 self.main_box.append(empty)
-
-            if p.others:
-                other = self._heading("Other distros")
-                other.add_css_class("catalog-heading")
-                self.main_box.append(other)
-                catalog = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-                for distro in p.others:
-                    catalog.append(self._row(distro))
-                if len(p.others) > 6:
-                    scroll = Gtk.ScrolledWindow()
-                    scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-                    scroll.set_min_content_height(200)
-                    scroll.set_max_content_height(320)
-                    scroll.set_propagate_natural_height(True)
-                    scroll.set_child(catalog)
-                    self.main_box.append(scroll)
-                else:
-                    self.main_box.append(catalog)
 
             if p.errors:
                 err = Gtk.Label(label="\n".join(p.errors), xalign=0)
@@ -403,14 +418,15 @@ def run_window(
             fallback.set_size_request(pixel, pixel)
             return fallback
 
-        def _card_rows(self, distros: list[Distro]) -> Gtk.Widget:
+        def _card_rows(self, cards: list[Gtk.Widget]) -> Gtk.Widget:
             col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-            col.set_valign(Gtk.Align.START)
-            for i in range(0, len(distros), 5):
+            col.set_halign(Gtk.Align.CENTER)
+            col.set_valign(Gtk.Align.CENTER)
+            for i in range(0, len(cards), 6):
                 row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-                row.set_halign(Gtk.Align.START)
-                for distro in distros[i : i + 5]:
-                    row.append(self._card(distro))
+                row.set_halign(Gtk.Align.CENTER)
+                for card in cards[i : i + 6]:
+                    row.append(card)
                 col.append(row)
             return col
 
@@ -438,6 +454,45 @@ def run_window(
             btn.connect("clicked", lambda *_: self.open_detail(distro, from_catalog=False))
             return btn
 
+        def _other_card(self) -> Gtk.Widget:
+            btn = Gtk.Button()
+            btn.add_css_class("distro-card")
+            btn.add_css_class("other-option-card")
+            btn.set_has_frame(False)
+            btn.set_valign(Gtk.Align.START)
+            btn.set_size_request(176, 198)
+            inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            inner.set_halign(Gtk.Align.CENTER)
+            logo = Gtk.Image()
+            logo.set_pixel_size(64)
+            logo.set_halign(Gtk.Align.CENTER)
+            logo.set_valign(Gtk.Align.CENTER)
+            logo.set_size_request(64, 64)
+            self.other_logo = logo
+            self._paint_other_logo()
+            inner.append(logo)
+            name = Gtk.Label(label="Other options")
+            name.add_css_class("card-name")
+            desk = Gtk.Label(label="...")
+            desk.add_css_class("card-desktop")
+            ver = Gtk.Label(label="\u00a0")
+            ver.add_css_class("card-version")
+            inner.append(name)
+            inner.append(desk)
+            inner.append(ver)
+            btn.set_child(inner)
+            btn.connect("clicked", lambda *_: self.open_catalog())
+            return btn
+
+        def _paint_other_logo(self) -> None:
+            img = self.other_logo
+            if img is None:
+                return
+            name = "other-option-dark.png" if self.dark else "other-option-light.png"
+            path = find_app_icon(name)
+            if path:
+                img.set_from_file(path)
+
         def _row(self, distro: Distro) -> Gtk.Widget:
             btn = Gtk.Button()
             btn.add_css_class("catalog-row")
@@ -445,7 +500,7 @@ def run_window(
             btn.set_hexpand(True)
             row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
             row.append(self._logo_image(distro.id, 40))
-            name = Gtk.Label(label=distro.name, xalign=0)
+            name = Gtk.Label(label=distro.catalog_name, xalign=0)
             name.add_css_class("row-name")
             name.set_hexpand(True)
             row.append(name)
@@ -456,23 +511,105 @@ def run_window(
             btn.connect("clicked", lambda *_: self.open_detail(distro, from_catalog=True))
             return btn
 
-        def open_detail(self, distro: Distro, *, from_catalog: bool) -> None:
-            self.shell.close_menus()
-            self.detail_distro = distro
-            self.detail_from_catalog = from_catalog
-            self._clear(self.detail_host)
-
-            wrap = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-            wrap.set_margin_start(16)
-            wrap.set_margin_end(16)
-
+        def _back_button(self, on_click) -> Gtk.Button:
             back = Gtk.Button(label="←  Back")
             back.add_css_class("back-link")
             back.set_has_frame(False)
             back.set_halign(Gtk.Align.START)
-            back.connect("clicked", lambda *_: self.close_detail())
-            wrap.append(back)
+            back.connect("clicked", lambda *_: on_click())
+            return back
 
+        def _overlay_wrap(self, on_back, child: Gtk.Widget) -> Gtk.Widget:
+            wrap = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            wrap.set_margin_start(16)
+            wrap.set_margin_end(16)
+            wrap.append(self._back_button(on_back))
+            wrap.append(child)
+            return wrap
+
+        def _set_dimmed(self, on: bool) -> None:
+            self.dimmer.set_visible(on)
+            if on:
+                self.dimmer.queue_draw()
+            self.footer.set_visible(bool(self.payload.retailer) and not on)
+
+        def _show_overlay(self, page: str, *, slide: bool) -> None:
+            if slide:
+                trans = (
+                    Gtk.StackTransitionType.SLIDE_LEFT
+                    if page == "detail"
+                    else Gtk.StackTransitionType.SLIDE_RIGHT
+                )
+            else:
+                trans = Gtk.StackTransitionType.NONE
+            self.overlay_stack.set_transition_type(trans)
+            self.overlay_stack.set_visible_child_name(page)
+            self.overlay_mode = page
+            self._set_dimmed(True)
+            self.detail_host.set_visible(True)
+
+        def _hide_overlay(self) -> None:
+            self.overlay_mode = None
+            self.detail_distro = None
+            self.detail_from_catalog = False
+            self._set_dimmed(False)
+            self.detail_host.set_visible(False)
+
+        def _overlay_back(self) -> None:
+            if self.overlay_mode == "detail" and self.detail_from_catalog:
+                self._show_overlay("catalog", slide=True)
+                return
+            self._hide_overlay()
+
+        def open_catalog(self) -> None:
+            self.shell.close_menus()
+            self.detail_distro = None
+            self.detail_from_catalog = False
+            self._fill_catalog()
+            self._show_overlay("catalog", slide=False)
+
+        def _fill_catalog(self) -> None:
+            self._clear(self.catalog_page)
+            card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            card.add_css_class("detail-card")
+            card.add_css_class("catalog-card")
+            card.set_size_request(480, -1)
+            title = Gtk.Label(label="Other options", xalign=0)
+            title.add_css_class("catalog-title")
+            card.append(title)
+            listing = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            distros = sorted(
+                self.payload.others,
+                key=lambda d: (d.catalog_name.casefold(), d.id),
+            )
+            for distro in distros:
+                listing.append(self._row(distro))
+            scroll = Gtk.ScrolledWindow()
+            scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            scroll.set_max_content_height(480)
+            scroll.set_propagate_natural_height(True)
+            scroll.set_hexpand(True)
+            scroll.set_has_frame(False)
+            scroll.set_child(listing)
+            card.append(scroll)
+            self.catalog_page.append(self._overlay_wrap(self._hide_overlay, card))
+
+        def open_detail(self, distro: Distro, *, from_catalog: bool) -> None:
+            self.shell.close_menus()
+            self.detail_distro = distro
+            self.detail_from_catalog = from_catalog
+            if from_catalog and self.catalog_page.get_first_child() is None:
+                self._fill_catalog()
+            self._fill_detail(distro, from_catalog=from_catalog)
+            slide = (
+                from_catalog
+                and self.overlay_mode == "catalog"
+                and self.detail_host.get_visible()
+            )
+            self._show_overlay("detail", slide=slide)
+
+        def _fill_detail(self, distro: Distro, *, from_catalog: bool) -> None:
+            self._clear(self.detail_page)
             card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
             card.add_css_class("detail-card")
             card.set_size_request(480, -1)
@@ -519,11 +656,7 @@ def run_window(
                 actions.append(btn)
                 card.append(actions)
 
-            wrap.append(card)
-            self.detail_host.append(wrap)
-            self.dimmer.set_visible(True)
-            self.dimmer.queue_draw()
-            self.detail_host.set_visible(True)
+            self.detail_page.append(self._overlay_wrap(self._overlay_back, card))
 
         def _edition_row(self, distro: Distro, ed: Edition) -> Gtk.Widget:
             row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
@@ -546,10 +679,7 @@ def run_window(
             return row
 
         def close_detail(self) -> None:
-            self.detail_distro = None
-            self.dimmer.set_visible(False)
-            self.detail_host.set_visible(False)
-            self._clear(self.detail_host)
+            self._hide_overlay()
 
         def _act(self, distro: Distro, ed: Edition) -> None:
             if not ed.on_disk:
@@ -678,8 +808,7 @@ def run_window(
             self.term.close()
             self.shell.locked = True
             self._installing = True
-            self.dimmer.set_visible(True)
-            self.dimmer.queue_draw()
+            self._set_dimmed(True)
             self.done_host.set_visible(False)
             self.install_host.set_visible(True)
             self._set_shop_progress(0, "")
@@ -701,7 +830,7 @@ def run_window(
             self.shell.locked = False
             self.install_host.set_visible(False)
             self.done_host.set_visible(False)
-            self.dimmer.set_visible(False)
+            self._set_dimmed(False)
             self._paint_brand_logo()
             self.install_title.set_label("Installing First Boot Linux")
             self.done_msg.set_label(
@@ -810,8 +939,7 @@ def run_window(
             self.shell.locked = True
             self._installing = False
             self.install_host.set_visible(False)
-            self.dimmer.set_visible(True)
-            self.dimmer.queue_draw()
+            self._set_dimmed(True)
             self.done_host.set_visible(True)
             return False
 
@@ -1066,7 +1194,8 @@ def run_window(
             payload_root,
             screenshot,
             open_id,
-            open_catalog,
+            open_as_catalog,
+            open_catalog_list,
             open_menu,
             light,
             shop,
@@ -1115,9 +1244,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--open", metavar="ID", help="open this distro's detail view")
     parser.add_argument(
+        "--catalog",
+        action="store_true",
+        help="open the Other options popover (host/CI screenshots)",
+    )
+    parser.add_argument(
         "--catalog-detail",
         action="store_true",
-        help="open --open as an Other distros popover (DE rows)",
+        help="open --open as an Other options detail (DE rows)",
     )
     parser.add_argument(
         "--menu",
@@ -1151,7 +1285,8 @@ def main(argv: list[str] | None = None) -> int:
         args.payload,
         screenshot=args.screenshot,
         open_id=args.open,
-        open_catalog=args.catalog_detail,
+        open_as_catalog=args.catalog_detail,
+        open_catalog_list=args.catalog,
         open_menu=args.menu,
         light=args.light,
         shop=args.shop,

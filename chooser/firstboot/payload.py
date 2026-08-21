@@ -93,6 +93,12 @@ class Distro:
     def default_desktop(self) -> str:
         return self.default_edition.name
 
+    @property
+    def catalog_name(self) -> str:
+        if self.id == "ms-windows":
+            return "Microsoft Windows"
+        return self.name
+
 
 @dataclass
 class Payload:

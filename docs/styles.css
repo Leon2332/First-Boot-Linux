@@ -742,8 +742,21 @@ html[data-theme="light"] .qs-slider::-moz-range-thumb {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 220px;
+  max-height: 320px;
   overflow-y: auto;
+}
+
+.wifi-row {
+  border-radius: 12px;
+}
+
+.wifi-row.expanded {
+  background: var(--surface-muted);
+}
+
+.wifi-row.active {
+  background: rgba(53, 132, 228, 0.25);
+  color: #fff;
 }
 
 .wifi-item {
@@ -757,13 +770,8 @@ html[data-theme="light"] .qs-slider::-moz-range-thumb {
   text-align: left;
 }
 
-.wifi-item:hover {
+.wifi-row:not(.expanded):not(.active) .wifi-item:hover {
   background-color: var(--surface-muted);
-}
-
-.wifi-item.active {
-  background: rgba(53, 132, 228, 0.25);
-  color: #fff;
 }
 
 .wifi-item-left {
@@ -772,9 +780,115 @@ html[data-theme="light"] .qs-slider::-moz-range-thumb {
   gap: 10px;
 }
 
+.wifi-item-meta {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
 .wifi-item .sym {
   width: 16px;
   height: 16px;
+}
+
+.wifi-expand {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.wifi-password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.wifi-password {
+  width: 100%;
+  height: 36px;
+  padding: 0 76px 0 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--border-strong);
+  color: var(--surface-fg);
+}
+
+.wifi-password::placeholder {
+  color: var(--surface-fg-dim);
+}
+
+.wifi-password:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.wifi-unhide {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--surface-fg-dim);
+}
+
+.wifi-unhide:hover {
+  background: var(--surface-muted-hover);
+  color: var(--surface-fg);
+}
+
+.wifi-expand-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.wifi-forget {
+  margin-right: auto;
+}
+
+.wifi-connect {
+  background: var(--accent);
+  color: #fff;
+}
+
+.wifi-connect:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.wifi-row.active .btn-pill {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.wifi-row.active .btn-pill:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.wifi-row.active .wifi-connect {
+  background: var(--accent);
+}
+
+.wifi-row.active .wifi-connect:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+html[data-theme="light"] .wifi-password {
+  background: #fff;
+}
+
+html[data-theme="light"] .wifi-row.active .wifi-password {
+  background: #fff;
+  color: var(--surface-fg);
+}
+
+html[data-theme="light"] .wifi-row.active .wifi-unhide {
+  color: var(--surface-fg-dim);
 }
 
 /* Applications menu */

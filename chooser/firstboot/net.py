@@ -73,6 +73,8 @@ class NetSnapshot:
     wifi: WifiRadio
     access_points: tuple[WifiAP, ...]
     available: bool = True
+    saved_ssids: frozenset[str] = frozenset()
+    saved_uuids: tuple[tuple[str, str], ...] = ()
 
     @property
     def connected(self) -> bool:
@@ -313,6 +315,41 @@ def pick_wifi(devices: list[Device], hardware: bool, enabled: bool) -> WifiRadio
     )
 
 
+WIFI_CONNECTION_TYPES = frozenset({"802-11-wireless", "wifi", "wireless"})
+WIFI_LIST_LIMIT = 8
+
+
+def parse_wifi_connections(text: str) -> dict[str, str]:
+    """Map connection name (usually the SSID) to UUID.
+
+    Source: `nmcli -t -f NAME,UUID,TYPE connection show`.
+    """
+    out: dict[str, str] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        parts = split_nmcli(line)
+        if len(parts) < 3:
+            continue
+        name, uuid, typ = parts[0].strip(), parts[1].strip(), parts[2].strip()
+        if name and uuid and typ in WIFI_CONNECTION_TYPES:
+            out[name] = uuid
+    return out
+
+
+def wifi_row_actions(*, secure: bool, in_use: bool, saved: bool) -> tuple[bool, bool, bool]:
+    """Password field, Connect, Forget — same rules as the mockup."""
+    return (secure and not in_use, not in_use, saved)
+
+
+def uuid_for_ssid(saved_uuids: tuple[tuple[str, str], ...], ssid: str) -> str | None:
+    for name, uuid in saved_uuids:
+        if name == ssid:
+            return uuid
+    return None
+
+
 def empty_snapshot(*, available: bool = True) -> NetSnapshot:
     return NetSnapshot(
         ethernet=Ethernet(
@@ -327,7 +364,10 @@ def empty_snapshot(*, available: bool = True) -> NetSnapshot:
 
 
 def snapshot_from_text(
-    devices_text: str, radio_text: str, wifi_text: str
+    devices_text: str,
+    radio_text: str,
+    wifi_text: str,
+    connections_text: str = "",
 ) -> NetSnapshot:
     devices = parse_device_status(devices_text)
     hardware, enabled = parse_radio(radio_text)
@@ -350,8 +390,18 @@ def snapshot_from_text(
                 0,
                 WifiAP(ssid=wifi.ssid, signal=100, security="", in_use=True),
             )
+    conns = parse_wifi_connections(connections_text) if connections_text else {}
+    saved_names = set(conns)
+    if wifi.connected and wifi.ssid:
+        saved_names.add(wifi.ssid)
+    saved_uuids = tuple((name, uuid) for name, uuid in conns.items() if uuid)
     return NetSnapshot(
-        ethernet=ethernet, wifi=wifi, access_points=tuple(aps), available=True
+        ethernet=ethernet,
+        wifi=wifi,
+        access_points=tuple(aps),
+        available=True,
+        saved_ssids=frozenset(saved_names),
+        saved_uuids=saved_uuids,
     )
 
 
@@ -434,7 +484,15 @@ def snapshot() -> NetSnapshot:
         )
     except NmError:
         wifi_text = ""
-    return snapshot_from_text(devices, radio, wifi_text)
+    conn_text = ""
+    try:
+        conn_text = run_nmcli(
+            ["-t", "-f", "NAME,UUID,TYPE", "connection", "show"],
+            timeout=6,
+        )
+    except NmError:
+        conn_text = ""
+    return snapshot_from_text(devices, radio, wifi_text, conn_text)
 
 
 def request_scan() -> None:
@@ -456,8 +514,100 @@ def set_wifi_radio(enabled: bool) -> None:
     run_nmcli(["radio", "wifi", "on" if enabled else "off"], write=True, timeout=8)
 
 
-def connect_wifi(ssid: str, password: str | None = None) -> None:
-    args = ["device", "wifi", "connect", ssid]
-    if password:
-        args.extend(["password", password])
-    run_nmcli(args, write=True, timeout=35)
+def wifi_key_mgmt(security: str) -> str | None:
+    """NM `wifi-sec.key-mgmt` from `nmcli device wifi list` SECURITY.
+
+    None means open (no 802-11-wireless-security setting).
+    """
+    text = (security or "").strip().casefold()
+    if not text or text in {"--", "none"}:
+        return None
+    if "802.1x" in text or "eap" in text or "enterprise" in text:
+        return "wpa-eap"
+    if "owe" in text:
+        return "owe"
+    if "wep" in text:
+        return "none"
+    if "sae" in text:
+        return "sae"
+    if "wpa3" in text and "wpa2" not in text and "wpa1" not in text:
+        return "sae"
+    return "wpa-psk"
+
+
+def wifi_profile_settings(*, security: str, password: str | None) -> list[str]:
+    """`nmcli connection add|modify` pairs. Empty for an open network."""
+    key = wifi_key_mgmt(security)
+    if key is None:
+        return []
+    if key == "wpa-eap":
+        raise NmError("Enterprise Wi-Fi is not supported yet")
+    out = ["wifi-sec.key-mgmt", key]
+    secret = (password or "").strip()
+    if secret and key in {"wpa-psk", "sae"}:
+        out.extend(["wifi-sec.psk", secret])
+    elif secret and key == "none":
+        out.extend(["wifi-sec.wep-key-type", "phrase", "wifi-sec.wep-key0", secret])
+    return out
+
+
+def connect_wifi(
+    ssid: str,
+    password: str | None = None,
+    *,
+    security: str = "",
+    uuid: str | None = None,
+    device: str | None = None,
+) -> None:
+    secret = (password or "").strip() or None
+    key = wifi_key_mgmt(security)
+    if key == "wpa-eap":
+        raise NmError("Enterprise Wi-Fi is not supported yet")
+    if key and not secret:
+        if uuid:
+            try:
+                run_nmcli(["connection", "up", "uuid", uuid], write=True, timeout=35)
+                return
+            except NmError as exc:
+                if "key-mgmt" in str(exc).casefold():
+                    raise NmError("Enter the network password") from exc
+                raise
+        raise NmError("Password required")
+
+    settings = wifi_profile_settings(security=security, password=secret)
+    if uuid:
+        forget_wifi(ssid, uuid)
+    add = ["connection", "add", "type", "wifi"]
+    if device:
+        add.extend(["ifname", device])
+    add.extend(
+        ["con-name", ssid, "autoconnect", "yes", "ssid", ssid, *settings]
+    )
+    try:
+        run_nmcli(add, write=True, timeout=20)
+    except NmError as exc:
+        if not settings:
+            pass
+        else:
+            try:
+                run_nmcli(
+                    ["connection", "modify", "id", ssid, *settings],
+                    write=True,
+                    timeout=15,
+                )
+            except NmError:
+                raise exc
+    run_nmcli(["connection", "up", "id", ssid], write=True, timeout=35)
+
+
+def forget_wifi(ssid: str, uuid: str | None = None) -> None:
+    try:
+        run_nmcli(["connection", "delete", "id", ssid], write=True, timeout=15)
+        return
+    except NmError as exc:
+        if not uuid:
+            raise
+        try:
+            run_nmcli(["connection", "delete", "uuid", uuid], write=True, timeout=15)
+        except NmError:
+            raise exc

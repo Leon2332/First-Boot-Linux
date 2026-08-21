@@ -257,8 +257,8 @@
   const CATALOG = RECOMMENDED.concat(CATALOG_EXTRA);
 
   const WIFI_NETWORKS = [
-    { ssid: "Home-5G", secure: true },
-    { ssid: "Home-2.4", secure: true },
+    { ssid: "Home-5G", secure: true, saved: true },
+    { ssid: "Home-2.4", secure: true, saved: true },
     { ssid: "CoffeeShop_Guest", secure: false },
     { ssid: "Office-Secure", secure: true },
   ];
@@ -297,6 +297,13 @@
       name: null,
       ethernetPlugged: false,
     },
+    wifiExpanded: null,
+    wifiSaved: new Set(
+      WIFI_NETWORKS.filter((n) => n.saved).map((n) => n.ssid)
+    ),
+    wifiSecrets: {},
+    wifiReveal: {},
+    wifiConnecting: null,
     darkStyle: true,
     detailMode: "recommended",
     selected: null,
@@ -447,6 +454,10 @@
     els.systemMenuBtn.setAttribute("aria-expanded", "false");
     els.appMenuBtn.setAttribute("aria-expanded", "false");
     els.backdrop.hidden = true;
+    if (state.wifiExpanded) {
+      setWifiExpanded(null);
+      renderWifi();
+    }
   }
 
   function startOverlayOpen() {
@@ -936,6 +947,13 @@
     els.backdrop.hidden = false;
   }
 
+  function openNetworkMenu() {
+    closeMenus();
+    els.networkMenu.hidden = false;
+    els.systemMenuBtn.setAttribute("aria-expanded", "true");
+    els.backdrop.hidden = false;
+  }
+
   function showScreen(name) {
     const showChooser =
       name === "chooser" ||
@@ -1099,31 +1117,147 @@
     }
   }
 
+  function wifiIsActive(ssid) {
+    return (
+      state.network.connected &&
+      state.network.type === "wifi" &&
+      state.network.name === ssid
+    );
+  }
+
+  function setWifiExpanded(ssid) {
+    const prev = state.wifiExpanded;
+    if (prev && prev !== ssid) delete state.wifiReveal[prev];
+    state.wifiExpanded = ssid;
+  }
+
+  function toggleWifiExpand(ssid) {
+    setWifiExpanded(state.wifiExpanded === ssid ? null : ssid);
+    renderWifi();
+    if (state.wifiExpanded !== ssid) return;
+    const input = els.wifiList.querySelector(".wifi-password");
+    if (input) input.focus();
+  }
+
+  function buildWifiExpand(net, isActive, saved) {
+    const box = document.createElement("div");
+    box.className = "wifi-expand";
+
+    if (net.secure && !isActive) {
+      const wrap = document.createElement("div");
+      wrap.className = "wifi-password-field";
+
+      const revealed = !!state.wifiReveal[net.ssid];
+      const input = document.createElement("input");
+      input.className = "wifi-password";
+      input.type = revealed ? "text" : "password";
+      input.dataset.ssid = net.ssid;
+      input.placeholder = "Password";
+      input.autocomplete = "off";
+      input.spellcheck = false;
+      input.setAttribute("aria-label", `Password for ${net.ssid}`);
+      input.value = state.wifiSecrets[net.ssid] || "";
+      input.addEventListener("input", () => {
+        state.wifiSecrets[net.ssid] = input.value;
+      });
+      input.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        connectWifi(net.ssid);
+      });
+
+      const unhide = document.createElement("button");
+      unhide.type = "button";
+      unhide.className = "wifi-unhide";
+      unhide.textContent = revealed ? "Hide" : "Unhide";
+      unhide.setAttribute("aria-pressed", String(revealed));
+      unhide.setAttribute(
+        "aria-label",
+        revealed ? "Hide password" : "Show password"
+      );
+      unhide.addEventListener("mousedown", (e) => e.preventDefault());
+      unhide.addEventListener("click", () => {
+        state.wifiReveal[net.ssid] = !revealed;
+        renderWifi();
+        const next = els.wifiList.querySelector(
+          `.wifi-password[data-ssid="${CSS.escape(net.ssid)}"]`
+        );
+        if (next) next.focus();
+      });
+
+      wrap.appendChild(input);
+      wrap.appendChild(unhide);
+      box.appendChild(wrap);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "wifi-expand-actions";
+    if (saved) {
+      const forget = document.createElement("button");
+      forget.type = "button";
+      forget.className = "btn-pill wifi-forget";
+      forget.textContent = "Forget";
+      forget.addEventListener("click", () => forgetWifi(net.ssid));
+      actions.appendChild(forget);
+    }
+    if (!isActive) {
+      const connect = document.createElement("button");
+      connect.type = "button";
+      connect.className = "btn-pill wifi-connect";
+      const busy = state.wifiConnecting === net.ssid;
+      connect.textContent = busy ? "Connecting…" : "Connect";
+      connect.disabled = busy;
+      connect.addEventListener("click", () => connectWifi(net.ssid));
+      actions.appendChild(connect);
+    }
+    if (actions.childNodes.length) box.appendChild(actions);
+    return box;
+  }
+
   function renderWifi() {
+    const keep = document.activeElement;
+    const keepSsid =
+      keep && keep.classList && keep.classList.contains("wifi-password")
+        ? keep.dataset.ssid
+        : "";
+    const selStart = keepSsid ? keep.selectionStart : null;
+    const selEnd = keepSsid ? keep.selectionEnd : null;
+
     els.wifiList.innerHTML = "";
 
     WIFI_NETWORKS.forEach((net) => {
       const li = document.createElement("li");
+      li.className = "wifi-row";
+      const isActive = wifiIsActive(net.ssid);
+      const expanded = state.wifiExpanded === net.ssid;
+      const saved = state.wifiSaved.has(net.ssid);
+      if (isActive) li.classList.add("active");
+      if (expanded) li.classList.add("expanded");
+
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "wifi-item";
-      const isActive =
-        state.network.connected &&
-        state.network.type === "wifi" &&
-        state.network.name === net.ssid;
-      if (isActive) btn.classList.add("active");
-
+      btn.setAttribute("aria-expanded", String(expanded));
       btn.innerHTML = `
         <span class="wifi-item-left">
           <img class="sym" src="assets/status/network-wireless-signal-excellent-symbolic.svg" alt="" draggable="false" />
           <span>${escapeHtml(net.ssid)}</span>
         </span>
-        <span style="font-size:12px;opacity:0.7">${isActive ? "Connected" : ""}</span>
+        <span class="wifi-item-meta">${isActive ? "Connected" : ""}</span>
       `;
-      btn.addEventListener("click", () => connectWifi(net.ssid));
+      btn.addEventListener("click", () => toggleWifiExpand(net.ssid));
       li.appendChild(btn);
+      if (expanded) li.appendChild(buildWifiExpand(net, isActive, saved));
       els.wifiList.appendChild(li);
     });
+
+    if (!keepSsid) return;
+    const input = els.wifiList.querySelector(
+      `.wifi-password[data-ssid="${CSS.escape(keepSsid)}"]`
+    );
+    if (!input) return;
+    input.focus();
+    if (selStart != null) input.setSelectionRange(selStart, selEnd);
   }
 
   function outputVolume() {
@@ -1193,14 +1327,41 @@
   }
 
   function connectWifi(ssid) {
+    const net = WIFI_NETWORKS.find((n) => n.ssid === ssid);
+    if (!net || state.wifiConnecting) return;
+    if (wifiIsActive(ssid)) return;
+    const secret = (state.wifiSecrets[ssid] || "").trim();
+    if (net.secure && !state.wifiSaved.has(ssid) && !secret) {
+      showToast("Password required");
+      return;
+    }
+    state.wifiConnecting = ssid;
     els.qsNetSub.textContent = "Connecting…";
+    renderWifi();
     setTimeout(() => {
+      state.wifiConnecting = null;
+      state.wifiSaved.add(ssid);
+      setWifiExpanded(null);
       state.network.connected = true;
       state.network.type = "wifi";
       state.network.name = ssid;
       updateNetworkUI();
       showToast(`Connected to ${ssid}`);
     }, 700);
+  }
+
+  function forgetWifi(ssid) {
+    state.wifiSaved.delete(ssid);
+    delete state.wifiSecrets[ssid];
+    delete state.wifiReveal[ssid];
+    if (wifiIsActive(ssid)) {
+      state.network.connected = false;
+      state.network.type = null;
+      state.network.name = null;
+    }
+    if (state.wifiExpanded === ssid) setWifiExpanded(null);
+    updateNetworkUI();
+    showToast(`Forgot ${ssid}`);
   }
 
   function toggleEthernet() {
@@ -1906,6 +2067,14 @@
     if (q.get("catalog") === "open") openCatalog();
     if (menu === "apps") openAppMenu();
     if (menu === "qs") openQuickSettings();
+    if (menu === "network") {
+      openNetworkMenu();
+      const wifi = q.get("wifi");
+      if (wifi && WIFI_NETWORKS.some((n) => n.ssid === wifi)) {
+        setWifiExpanded(wifi);
+        renderWifi();
+      }
+    }
     if (menu === "terminal") openTerminal();
     if (shop === "confirm") requestShopInstall();
     if (shop === "install") startShopInstall();
