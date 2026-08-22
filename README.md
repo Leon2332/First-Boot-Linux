@@ -53,3 +53,13 @@ The USB Creator provides a method for pre-installing First Boot Linux with its c
 ![First Boot Creator screenshot](docs/screenshots/usb-creator_step-02.png)
 ![First Boot Creator screenshot](docs/screenshots/usb-creator_step-03.png)
 ![First Boot Creator screenshot](docs/screenshots/usb-creator_step-04.png)
+
+
+# Good practice for recommendations
+
+It is up to the retailer to decide which operating systems they will recommend to their customers.
+However, it is good practice to:
+- not recommend options you have not tested on the particular device.
+- not block or prevent consumers from choosing something different from what you recommend.
+- provide basic installation support for your recommendations.
+- pick recommened options that your support team is familiar with (If your support team is only familiar with MS Windows, it is perfectly fine to add Windows as the only recommended option).

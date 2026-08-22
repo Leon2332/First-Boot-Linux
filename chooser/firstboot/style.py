@@ -866,4 +866,57 @@ window.firstboot.light .term-max-mark {
   padding: 24px;
   background-color: #1e1e1e;
 }
+
+.info-window {
+  background-color: #242424;
+  color: #eef1f6;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  min-width: 640px;
+}
+
+window.firstboot.light .info-window {
+  background-color: #ffffff;
+  color: #1c1c1c;
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+.info-window.maximized {
+  border-radius: 0;
+  border: none;
+  min-width: 0;
+  min-height: 0;
+}
+
+.info-body {
+  padding: 8px 20px 20px;
+}
+
+.info-heading {
+  font-size: 15px;
+  font-weight: 700;
+  padding: 8px 0 8px;
+}
+
+.info-field {
+  padding: 6px 0;
+}
+
+.info-field-label {
+  font-size: 12px;
+  color: #9aa3b2;
+}
+
+window.firstboot.light .info-field-label {
+  color: #5e6772;
+}
+
+.info-field-value {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+picture.info-sw-brand {
+  margin: 0 0 8px;
+}
 """.encode("utf-8")

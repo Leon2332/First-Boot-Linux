@@ -65,6 +65,18 @@ def find_brand_logo() -> str | None:
     )
 
 
+def find_brand_wordmark(dark: bool) -> str | None:
+    if dark:
+        return find_asset(
+            "logo-wordmark-dark.png",
+            os.path.join("Logo", "First Boot Linux - dark mode.png"),
+        )
+    return find_asset(
+        "logo-wordmark-light.png",
+        os.path.join("Logo", "First Boot Linux- light mode.png"),
+    )
+
+
 def recolor_svg(text: str, color: str) -> str:
     """Force a symbolic SVG onto one fill color (panel / QS icons)."""
     text = re.sub(r'fill="(?!none)[^"]*"', f'fill="{color}"', text)
@@ -154,3 +166,77 @@ def brand_logo_pixbuf(path: str, dark: bool, size: int):
         h,
         dest_stride,
     )
+
+
+def wordmark_pixbuf(path: str, dark: bool, width: int):
+    """White-on-black wordmark → transparent; invert for the light style."""
+    try:
+        import gi
+
+        gi.require_version("GdkPixbuf", "2.0")
+        from gi.repository import GdkPixbuf, GLib
+    except (ImportError, ValueError):
+        return None
+    try:
+        src = GdkPixbuf.Pixbuf.new_from_file(path)
+    except Exception:
+        return None
+    if src is None or src.get_width() <= 0:
+        return None
+    height = max(1, round(src.get_height() * width / src.get_width()))
+    src = src.scale_simple(width, height, GdkPixbuf.InterpType.BILINEAR)
+    if src is None:
+        return None
+    if src.get_n_channels() < 4:
+        src = src.add_alpha(True, 0, 0, 0)
+    else:
+        src = src.copy()
+    w, h = src.get_width(), src.get_height()
+    n = src.get_n_channels()
+    stride = src.get_rowstride()
+    src_px = src.get_pixels()
+    dest_stride = w * 4
+    dest_px = bytearray(dest_stride * h)
+    min_x, min_y, max_x, max_y = w, h, -1, -1
+    for y in range(h):
+        row = y * stride
+        for x in range(w):
+            i = row + x * n
+            r, g, b = src_px[i], src_px[i + 1], src_px[i + 2]
+            a = src_px[i + 3] if n >= 4 else 255
+            dest = y * dest_stride + x * 4
+            if r < 24 and g < 24 and b < 24:
+                dest_px[dest : dest + 4] = b"\x00\x00\x00\x00"
+                continue
+            if not dark:
+                r, g, b = 255 - r, 255 - g, 255 - b
+            dest_px[dest] = r
+            dest_px[dest + 1] = g
+            dest_px[dest + 2] = b
+            dest_px[dest + 3] = a
+            if x < min_x:
+                min_x = x
+            if y < min_y:
+                min_y = y
+            if x > max_x:
+                max_x = x
+            if y > max_y:
+                max_y = y
+    full = GdkPixbuf.Pixbuf.new_from_bytes(
+        GLib.Bytes.new(bytes(dest_px)),
+        GdkPixbuf.Colorspace.RGB,
+        True,
+        8,
+        w,
+        h,
+        dest_stride,
+    )
+    if max_x < min_x:
+        return full
+    pad = 2
+    x0 = max(0, min_x - pad)
+    y0 = max(0, min_y - pad)
+    cw = min(w - x0, max_x - min_x + 1 + pad * 2)
+    ch = min(h - y0, max_y - min_y + 1 + pad * 2)
+    cropped = full.new_subpixbuf(x0, y0, cw, ch)
+    return cropped.copy() if cropped is not None else full

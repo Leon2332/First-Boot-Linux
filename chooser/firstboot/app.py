@@ -30,7 +30,9 @@ from firstboot.osinstall import (
 )
 from firstboot.payload import Distro, Edition, Payload, load_payload
 from firstboot.shell import Shell
+from firstboot.floatlayer import FloatLayer
 from firstboot.style import CSS
+from firstboot.sysinfo import SysinfoWindow
 from firstboot.term import TermWindow
 
 PAYLOAD_DEFAULT = "/run/payload"
@@ -171,9 +173,16 @@ def run_window(
                 or os.environ.get("FIRSTBOOT_SHOP_INSTALL") == "1"
                 or (bool(self.screenshot) and self.open_menu == "apps")
             )
+            self.float_layer = FloatLayer()
             self.term = TermWindow(
                 get_window=lambda: self.win,
                 on_toast=self._toast,
+                layer=self.float_layer,
+            )
+            self.sysinfo = SysinfoWindow(
+                get_window=lambda: self.win,
+                retailer=self.payload.retailer,
+                layer=self.float_layer,
             )
             self.shell = Shell(
                 on_theme=self._set_dark,
@@ -182,6 +191,7 @@ def run_window(
                 get_window=lambda: self.win,
                 on_shop_install=self._confirm_shop_install,
                 on_terminal=self.term.open,
+                on_sysinfo=self.sysinfo.open,
                 show_shop_install=show_shop,
             )
             self.shell.allow_scan = not bool(self.screenshot)
@@ -248,7 +258,9 @@ def run_window(
             self.done_host = self._build_done_overlay()
             stage.add_overlay(self.install_host)
             stage.add_overlay(self.done_host)
-            stage.add_overlay(self.term.build())
+            self.term.build()
+            self.sysinfo.build()
+            stage.add_overlay(self.float_layer)
 
             for widget in menus:
                 self.overlay.add_overlay(widget)
@@ -277,6 +289,8 @@ def run_window(
             self._announce_ready()
             if self.open_menu == "terminal":
                 GLib.idle_add(lambda: self.term.open() or False)
+            elif self.open_menu == "sysinfo":
+                GLib.idle_add(lambda: self.sysinfo.open() or False)
             elif self.open_menu:
                 GLib.idle_add(lambda: self.shell.show_menu(self.open_menu) or False)
             if self.shop == "confirm":
@@ -297,6 +311,7 @@ def run_window(
                     if self.shop == "confirm"
                     or self.osinstall == "confirm"
                     or self.open_menu == "terminal"
+                    or self.open_menu == "sysinfo"
                     else 1200
                 )
                 GLib.timeout_add(delay, self._write_screenshot)
@@ -344,6 +359,8 @@ def run_window(
             self.dimmer.set_dark(self.dark)
             if hasattr(self, "term"):
                 self.term.apply_theme(self.dark)
+            if hasattr(self, "sysinfo"):
+                self.sysinfo.apply_theme(self.dark)
             if hasattr(self, "install_logo"):
                 self._paint_brand_logo()
             self._paint_other_logo()
@@ -806,6 +823,7 @@ def run_window(
             self.close_detail()
             self.shell.close_menus()
             self.term.close()
+            self.sysinfo.close()
             self.shell.locked = True
             self._installing = True
             self._set_dimmed(True)
@@ -1255,8 +1273,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--menu",
-        choices=("qs", "network", "apps", "power", "terminal"),
-        help="open a shell menu or the terminal (host/CI screenshots)",
+        choices=("qs", "network", "apps", "power", "terminal", "sysinfo"),
+        help="open a shell menu, the terminal, or system details (host/CI screenshots)",
     )
     parser.add_argument(
         "--light",

@@ -1,7 +1,7 @@
 """GNOME-like kiosk chrome: top bar, quick settings, network, power.
 
-Browser and system details are listed and do not launch. Terminal opens
-the in-kiosk VTE window.
+Browser is listed and does not launch. System details and Terminal open
+in-kiosk windows.
 """
 
 from __future__ import annotations
@@ -48,7 +48,6 @@ APP_ITEMS = (
 
 APP_TOASTS = {
     "browser": "Web browser is not on this image yet.",
-    "sysinfo": "System details is not on this image yet.",
 }
 
 
@@ -277,6 +276,7 @@ class Shell:
         get_window: Callable,
         on_shop_install: Callable[[], None] | None = None,
         on_terminal: Callable[[], None] | None = None,
+        on_sysinfo: Callable[[], None] | None = None,
         show_shop_install: bool = False,
     ) -> None:
         self.on_theme = on_theme
@@ -285,6 +285,7 @@ class Shell:
         self.get_window = get_window
         self.on_shop_install = on_shop_install
         self.on_terminal = on_terminal
+        self.on_sysinfo = on_sysinfo
         self.show_shop_install = show_shop_install
         self.dark = True
         self.volume = get_volume_backend()
@@ -840,6 +841,12 @@ class Shell:
                 self.on_terminal()
             else:
                 self.on_toast("Terminal is not on this image yet.")
+            return
+        if action == "sysinfo":
+            if self.on_sysinfo is not None:
+                self.on_sysinfo()
+            else:
+                self.on_toast("System details is not on this image yet.")
             return
         self.on_toast(APP_TOASTS.get(action, f"{action} is not on this image yet."))
 

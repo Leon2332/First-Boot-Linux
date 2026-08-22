@@ -50,10 +50,11 @@ class TermHelperTests(unittest.TestCase):
 
 
 class AppGridTests(unittest.TestCase):
-    def test_terminal_is_an_action(self) -> None:
+    def test_app_grid_actions(self) -> None:
         actions = [item[2] for item in APP_ITEMS]
         self.assertEqual(actions, ["browser", "sysinfo", "terminal"])
         self.assertNotIn("terminal", APP_TOASTS)
+        self.assertNotIn("sysinfo", APP_TOASTS)
 
 
 if __name__ == "__main__":

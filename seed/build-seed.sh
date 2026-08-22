@@ -215,8 +215,16 @@ install_chooser() {
   cp -a "$REPO_DIR/chooser/firstboot" "$ROOTFS/usr/share/firstboot/python/firstboot"
   find "$ROOTFS/usr/share/firstboot/python" -depth -type d -name __pycache__ -exec rm -rf {} +
   local logo="$REPO_DIR/docs/Logo/First Boot Linux.png"
+  local logo_dark="$REPO_DIR/docs/Logo/First Boot Linux - dark mode.png"
+  local logo_light="$REPO_DIR/docs/Logo/First Boot Linux- light mode.png"
   if [[ -f $logo ]]; then
     install -D -m 0644 "$logo" "$ROOTFS/usr/share/firstboot/logo.png"
+  fi
+  if [[ -f $logo_dark ]]; then
+    install -D -m 0644 "$logo_dark" "$ROOTFS/usr/share/firstboot/logo-wordmark-dark.png"
+  fi
+  if [[ -f $logo_light ]]; then
+    install -D -m 0644 "$logo_light" "$ROOTFS/usr/share/firstboot/logo-wordmark-light.png"
   fi
   if [[ -d $REPO_DIR/docs/assets/distros ]]; then
     cp -a "$REPO_DIR/docs/assets/distros/." "$ROOTFS/usr/share/firstboot/distros/"

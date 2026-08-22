@@ -2076,6 +2076,7 @@
       }
     }
     if (menu === "terminal") openTerminal();
+    if (menu === "sysinfo") openSysInfo();
     if (shop === "confirm") requestShopInstall();
     if (shop === "install") startShopInstall();
     if (shop === "progress") {

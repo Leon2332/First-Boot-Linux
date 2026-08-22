@@ -54,9 +54,11 @@ class TermWindow:
         *,
         get_window: Callable,
         on_toast: Callable[[str], None],
+        layer=None,
     ) -> None:
         self.get_window = get_window
         self.on_toast = on_toast
+        self.layer = layer
         self.frame = None
         self.vte = None
         self.title_lab = None
@@ -66,7 +68,7 @@ class TermWindow:
         self._placed = False
         self._x = 0
         self._y = TERM_TOP
-        self._drag_orig: tuple[int, int] | None = None
+        self._header_drag = None
 
     @property
     def visible(self) -> bool:
@@ -81,7 +83,10 @@ class TermWindow:
         self.frame.add_css_class("term-window")
         self.frame.set_halign(Gtk.Align.START)
         self.frame.set_valign(Gtk.Align.START)
+        self.frame.set_hexpand(False)
+        self.frame.set_vexpand(False)
         self.frame.set_size_request(TERM_WIDTH, TERM_HEIGHT)
+        self.frame.set_overflow(Gtk.Overflow.HIDDEN)
         self.frame.set_visible(False)
 
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
@@ -138,11 +143,10 @@ class TermWindow:
         header.append(controls)
         self.frame.append(header)
 
-        drag = Gtk.GestureDrag()
-        drag.connect("drag-begin", self._on_drag_begin)
-        drag.connect("drag-update", self._on_drag_update)
-        drag.connect("drag-end", lambda *_: setattr(self, "_drag_orig", None))
-        header.add_controller(drag)
+        from firstboot.floatlayer import HeaderDrag
+
+        self._header_drag = HeaderDrag(self)
+        self._header_drag.attach(header)
         dbl = Gtk.GestureClick()
         dbl.connect("pressed", self._on_header_press)
         header.add_controller(dbl)
@@ -178,6 +182,8 @@ class TermWindow:
             miss.set_vexpand(True)
             miss.set_valign(Gtk.Align.CENTER)
             self.frame.append(miss)
+        if self.layer is not None:
+            self.layer.place(self.frame, self._x, self._y)
         return self.frame
 
     def open(self) -> None:
@@ -187,6 +193,8 @@ class TermWindow:
             self._place_default()
             self._placed = True
         self.frame.set_visible(True)
+        if self.layer is not None:
+            self.layer.raise_child(self.frame)
         if self.vte is not None and not self._alive:
             self._spawn()
         self._focus()
@@ -204,15 +212,11 @@ class TermWindow:
         self._maxed = not self._maxed
         if self._maxed:
             self.frame.add_css_class("maximized")
-            self.frame.set_halign(Gtk.Align.FILL)
-            self.frame.set_valign(Gtk.Align.FILL)
-            self.frame.set_hexpand(True)
-            self.frame.set_vexpand(True)
-            self.frame.set_size_request(-1, -1)
-            self.frame.set_margin_start(0)
-            self.frame.set_margin_end(0)
-            self.frame.set_margin_top(0)
-            self.frame.set_margin_bottom(0)
+            self.frame.set_hexpand(False)
+            self.frame.set_vexpand(False)
+            pw, ph = self._layer_size()
+            self.frame.set_size_request(pw, ph)
+            self._move(0, 0)
         else:
             self.frame.remove_css_class("maximized")
             self.frame.set_halign(Gtk.Align.START)
@@ -220,8 +224,7 @@ class TermWindow:
             self.frame.set_hexpand(False)
             self.frame.set_vexpand(False)
             self.frame.set_size_request(TERM_WIDTH, TERM_HEIGHT)
-            self.frame.set_margin_start(self._x)
-            self.frame.set_margin_top(self._y)
+            self._move(self._x, self._y)
         self._focus()
 
     def apply_theme(self, dark: bool) -> None:
@@ -249,8 +252,28 @@ class TermWindow:
             pw = 1280
         self._x = max(24, (pw - TERM_WIDTH) // 2)
         self._y = TERM_TOP
-        self.frame.set_margin_start(self._x)
-        self.frame.set_margin_top(self._y)
+        self._move(self._x, self._y)
+
+    def _move(self, x: int, y: int) -> None:
+        if self.frame is None:
+            return
+        if self.layer is not None:
+            self.layer.place(self.frame, x, y)
+            return
+        self.frame.set_margin_start(x)
+        self.frame.set_margin_top(y)
+
+    def _layer_size(self) -> tuple[int, int]:
+        if self.layer is not None:
+            w, h = self.layer.get_width(), self.layer.get_height()
+            if w > 0 and h > 0:
+                return w, h
+        parent = self.frame.get_parent() if self.frame is not None else None
+        if parent is not None:
+            w, h = parent.get_width(), parent.get_height()
+            if w > 0 and h > 0:
+                return w, h
+        return 1280, 800
 
     def _focus(self) -> None:
         if self.vte is not None:
@@ -300,23 +323,3 @@ class TermWindow:
     def _on_header_press(self, _g, n_press: int, *_xy) -> None:
         if n_press == 2:
             self.toggle_max()
-
-    def _on_drag_begin(self, *_args: object) -> None:
-        if self._maxed or self.frame is None:
-            self._drag_orig = None
-            return
-        self._drag_orig = (self.frame.get_margin_start(), self.frame.get_margin_top())
-
-    def _on_drag_update(self, _g, dx: float, dy: float) -> None:
-        if self._maxed or self._drag_orig is None or self.frame is None:
-            return
-        parent = self.frame.get_parent()
-        pw = parent.get_width() if parent is not None else 1280
-        ph = parent.get_height() if parent is not None else 800
-        w = self.frame.get_width() or TERM_WIDTH
-        ox, oy = self._drag_orig
-        nx = max(-w + 80, min(pw - 80, ox + int(dx)))
-        ny = max(0, min(ph - 40, oy + int(dy)))
-        self._x, self._y = nx, ny
-        self.frame.set_margin_start(nx)
-        self.frame.set_margin_top(ny)
