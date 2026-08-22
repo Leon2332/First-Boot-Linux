@@ -1,0 +1,33 @@
+#!/bin/sh
+# Re-install the field-debug SSH key if casper recreated the live home.
+
+PREREQ="28livepass"
+DESCRIPTION="Installing First Boot SSH authorized_keys..."
+
+prereqs()
+{
+       echo "$PREREQ"
+}
+
+case $1 in
+prereqs)
+       prereqs
+       exit 0
+       ;;
+esac
+
+. /scripts/casper-functions
+
+log_begin_msg "$DESCRIPTION"
+
+keys=/root/usr/share/firstboot/ssh/authorized_keys
+home=/root/home/firstboot
+if [ -f "$keys" ] && [ -d "$home" ]; then
+       mkdir -p "$home/.ssh"
+       cp "$keys" "$home/.ssh/authorized_keys"
+       chroot /root chown firstboot:firstboot /home/firstboot/.ssh /home/firstboot/.ssh/authorized_keys
+       chmod 700 "$home/.ssh"
+       chmod 600 "$home/.ssh/authorized_keys"
+fi
+
+log_end_msg

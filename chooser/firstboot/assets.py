@@ -58,6 +58,13 @@ def find_app_icon(name: str) -> str | None:
     )
 
 
+def find_search_icon(name: str) -> str | None:
+    return find_asset(
+        os.path.join("search-engines", name),
+        os.path.join("assets", "search-engines", name),
+    )
+
+
 def find_brand_logo() -> str | None:
     return find_asset(
         "logo.png",

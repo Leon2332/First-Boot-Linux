@@ -904,11 +904,7 @@ window.firstboot.light .info-window {
 
 .info-field-label {
   font-size: 12px;
-  color: #9aa3b2;
-}
-
-window.firstboot.light .info-field-label {
-  color: #5e6772;
+  opacity: 0.65;
 }
 
 .info-field-value {
@@ -918,5 +914,59 @@ window.firstboot.light .info-field-label {
 
 picture.info-sw-brand {
   margin: 0 0 8px;
+}
+
+.epi-window {
+  background-color: #242424;
+  color: #eef1f6;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  min-width: 480px;
+  min-height: 280px;
+}
+
+window.firstboot.light .epi-window {
+  background-color: #ffffff;
+  color: #1c1c1c;
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+.epi-window.maximized,
+.epi-window.toplevel {
+  border-radius: 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.epi-window.maximized {
+  border: none;
+}
+
+.epi-toolbar {
+  padding: 8px 12px;
+  background-color: #303030;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+window.firstboot.light .epi-toolbar {
+  background-color: #ebebeb;
+  border-bottom-color: rgba(0, 0, 0, 0.12);
+}
+
+entry.epi-url {
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #eef1f6;
+  border: none;
+  box-shadow: none;
+  outline: none;
+  font-size: 13px;
+}
+
+window.firstboot.light entry.epi-url {
+  background-color: rgba(0, 0, 0, 0.06);
+  color: #1c1c1c;
 }
 """.encode("utf-8")

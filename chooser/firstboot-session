@@ -8,7 +8,6 @@ export FIRSTBOOT_KIOSK=1
 export GDK_BACKEND=wayland
 export GTK_A11Y=none
 export NO_AT_BRIDGE=1
-export GSETTINGS_BACKEND="${GSETTINGS_BACKEND:-memory}"
 export GTK_USE_PORTAL="${GTK_USE_PORTAL:-0}"
 
 LABWC_DIR=/usr/share/firstboot/labwc

@@ -3,6 +3,27 @@
 
   const LOGO = (id) => `assets/distros/${id}.png`;
 
+  const SEARCH_ENGINES = [
+    {
+      id: "google",
+      name: "Google",
+      url: "https://www.google.com/",
+      icon: "assets/search-engines/google.png",
+    },
+    {
+      id: "brave",
+      name: "Brave",
+      url: "https://search.brave.com/",
+      icon: "assets/search-engines/brave.png",
+    },
+    {
+      id: "duckduckgo",
+      name: "DuckDuckGo",
+      url: "https://duckduckgo.com/",
+      icon: "assets/search-engines/duckduckgo.png",
+    },
+  ];
+
   const RECOMMENDED = [
     {
       id: "ubuntu",
@@ -772,23 +793,35 @@
   }
 
   function renderEpiPage() {
-    const online = state.network.connected;
     if (els.epiUrl) {
-      els.epiUrl.value = online ? "https://firstboot.local/" : "about:offline";
+      els.epiUrl.value = "https://firstboot.local/";
     }
     if (els.epiTitle) {
-      els.epiTitle.textContent = online ? "First Boot Linux" : "Offline";
+      els.epiTitle.textContent = "First Boot Linux";
     }
     if (!els.epiPage) return;
-    els.epiPage.innerHTML = online
-      ? `<div class="epi-start">
-          <h1>First Boot Linux</h1>
-          <p>Pick a distribution on the desktop. This browser is a preview for first boot only.</p>
-        </div>`
-      : `<div class="epi-start">
-          <h1>You’re offline</h1>
-          <p>Connect from the system menu to use the network. This preview has no remote pages.</p>
+    const engines = SEARCH_ENGINES.map(
+      (e) => `<button type="button" class="epi-engine" data-engine="${e.id}" title="${e.name}">
+            <img src="${e.icon}" alt="" draggable="false" />
+            <span>${e.name}</span>
+          </button>`
+    ).join("");
+    els.epiPage.innerHTML = `<div class="epi-start">
+          <p>Search or type an address.</p>
+          <div class="epi-engines">${engines}</div>
         </div>`;
+  }
+
+  function onEpiEngineClick(e) {
+    const btn = e.target.closest(".epi-engine");
+    if (!btn || !els.epiPage.contains(btn)) return;
+    const engine = SEARCH_ENGINES.find((item) => item.id === btn.dataset.engine);
+    if (!engine) return;
+    if (els.epiUrl) els.epiUrl.value = engine.url;
+    if (els.epiTitle) els.epiTitle.textContent = engine.name;
+    els.epiPage.querySelectorAll(".epi-engine").forEach((el) => {
+      el.classList.toggle("is-active", el === btn);
+    });
   }
 
   function openEpiphany() {
@@ -2038,6 +2071,9 @@
     enableWindowChrome(els.termWindow, els.termHeaderbar, els.termMax, els.termClose);
     enableWindowChrome(els.epiWindow, els.epiHeaderbar, els.epiMax, els.epiClose);
     enableWindowChrome(els.infoWindow, els.infoHeaderbar, els.infoMax, els.infoClose);
+    if (els.epiPage) {
+      els.epiPage.addEventListener("click", onEpiEngineClick);
+    }
   }
 
   function init() {
@@ -2077,6 +2113,7 @@
     }
     if (menu === "terminal") openTerminal();
     if (menu === "sysinfo") openSysInfo();
+    if (menu === "browser") openEpiphany();
     if (shop === "confirm") requestShopInstall();
     if (shop === "install") startShopInstall();
     if (shop === "progress") {

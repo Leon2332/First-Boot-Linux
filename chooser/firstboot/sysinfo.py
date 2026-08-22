@@ -1,9 +1,10 @@
-"""System details probe and in-kiosk window."""
+"""System details probe, in-kiosk window, and standalone helper."""
 
 from __future__ import annotations
 
 import os
 import re
+import sys
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -636,13 +637,15 @@ class SysinfoWindow:
     def __init__(
         self,
         *,
-        get_window: Callable,
+        get_window: Callable | None = None,
         retailer: Retailer | None = None,
         layer=None,
+        host_window=None,
     ) -> None:
-        self.get_window = get_window
+        self.get_window = get_window or (lambda: host_window)
         self.retailer = retailer
         self.layer = layer
+        self.win = host_window
         self.frame = None
         self._close_img = None
         self._cog_img = None
@@ -665,9 +668,89 @@ class SysinfoWindow:
         return bool(self.frame is not None and self.frame.get_visible())
 
     def build(self):
+        from gi.repository import Gtk
+
+        scroll = self._build_body_scroll()
+        if self.win is not None:
+            return self._build_adw_window(scroll)
+        return self._build_kiosk_frame(scroll)
+
+    def _build_body_scroll(self):
+        from gi.repository import Gtk
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_hexpand(True)
+        scroll.set_vexpand(True)
+
+        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        body.add_css_class("info-body")
+        cols = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=28)
+        cols.add_css_class("info-cols")
+        cols.set_homogeneous(True)
+        cols.set_hexpand(True)
+        cols.set_size_request(INFO_WIDTH - 40, -1)
+
+        hw = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        hw_h = Gtk.Label(label="Hardware Information", xalign=0)
+        hw_h.add_css_class("info-heading")
+        hw.append(hw_h)
+        self._hw_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        hw.append(self._hw_box)
+        cols.append(hw)
+
+        sw = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        sw_h = Gtk.Label(label="Software Information", xalign=0)
+        sw_h.add_css_class("info-heading")
+        sw.append(sw_h)
+        self._brand = Gtk.Picture()
+        self._brand.add_css_class("info-sw-brand")
+        self._brand.set_can_shrink(True)
+        self._brand.set_content_fit(Gtk.ContentFit.CONTAIN)
+        self._brand.set_halign(Gtk.Align.START)
+        self._brand.set_valign(Gtk.Align.START)
+        self._brand.set_hexpand(False)
+        self._brand.set_vexpand(False)
+        self._brand.set_size_request(WORDMARK_WIDTH, WORDMARK_HEIGHT)
+        sw.append(self._brand)
+        self._sw_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        sw.append(self._sw_box)
+        self._retailer_box, self._retailer_value = self._make_field(
+            "Configured by", ""
+        )
+        self._retailer_box.set_visible(False)
+        sw.append(self._retailer_box)
+        cols.append(sw)
+
+        body.append(cols)
+        scroll.set_child(body)
+        return scroll
+
+    def _build_adw_window(self, scroll):
+        from gi.repository import Adw, Gtk
+
+        header = Adw.HeaderBar()
+        title = Gtk.Label(label="System details")
+        title.add_css_class("title")
+        header.set_title_widget(title)
+        toolbar = Adw.ToolbarView()
+        toolbar.add_top_bar(header)
+        toolbar.set_content(scroll)
+        self.frame = toolbar
+        self.frame.set_visible(True)
+        self._paint_brand()
+        self._paint_retailer()
+        if hasattr(self.win, "set_content"):
+            self.win.set_content(self.frame)
+        else:
+            self.win.set_child(self.frame)
+        return self.frame
+
+    def _build_kiosk_frame(self, scroll):
         from gi.repository import Gtk, Pango
 
         from firstboot.assets import find_status
+        from firstboot.floatlayer import HeaderDrag
 
         self.frame = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.frame.add_css_class("info-window")
@@ -675,9 +758,9 @@ class SysinfoWindow:
         self.frame.set_valign(Gtk.Align.START)
         self.frame.set_hexpand(False)
         self.frame.set_vexpand(False)
+        self.frame.set_visible(False)
         self.frame.set_size_request(INFO_WIDTH, INFO_HEIGHT)
         self.frame.set_overflow(Gtk.Overflow.HIDDEN)
-        self.frame.set_visible(False)
 
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         header.add_css_class("term-headerbar")
@@ -726,60 +809,12 @@ class SysinfoWindow:
         header.append(controls)
         self.frame.append(header)
 
-        from firstboot.floatlayer import HeaderDrag
-
         self._header_drag = HeaderDrag(self)
         self._header_drag.attach(header)
         dbl = Gtk.GestureClick()
         dbl.connect("pressed", self._on_header_press)
         header.add_controller(dbl)
 
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scroll.set_hexpand(True)
-        scroll.set_vexpand(True)
-
-        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        body.add_css_class("info-body")
-        cols = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=28)
-        cols.add_css_class("info-cols")
-        cols.set_homogeneous(True)
-        cols.set_hexpand(True)
-        cols.set_size_request(INFO_WIDTH - 40, -1)
-
-        hw = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        hw_h = Gtk.Label(label="Hardware Information", xalign=0)
-        hw_h.add_css_class("info-heading")
-        hw.append(hw_h)
-        self._hw_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        hw.append(self._hw_box)
-        cols.append(hw)
-
-        sw = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        sw_h = Gtk.Label(label="Software Information", xalign=0)
-        sw_h.add_css_class("info-heading")
-        sw.append(sw_h)
-        self._brand = Gtk.Picture()
-        self._brand.add_css_class("info-sw-brand")
-        self._brand.set_can_shrink(True)
-        self._brand.set_content_fit(Gtk.ContentFit.CONTAIN)
-        self._brand.set_halign(Gtk.Align.START)
-        self._brand.set_valign(Gtk.Align.START)
-        self._brand.set_hexpand(False)
-        self._brand.set_vexpand(False)
-        self._brand.set_size_request(WORDMARK_WIDTH, WORDMARK_HEIGHT)
-        sw.append(self._brand)
-        self._sw_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        sw.append(self._sw_box)
-        self._retailer_box, self._retailer_value = self._make_field(
-            "Configured by", ""
-        )
-        self._retailer_box.set_visible(False)
-        sw.append(self._retailer_box)
-        cols.append(sw)
-
-        body.append(cols)
-        scroll.set_child(body)
         self.frame.append(scroll)
         self._paint_chrome()
         self._paint_brand()
@@ -790,6 +825,12 @@ class SysinfoWindow:
 
     def open(self) -> None:
         if self.frame is None:
+            return
+        if self.win is not None:
+            if not self._placed:
+                self._probe()
+                self._placed = True
+            self.win.present()
             return
         if not self._placed:
             self._place_default()
@@ -802,6 +843,9 @@ class SysinfoWindow:
             self._probe()
 
     def close(self) -> None:
+        if self.win is not None:
+            self.win.close()
+            return
         if self.frame is None:
             return
         self.frame.set_visible(False)
@@ -809,6 +853,16 @@ class SysinfoWindow:
     def toggle_max(self) -> None:
         from gi.repository import Gtk
 
+        if self.win is not None:
+            if self.win.is_maximized():
+                self.win.unmaximize()
+                if self.frame is not None:
+                    self.frame.remove_css_class("maximized")
+            else:
+                self.win.maximize()
+                if self.frame is not None:
+                    self.frame.add_css_class("maximized")
+            return
         if self.frame is None:
             return
         self._maxed = not self._maxed
@@ -998,3 +1052,54 @@ class SysinfoWindow:
     def _on_header_press(self, _g, n_press: int, *_xy) -> None:
         if n_press == 2:
             self.toggle_max()
+
+
+def run_sysinfo(argv: list[str] | None = None) -> int:
+    del argv
+
+    import gi
+
+    gi.require_version("Gdk", "4.0")
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Adw", "1")
+    from gi.repository import Adw, Gdk, Gtk
+
+    from firstboot.payload import load_payload
+    from firstboot.style import CSS
+
+    payload_root = os.environ.get("FIRSTBOOT_PAYLOAD") or "/run/payload"
+    try:
+        retailer = load_payload(payload_root).retailer
+    except Exception:
+        retailer = None
+
+    class SysinfoApp(Adw.Application):
+        def __init__(self) -> None:
+            super().__init__(application_id="org.firstboot.Sysinfo")
+            self.connect("activate", self.on_activate)
+
+        def on_activate(self, *_app) -> None:
+            existing = self.get_active_window()
+            if existing is not None:
+                existing.present()
+                return
+            Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.DEFAULT)
+            provider = Gtk.CssProvider()
+            provider.load_from_data(CSS)
+            display = Gdk.Display.get_default()
+            if display is not None:
+                Gtk.StyleContext.add_provider_for_display(
+                    display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                )
+            win = Adw.ApplicationWindow(application=self, title="System details")
+            win.set_default_size(INFO_WIDTH, INFO_HEIGHT)
+            page = SysinfoWindow(host_window=win, retailer=retailer)
+            page.build()
+            mgr = Adw.StyleManager.get_default()
+            page.apply_theme(mgr.get_dark())
+            mgr.connect("notify::dark", lambda m, *_: page.apply_theme(m.get_dark()))
+            page.open()
+            print("firstboot-sysinfo: window presented", file=sys.stderr, flush=True)
+
+    print("firstboot-sysinfo: run", file=sys.stderr, flush=True)
+    return int(SysinfoApp().run(None))

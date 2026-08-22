@@ -179,6 +179,9 @@ copy_overlay() {
   if [[ -f $ROOTFS/usr/share/initramfs-tools/scripts/casper-bottom/28livepass ]]; then
     chmod 755 "$ROOTFS/usr/share/initramfs-tools/scripts/casper-bottom/28livepass"
   fi
+  if [[ -f $ROOTFS/usr/share/initramfs-tools/scripts/casper-bottom/29sshkeys ]]; then
+    chmod 755 "$ROOTFS/usr/share/initramfs-tools/scripts/casper-bottom/29sshkeys"
+  fi
   if [[ -f $ROOTFS/usr/libexec/firstboot/print-secureboot ]]; then
     chmod 755 "$ROOTFS/usr/libexec/firstboot/print-secureboot"
   fi
@@ -199,6 +202,10 @@ copy_overlay() {
 install_chooser() {
   install -D -m 0755 "$REPO_DIR/chooser/firstboot-chooser" \
     "$ROOTFS/usr/bin/firstboot-chooser"
+  install -D -m 0755 "$REPO_DIR/chooser/firstboot-browser" \
+    "$ROOTFS/usr/bin/firstboot-browser"
+  install -D -m 0755 "$REPO_DIR/chooser/firstboot-sysinfo" \
+    "$ROOTFS/usr/bin/firstboot-sysinfo"
   install -D -m 0755 "$REPO_DIR/chooser/firstboot-session" \
     "$ROOTFS/usr/bin/firstboot-session"
   install -D -m 0755 "$REPO_DIR/chooser/firstboot-install-disk" \
@@ -209,7 +216,8 @@ install_chooser() {
     "$ROOTFS/usr/share/firstboot/python" \
     "$ROOTFS/usr/share/firstboot/distros" \
     "$ROOTFS/usr/share/firstboot/status" \
-    "$ROOTFS/usr/share/firstboot/apps"
+    "$ROOTFS/usr/share/firstboot/apps" \
+    "$ROOTFS/usr/share/firstboot/search-engines"
   # dest must not already exist: `cp -a src dest` then nests dest/firstboot/.
   rm -rf "$ROOTFS/usr/share/firstboot/python/firstboot"
   cp -a "$REPO_DIR/chooser/firstboot" "$ROOTFS/usr/share/firstboot/python/firstboot"
@@ -234,6 +242,15 @@ install_chooser() {
   fi
   if [[ -d $REPO_DIR/docs/assets/apps ]]; then
     cp -a "$REPO_DIR/docs/assets/apps/." "$ROOTFS/usr/share/firstboot/apps/"
+  fi
+  if [[ -d $REPO_DIR/docs/assets/search-engines ]]; then
+    local icon
+    for icon in google.png brave.png duckduckgo.png; do
+      if [[ -f $REPO_DIR/docs/assets/search-engines/$icon ]]; then
+        install -m 0644 "$REPO_DIR/docs/assets/search-engines/$icon" \
+          "$ROOTFS/usr/share/firstboot/search-engines/$icon"
+      fi
+    done
   fi
   chown -R root:root "$ROOTFS/usr/share/firstboot"
   find "$ROOTFS/usr/share/firstboot" -type d -exec chmod 755 {} +

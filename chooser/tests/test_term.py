@@ -55,6 +55,7 @@ class AppGridTests(unittest.TestCase):
         self.assertEqual(actions, ["browser", "sysinfo", "terminal"])
         self.assertNotIn("terminal", APP_TOASTS)
         self.assertNotIn("sysinfo", APP_TOASTS)
+        self.assertNotIn("browser", APP_TOASTS)
 
 
 if __name__ == "__main__":

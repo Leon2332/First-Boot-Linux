@@ -58,6 +58,43 @@ def pointer_from_surface(
     return (out.x, out.y)
 
 
+def attach_toplevel_drag(header, win) -> None:
+    """Drag a real Gtk window by its header (GNOME-style CSD)."""
+    from gi.repository import Gdk
+
+    drag = Gtk.GestureDrag()
+    drag.set_button(1)
+
+    def begin(gesture, x: float, y: float) -> None:
+        widget = gesture.get_widget()
+        if widget is not None:
+            picked = widget.pick(x, y, Gtk.PickFlags.DEFAULT)
+            cur = picked
+            while cur is not None and cur is not widget:
+                if cur.has_css_class("term-wc"):
+                    gesture.set_state(Gtk.EventSequenceState.DENIED)
+                    return
+                cur = cur.get_parent()
+        if win is not None and win.is_maximized():
+            gesture.set_state(Gtk.EventSequenceState.DENIED)
+            return
+        native = win.get_native() if win is not None else None
+        surface = native.get_surface() if native is not None else None
+        device = gesture.get_device()
+        event = gesture.get_current_event()
+        stamp = event.get_time() if event is not None else Gdk.CURRENT_TIME
+        sx, sy = x, y
+        if event is not None:
+            ok, px, py = event.get_position()
+            if ok:
+                sx, sy = px, py
+        if isinstance(surface, Gdk.Toplevel) and device is not None:
+            surface.begin_move(device, 1, sx, sy, stamp)
+
+    drag.connect("drag-begin", begin)
+    header.add_controller(drag)
+
+
 def pointer_from_gesture(target, gesture) -> tuple[float, float] | None:
     """Current pointer in target coordinates.
 

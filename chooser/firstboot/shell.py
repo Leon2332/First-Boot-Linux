@@ -1,7 +1,6 @@
 """GNOME-like kiosk chrome: top bar, quick settings, network, power.
 
-Browser is listed and does not launch. System details and Terminal open
-in-kiosk windows.
+Web browser, System details, and Terminal open as separate windows.
 """
 
 from __future__ import annotations
@@ -46,9 +45,7 @@ APP_ITEMS = (
     ("org.gnome.Terminal.png", "Terminal", "terminal"),
 )
 
-APP_TOASTS = {
-    "browser": "Web browser is not on this image yet.",
-}
+APP_TOASTS: dict[str, str] = {}
 
 
 def format_clock(now: dt.datetime) -> str:
@@ -277,6 +274,7 @@ class Shell:
         on_shop_install: Callable[[], None] | None = None,
         on_terminal: Callable[[], None] | None = None,
         on_sysinfo: Callable[[], None] | None = None,
+        on_browser: Callable[[], None] | None = None,
         show_shop_install: bool = False,
     ) -> None:
         self.on_theme = on_theme
@@ -286,6 +284,7 @@ class Shell:
         self.on_shop_install = on_shop_install
         self.on_terminal = on_terminal
         self.on_sysinfo = on_sysinfo
+        self.on_browser = on_browser
         self.show_shop_install = show_shop_install
         self.dark = True
         self.volume = get_volume_backend()
@@ -847,6 +846,12 @@ class Shell:
                 self.on_sysinfo()
             else:
                 self.on_toast("System details is not on this image yet.")
+            return
+        if action == "browser":
+            if self.on_browser is not None:
+                self.on_browser()
+            else:
+                self.on_toast("Web browser is not on this image yet.")
             return
         self.on_toast(APP_TOASTS.get(action, f"{action} is not on this image yet."))
 

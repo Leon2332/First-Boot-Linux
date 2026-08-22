@@ -1,0 +1,13 @@
+[Unit]
+Description=Generate SSH host keys
+After=local-fs.target
+Before=ssh.service ssh.socket
+ConditionPathExists=!/etc/ssh/ssh_host_ed25519_key
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/ssh-keygen -A
+
+[Install]
+WantedBy=multi-user.target

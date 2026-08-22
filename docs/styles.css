@@ -2062,22 +2062,25 @@ html[data-theme="light"] .install-panel .install-brand-logo {
 }
 
 .epi-page {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #1c1c1c;
+}
+
+html[data-theme="light"] .epi-page {
+  background-color: #f0f2f5;
 }
 
 .epi-start {
   max-width: 420px;
-  margin: 64px auto;
-  padding: 0 24px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 12px 20px 28px;
   text-align: center;
-}
-
-.epi-start h1 {
-  margin: 0 0 10px;
-  font-size: 1.45rem;
 }
 
 .epi-start p {
@@ -2085,6 +2088,49 @@ html[data-theme="light"] .install-panel .install-brand-logo {
   color: var(--text-muted);
   line-height: 1.5;
   font-size: 0.95rem;
+}
+
+.epi-engines {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 8px;
+  margin: 28px 0 0;
+}
+
+.epi-engine {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 4px 12px;
+  border-radius: 16px;
+  color: var(--text);
+}
+
+.epi-engine:hover,
+.epi-engine:focus-visible {
+  background: var(--surface-muted);
+}
+
+.epi-engine.is-active {
+  background: var(--surface-muted-hover);
+}
+
+.epi-engine img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.epi-engine span {
+  max-width: 100%;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 .info-window {

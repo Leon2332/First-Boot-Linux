@@ -20,6 +20,16 @@
   <windowRules>
     <windowRule identifier="org.firstboot.Chooser" serverDecoration="no" skipTaskbar="yes" skipWindowSwitcher="yes">
       <action name="Maximize" />
+      <action name="ToggleAlwaysOnBottom" />
+    </windowRule>
+    <windowRule identifier="org.gnome.Epiphany" serverDecoration="no" skipTaskbar="yes" skipWindowSwitcher="yes">
+      <action name="Raise" />
+    </windowRule>
+    <windowRule identifier="org.gnome.Console" serverDecoration="no" skipTaskbar="yes" skipWindowSwitcher="yes">
+      <action name="Raise" />
+    </windowRule>
+    <windowRule identifier="org.firstboot.Sysinfo" serverDecoration="no" skipTaskbar="yes" skipWindowSwitcher="yes">
+      <action name="Raise" />
     </windowRule>
   </windowRules>
 </labwc_config>

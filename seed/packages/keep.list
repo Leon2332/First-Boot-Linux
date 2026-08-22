@@ -87,10 +87,21 @@ gir1.2-gtk-4.0
 gir1.2-adw-1
 gir1.2-vte-3.91
 libvte-2.91-gtk4-0
+gir1.2-webkit-6.0
+bubblewrap
+xdg-dbus-proxy
+gstreamer1.0-plugins-bad
+gstreamer1.0-libav
+gstreamer1.0-gtk4
+epiphany-browser
+epiphany-browser-data
+gnome-console
+glib-networking
 librsvg2-common
 dbus-user-session
 libpam-systemd
 gsettings-desktop-schemas
+libglib2.0-bin
 fonts-cantarell
 fonts-dejavu-core
 xcursor-themes
@@ -109,3 +120,5 @@ less
 nano
 zstd
 xz-utils
+openssh-client
+openssh-server

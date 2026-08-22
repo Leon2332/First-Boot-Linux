@@ -45,12 +45,14 @@ class PolicyTests(unittest.TestCase):
         env = renderer_env(["i915"], {})
         self.assertEqual(env["GSK_RENDERER"], "ngl")
         self.assertEqual(env["WLR_RENDERER"], "gles2")
+        self.assertNotIn("WEBKIT_DISABLE_DMABUF_RENDERER", env)
 
     def test_virtio_uses_software(self) -> None:
         self.assertTrue(use_software_render(["virtio_gpu"]))
         env = renderer_env(["virtio_gpu"], {})
         self.assertEqual(env["GSK_RENDERER"], "cairo")
         self.assertEqual(env["WLR_RENDERER"], "pixman")
+        self.assertNotIn("WEBKIT_DISABLE_DMABUF_RENDERER", env)
 
     def test_no_drm_is_software(self) -> None:
         self.assertTrue(use_software_render([]))
@@ -65,7 +67,17 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(use_software_render(["virtio_gpu"], {"FIRSTBOOT_SOFTWARE_RENDER": "0"}))
 
     def test_existing_env_not_overwritten(self) -> None:
-        env = renderer_env(["i915"], {"GSK_RENDERER": "cairo", "WLR_RENDERER": "pixman"})
+        env = renderer_env(
+            ["i915"],
+            {
+                "GSK_RENDERER": "cairo",
+                "WLR_RENDERER": "pixman",
+            },
+        )
+        self.assertEqual(env, {})
+
+    def test_session_does_not_force_webkit_dmabuf_off(self) -> None:
+        env = renderer_env(["i915"], {"GSK_RENDERER": "ngl", "WLR_RENDERER": "gles2"})
         self.assertEqual(env, {})
 
 

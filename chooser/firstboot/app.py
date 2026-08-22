@@ -31,6 +31,9 @@ from firstboot.osinstall import (
 from firstboot.payload import Distro, Edition, Payload, load_payload
 from firstboot.shell import Shell
 from firstboot.floatlayer import FloatLayer
+from firstboot.browser import BrowserWindow
+from firstboot.kioskapp import launch_console, launch_sysinfo, launch_web
+from firstboot.theme import apply_session_theme, ensure_default_browser
 from firstboot.style import CSS
 from firstboot.sysinfo import SysinfoWindow
 from firstboot.term import TermWindow
@@ -106,6 +109,7 @@ def run_window(
             self.open_menu = open_menu
             self.shop = shop
             self.osinstall = osinstall
+            self._app_procs: list = []
             self.shop_plan = live_plan(root)
             self.detail_distro: Distro | None = None
             self.detail_from_catalog = False
@@ -135,6 +139,7 @@ def run_window(
                 os.environ.get("FIRSTBOOT_KIOSK") == "1"
                 or os.environ.get("XDG_CURRENT_DESKTOP") == "FirstBoot"
             )
+            self.kiosk = kiosk
             if kiosk:
                 self.win.set_decorated(False)
             else:
@@ -174,24 +179,41 @@ def run_window(
                 or (bool(self.screenshot) and self.open_menu == "apps")
             )
             self.float_layer = FloatLayer()
-            self.term = TermWindow(
-                get_window=lambda: self.win,
-                on_toast=self._toast,
-                layer=self.float_layer,
-            )
-            self.sysinfo = SysinfoWindow(
-                get_window=lambda: self.win,
-                retailer=self.payload.retailer,
-                layer=self.float_layer,
-            )
+            self.term = None
+            self.sysinfo = None
+            self.browser = None
+            if kiosk:
+                on_terminal = self._open_console
+                on_sysinfo = self._open_sysinfo
+                on_browser = self._open_web
+            else:
+                self.term = TermWindow(
+                    get_window=lambda: self.win,
+                    on_toast=self._toast,
+                    layer=self.float_layer,
+                )
+                self.sysinfo = SysinfoWindow(
+                    get_window=lambda: self.win,
+                    retailer=self.payload.retailer,
+                    layer=self.float_layer,
+                )
+                self.browser = BrowserWindow(
+                    get_window=lambda: self.win,
+                    on_toast=self._toast,
+                    layer=self.float_layer,
+                )
+                on_terminal = self.term.open
+                on_sysinfo = self.sysinfo.open
+                on_browser = self.browser.open
             self.shell = Shell(
                 on_theme=self._set_dark,
                 on_toast=self._toast,
                 on_power=self._confirm_power,
                 get_window=lambda: self.win,
                 on_shop_install=self._confirm_shop_install,
-                on_terminal=self.term.open,
-                on_sysinfo=self.sysinfo.open,
+                on_terminal=on_terminal,
+                on_sysinfo=on_sysinfo,
+                on_browser=on_browser,
                 show_shop_install=show_shop,
             )
             self.shell.allow_scan = not bool(self.screenshot)
@@ -258,8 +280,12 @@ def run_window(
             self.done_host = self._build_done_overlay()
             stage.add_overlay(self.install_host)
             stage.add_overlay(self.done_host)
-            self.term.build()
-            self.sysinfo.build()
+            if self.term is not None:
+                self.term.build()
+            if self.sysinfo is not None:
+                self.sysinfo.build()
+            if self.browser is not None:
+                self.browser.build()
             stage.add_overlay(self.float_layer)
 
             for widget in menus:
@@ -270,6 +296,8 @@ def run_window(
             self.win.add_controller(key)
 
             self._apply_theme()
+            apply_session_theme(self.dark)
+            ensure_default_browser()
             self._render_main()
             if self.open_catalog_list and not self.open_id:
                 self.open_catalog()
@@ -288,9 +316,11 @@ def run_window(
             self.win.present()
             self._announce_ready()
             if self.open_menu == "terminal":
-                GLib.idle_add(lambda: self.term.open() or False)
+                GLib.idle_add(lambda: self._open_terminal_menu() or False)
             elif self.open_menu == "sysinfo":
-                GLib.idle_add(lambda: self.sysinfo.open() or False)
+                GLib.idle_add(lambda: self._open_sysinfo_menu() or False)
+            elif self.open_menu == "browser":
+                GLib.idle_add(lambda: self._open_browser_menu() or False)
             elif self.open_menu:
                 GLib.idle_add(lambda: self.shell.show_menu(self.open_menu) or False)
             if self.shop == "confirm":
@@ -312,9 +342,74 @@ def run_window(
                     or self.osinstall == "confirm"
                     or self.open_menu == "terminal"
                     or self.open_menu == "sysinfo"
+                    or self.open_menu == "browser"
                     else 1200
                 )
                 GLib.timeout_add(delay, self._write_screenshot)
+
+        def _open_terminal_menu(self) -> None:
+            if self.term is not None:
+                self.term.open()
+                return
+            self._open_console()
+
+        def _open_sysinfo_menu(self) -> None:
+            if self.sysinfo is not None:
+                self.sysinfo.open()
+                return
+            self._open_sysinfo()
+
+        def _open_browser_menu(self) -> None:
+            if self.browser is not None:
+                self.browser.open()
+                return
+            self._open_web()
+
+        def _open_web(self) -> None:
+            self._spawn_app("browser", launch_web)
+
+        def _open_console(self) -> None:
+            self._spawn_app("terminal", launch_console)
+
+        def _open_sysinfo(self) -> None:
+            self._spawn_app(
+                "sysinfo", lambda: launch_sysinfo(dark=self.dark)
+            )
+
+        def _spawn_app(self, kind: str, launcher) -> None:
+            from gi.repository import GLib
+
+            err, proc = launcher()
+            if err:
+                self._toast(err)
+                return
+            if proc is None:
+                return
+            self._app_procs.append(proc)
+            GLib.child_watch_add(
+                proc.pid, lambda pid, status: self._on_app_exit(kind, pid, status)
+            )
+
+        def _on_app_exit(self, kind: str, pid: int, status: int) -> None:
+            try:
+                rc = os.waitstatus_to_exitcode(status)
+            except ValueError:
+                rc = status
+            print(
+                f"firstboot-chooser: {kind} pid={pid} status={status} rc={rc}",
+                file=sys.stderr,
+                flush=True,
+            )
+            labels = {
+                "browser": "Web browser",
+                "terminal": "Terminal",
+                "sysinfo": "System details",
+            }
+            name = labels.get(kind, kind)
+            if rc < 0:
+                self._toast(f"{name} stopped unexpectedly.")
+            elif rc != 0:
+                self._toast(f"{name} failed to start.")
 
         def _announce_ready(self) -> None:
             print("firstboot-chooser: window presented", file=sys.stderr, flush=True)
@@ -338,6 +433,7 @@ def run_window(
 
         def _set_dark(self, dark: bool) -> None:
             self.dark = dark
+            apply_session_theme(dark)
             self._apply_theme()
             self.shell.apply_theme(dark)
 
@@ -357,10 +453,12 @@ def run_window(
             else:
                 self.wallpaper.set_filename(None)
             self.dimmer.set_dark(self.dark)
-            if hasattr(self, "term"):
+            if getattr(self, "term", None) is not None:
                 self.term.apply_theme(self.dark)
-            if hasattr(self, "sysinfo"):
+            if getattr(self, "sysinfo", None) is not None:
                 self.sysinfo.apply_theme(self.dark)
+            if getattr(self, "browser", None) is not None:
+                self.browser.apply_theme(self.dark)
             if hasattr(self, "install_logo"):
                 self._paint_brand_logo()
             self._paint_other_logo()
@@ -822,8 +920,10 @@ def run_window(
         def _show_install_overlay(self) -> None:
             self.close_detail()
             self.shell.close_menus()
-            self.term.close()
-            self.sysinfo.close()
+            if self.term is not None:
+                self.term.close()
+            if self.sysinfo is not None:
+                self.sysinfo.close()
             self.shell.locked = True
             self._installing = True
             self._set_dimmed(True)
@@ -1273,8 +1373,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--menu",
-        choices=("qs", "network", "apps", "power", "terminal", "sysinfo"),
-        help="open a shell menu, the terminal, or system details (host/CI screenshots)",
+        choices=("qs", "network", "apps", "power", "terminal", "sysinfo", "browser"),
+        help="open a shell menu or an in-kiosk window (host/CI screenshots)",
     )
     parser.add_argument(
         "--light",
