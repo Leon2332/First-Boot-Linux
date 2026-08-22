@@ -36,7 +36,7 @@ By all means, a retailer may configure their FBL install to provide Linux distro
 
 <i>"The reason the desktop is so hard to crack is most consumers do not want to install an operating system on their machine." ... "The reason Linux is successful on cell phones is not because you have 900,000 people downloading disk images and installing them on their cell phone every day. No, it's because it comes on the cell phone pre-installed. And that has never happened in the desktop market."</i>
 
-~ Linus Torvals
+~ Linus Torvalds
 
 ___
 
@@ -45,14 +45,14 @@ ___
 
 # First Boot USB Creator
 
-The USB Creator provides a method for pre-installing First Boot Linux with its configuration and iso packages. Simply complete the configuration steps and write to a flash drive. Then install on one or multiple devices.
+The USB Creator provides a method for pre-installing First Boot Linux with its configuration and ISO packages. Simply complete the configuration steps and write to a flash drive. Then install on one or multiple devices.
 > [!Note]
 > Currently, only an AppImage is available.
 
-![First Boot Creator screenshot](docs/screenshots/usb-creator_step-01.png)
-![First Boot Creator screenshot](docs/screenshots/usb-creator_step-02.png)
-![First Boot Creator screenshot](docs/screenshots/usb-creator_step-03.png)
-![First Boot Creator screenshot](docs/screenshots/usb-creator_step-04.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-1.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-2.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-3.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-4.png)
 
 
 # Good practice for recommendations
@@ -62,4 +62,4 @@ However, it is good practice to:
 - not recommend options you have not tested on the particular device.
 - not block or prevent consumers from choosing something different from what you recommend.
 - provide basic installation support for your recommendations.
-- pick recommened options that your support team is familiar with (If your support team is only familiar with MS Windows, it is perfectly fine to add Windows as the only recommended option).
+- pick recommended options that your support team is familiar with (If your support team is only familiar with MS Windows, it is perfectly fine to add Windows as the only recommended option).
