@@ -54,6 +54,14 @@ if [ ! -d "$LABWC_DIR" ]; then
   drop_to_shell "labwc config missing ($LABWC_DIR)"
 fi
 
+mkdir -p \
+  "${HOME:-/home/firstboot}/.config/epiphany" \
+  "${HOME:-/home/firstboot}/.local/share/epiphany" \
+  "${HOME:-/home/firstboot}/.config/dconf" \
+  "${HOME:-/home/firstboot}/.config/gtk-4.0" \
+  "${HOME:-/home/firstboot}/.config/gtk-3.0" \
+  2>/dev/null || true
+
 note "starting labwc + chooser"
 
 note "exec labwc"

@@ -44,10 +44,20 @@ class WriteTests(unittest.TestCase):
             apply_session_theme(False, env)
             gtk = Path(tmp, "gtk-4.0", "settings.ini").read_text(encoding="utf-8")
             self.assertIn("gtk-application-prefer-dark-theme=false", gtk)
+            gtk3 = Path(tmp, "gtk-3.0", "settings.ini").read_text(encoding="utf-8")
+            self.assertIn("gtk-application-prefer-dark-theme=false", gtk3)
             mime = Path(tmp, "mimeapps.list").read_text(encoding="utf-8")
             self.assertIn("[Default Applications]", mime)
             self.assertIn(f"x-scheme-handler/https={EPIPHANY_DESKTOP}", mime)
             self.assertIn(f"text/html={EPIPHANY_DESKTOP}", mime)
+
+
+class ChooserEnvTests(unittest.TestCase):
+    def test_chooser_does_not_force_memory_gsettings(self) -> None:
+        path = Path(CHOOSER_DIR, "firstboot-chooser")
+        text = path.read_text(encoding="utf-8")
+        self.assertNotIn('setdefault("GSETTINGS_BACKEND", "memory")', text)
+        self.assertIn('pop("GSETTINGS_BACKEND", None)', text)
 
 
 if __name__ == "__main__":

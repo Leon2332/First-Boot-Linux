@@ -6,7 +6,9 @@ Web browser, System details, and Terminal open as separate windows.
 from __future__ import annotations
 
 import datetime as dt
+import sys
 import threading
+import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -29,7 +31,7 @@ from firstboot.net import (
     wifi_row_actions,
 )
 from firstboot.brightness import BrightnessState, get_brightness_backend
-from firstboot.volume import VolumeState, get_volume_backend
+from firstboot.volume import MemoryVolume, VolumeState, get_volume_backend
 
 if TYPE_CHECKING:
     from gi.repository import Gtk
@@ -38,6 +40,7 @@ PANEL_FG = "#f6f5f4"
 QS_FG = "#f6f5f4"
 QS_FG_LIGHT = "#1c1c1c"
 QS_FG_ACTIVE = "#ffffff"
+TOPBAR_HEIGHT = 32
 
 APP_ITEMS = (
     ("epiphany.png", "Web browser", "browser"),
@@ -285,6 +288,7 @@ class Shell:
         self.on_terminal = on_terminal
         self.on_sysinfo = on_sysinfo
         self.on_browser = on_browser
+        self.on_menu_changed: Callable[[str | None], None] | None = None
         self.show_shop_install = show_shop_install
         self.dark = True
         self.volume = get_volume_backend()
@@ -303,6 +307,14 @@ class Shell:
         self._net_again = False
         self._net_again_scan = False
         self._net_gen = 0
+        self.qs_popover = None
+        self.app_popover = None
+        self.qs_stack = None
+        self._ignore_popover_closed = False
+        self._popover_closed_at = 0.0
+        self._popover_closed_which: str | None = None
+        self._app_running_dots: dict[str, object] = {}
+        self._app_running: dict[str, bool] = {}
 
     def build(self) -> tuple[Gtk.Widget, list[Gtk.Widget]]:
         from gi.repository import Gtk
@@ -399,11 +411,19 @@ class Shell:
         return False
 
     def refresh_volume(self) -> bool:
+        if isinstance(self.volume, MemoryVolume):
+            self.volume = get_volume_backend()
         try:
             self._paint_volume(self.volume.get())
         except Exception:
             pass
         return True
+
+    def set_app_running(self, action: str, running: bool) -> None:
+        self._app_running[action] = running
+        dot = self._app_running_dots.get(action)
+        if dot is not None:
+            dot.set_opacity(1.0 if running else 0.0)
 
     def refresh_brightness(self) -> bool:
         try:
@@ -426,17 +446,31 @@ class Shell:
     def show_menu(self, name: str | None) -> None:
         if self.locked and name is not None:
             return
+        if name is not None and self.app_popover is not None:
+            which = "apps" if name == "apps" else "qs"
+            if name not in {"apps", "qs", "network", "power"}:
+                which = None
+            if (
+                which is not None
+                and which == self._popover_closed_which
+                and (time.monotonic() - self._popover_closed_at) < 0.25
+            ):
+                self._popover_closed_which = None
+                return
         if name == self.open_menu:
             self.close_menus()
             return
         if name not in {"network", "qs"}:
             self._set_expanded(None)
         self.open_menu = name
-        self.backdrop.set_visible(name is not None)
-        self.qs.set_visible(name == "qs")
-        self.net_panel.set_visible(name == "network")
-        self.power_menu.set_visible(name == "power")
-        self.app_menu.set_visible(name == "apps")
+        if self.app_popover is not None:
+            self._sync_panel_popovers(name)
+        else:
+            self.backdrop.set_visible(name is not None)
+            self.qs.set_visible(name == "qs")
+            self.net_panel.set_visible(name == "network")
+            self.power_menu.set_visible(name == "power")
+            self.app_menu.set_visible(name == "apps")
         if name == "qs":
             self.sys_btn.add_css_class("open")
         else:
@@ -453,6 +487,77 @@ class Shell:
             self.refresh_brightness()
             if self.allow_scan:
                 self._request_net(scan=False)
+        if name is not None:
+            print(f"firstboot-chooser: menu {name}", file=sys.stderr, flush=True)
+        if self.on_menu_changed is not None:
+            self.on_menu_changed(self.open_menu)
+
+    def enable_panel_popovers(self) -> None:
+        from gi.repository import Gtk
+
+        if self.app_popover is not None:
+            return
+        for panel in (self.qs, self.net_panel, self.power_menu, self.app_menu):
+            panel.set_visible(True)
+            panel.set_margin_top(0)
+            panel.set_margin_end(0)
+            panel.set_margin_start(0)
+            panel.set_halign(Gtk.Align.FILL)
+            panel.set_valign(Gtk.Align.FILL)
+
+        self.qs_stack = Gtk.Stack()
+        self.qs_stack.set_interpolate_size(True)
+        self.qs_stack.set_vhomogeneous(False)
+        self.qs_stack.add_named(self.qs, "qs")
+        self.qs_stack.add_named(self.net_panel, "network")
+        self.qs_stack.add_named(self.power_menu, "power")
+
+        self.qs_popover = self._make_popover(self.qs_stack, self.sys_btn)
+        self.app_popover = self._make_popover(self.app_menu, self.app_btn)
+        self.qs_popover.connect("closed", self._on_popover_closed)
+        self.app_popover.connect("closed", self._on_popover_closed)
+
+    def _make_popover(self, child, parent):
+        from gi.repository import Gtk
+
+        pop = Gtk.Popover()
+        pop.add_css_class("shell-popover")
+        pop.set_autohide(True)
+        pop.set_has_arrow(False)
+        pop.set_position(Gtk.PositionType.BOTTOM)
+        pop.set_offset(0, 8)
+        pop.set_child(child)
+        pop.set_parent(parent)
+        return pop
+
+    def _sync_panel_popovers(self, name: str | None) -> None:
+        self._ignore_popover_closed = True
+        try:
+            if name == "apps":
+                self.qs_popover.popdown()
+                self.app_popover.popup()
+            elif name in {"qs", "network", "power"}:
+                self.app_popover.popdown()
+                self.qs_stack.set_visible_child_name(name)
+                self.qs_popover.popup()
+            else:
+                self.app_popover.popdown()
+                self.qs_popover.popdown()
+        finally:
+            self._ignore_popover_closed = False
+
+    def _on_popover_closed(self, pop) -> None:
+        if self._ignore_popover_closed:
+            return
+        which = "apps" if pop is self.app_popover else "qs"
+        self._popover_closed_at = time.monotonic()
+        self._popover_closed_which = which
+        if which == "apps" and self.open_menu == "apps":
+            self.open_menu = None
+            self.app_btn.remove_css_class("open")
+        elif which == "qs" and self.open_menu in {"qs", "network", "power"}:
+            self.open_menu = None
+            self.sys_btn.remove_css_class("open")
 
     def close_menus(self) -> None:
         if self.open_menu is None:
@@ -470,7 +575,7 @@ class Shell:
         bar = Gtk.CenterBox()
         bar.add_css_class("top-bar")
         bar.set_hexpand(True)
-        bar.set_size_request(-1, 32)
+        bar.set_size_request(-1, TOPBAR_HEIGHT)
         bar.set_valign(Gtk.Align.FILL)
 
         self.app_btn = Gtk.Button()
@@ -773,7 +878,13 @@ class Shell:
             btn = Gtk.Button()
             btn.add_css_class("app-menu-item")
             btn.set_has_frame(False)
-            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            dot = Gtk.Box()
+            dot.add_css_class("app-running-dot")
+            dot.set_valign(Gtk.Align.CENTER)
+            dot.set_halign(Gtk.Align.CENTER)
+            dot.set_opacity(1.0 if self._app_running.get(action) else 0.0)
+            self._app_running_dots[action] = dot
             img = Gtk.Image()
             img.set_pixel_size(24)
             if icon == "cog":
@@ -789,6 +900,7 @@ class Shell:
                 path = find_app_icon(icon)
                 if path:
                     img.set_from_file(path)
+            row.append(dot)
             row.append(img)
             row.append(Gtk.Label(label=label, xalign=0))
             btn.set_child(row)

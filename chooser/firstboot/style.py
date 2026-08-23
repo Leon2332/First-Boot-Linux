@@ -14,6 +14,29 @@ window.firstboot.light {
   color: #1c1c1c;
 }
 
+window.firstboot-panel,
+window.firstboot-panel.background,
+window.firstboot-panel.light,
+window.firstboot-panel.light.background {
+  background-color: #1c1c1c;
+}
+
+window.firstboot-panel popover,
+window.firstboot-panel popover.background,
+window.firstboot-panel popover contents,
+window.firstboot-panel popover > contents,
+window.firstboot-panel .shell-popover,
+window.firstboot-panel .shell-popover contents,
+window.firstboot-panel .shell-popover > contents {
+  background-color: transparent;
+  background-image: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  min-width: 0;
+  min-height: 0;
+}
+
 window.firstboot button {
   box-shadow: none;
   outline: none;
@@ -434,6 +457,13 @@ button.wifi-connect:hover {
 
 window.firstboot.light .app-menu-sep {
   background-color: rgba(0, 0, 0, 0.14);
+}
+
+.app-running-dot {
+  min-width: 8px;
+  min-height: 8px;
+  border-radius: 999px;
+  background-color: #3584e4;
 }
 
 .app-menu-item-label {

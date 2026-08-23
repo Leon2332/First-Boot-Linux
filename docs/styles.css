@@ -922,6 +922,18 @@ html[data-theme="light"] .wifi-row.active .wifi-unhide {
   background: var(--border-strong);
 }
 
+.app-running-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #3584e4;
+  flex-shrink: 0;
+}
+
+.app-running-dot.is-off {
+  visibility: hidden;
+}
+
 .app-menu-item-icon {
   width: 24px;
   height: 24px;

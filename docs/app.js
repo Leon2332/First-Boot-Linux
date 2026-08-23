@@ -695,6 +695,7 @@
     els.termWindow.classList.remove("maximized");
     TERM.open = false;
     termSetLine("");
+    syncAppRunningDots();
   }
 
   let winZ = 80;
@@ -707,6 +708,20 @@
     if (!win) return;
     winZ += 1;
     win.style.zIndex = String(winZ);
+    syncAppRunningDots();
+  }
+
+  function syncAppRunningDots() {
+    const map = [
+      ["app-running-browser", els.epiWindow],
+      ["app-running-sysinfo", els.infoWindow],
+      ["app-running-terminal", els.termWindow],
+    ];
+    map.forEach(([id, win]) => {
+      const dot = $(id);
+      if (!dot) return;
+      dot.classList.toggle("is-off", !win || win.hidden);
+    });
   }
 
   function topAppWindow() {
@@ -733,6 +748,7 @@
     }
     win.hidden = true;
     win.classList.remove("maximized");
+    syncAppRunningDots();
   }
 
   function enableWindowChrome(win, header, maxBtn, closeBtn) {

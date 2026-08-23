@@ -31,6 +31,7 @@ class AssetTests(unittest.TestCase):
         self.assertTrue(find_status("network-wired-symbolic.svg"))
         self.assertTrue(find_status("view-app-grid-symbolic.svg"))
         self.assertTrue(find_app_icon("epiphany.png"))
+        self.assertTrue(find_app_icon("org.gnome.Epiphany.svg"))
         self.assertTrue(find_app_icon("other-option-dark.png"))
         self.assertTrue(find_app_icon("other-option-light.png"))
         self.assertTrue(find_status("folder-download-symbolic.svg"))

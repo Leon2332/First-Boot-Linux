@@ -25,9 +25,9 @@ _reopen_closed_stdio()
 os.environ.setdefault("GTK_A11Y", "none")
 os.environ.setdefault("NO_AT_BRIDGE", "1")
 os.environ.setdefault("GSK_RENDERER", "cairo")
-os.environ.setdefault("GSETTINGS_BACKEND", "memory")
 os.environ.setdefault("GTK_USE_PORTAL", "0")
 os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
+os.environ.pop("GSETTINGS_BACKEND", None)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CANDIDATES = (
@@ -44,8 +44,10 @@ print("firstboot-chooser: starting", file=sys.stderr, flush=True)
 print(f"firstboot-chooser: WAYLAND_DISPLAY={os.environ.get('WAYLAND_DISPLAY')!r}", file=sys.stderr, flush=True)
 
 from firstboot.browser import drop_process_caps  # noqa: E402
+from firstboot.panel import preload_layer_shell  # noqa: E402
 
 drop_process_caps()
+preload_layer_shell()
 
 from firstboot.app import main  # noqa: E402
 print("firstboot-chooser: imported", file=sys.stderr, flush=True)

@@ -33,6 +33,7 @@ from firstboot.shell import Shell
 from firstboot.floatlayer import FloatLayer
 from firstboot.browser import BrowserWindow
 from firstboot.kioskapp import launch_console, launch_sysinfo, launch_web
+from firstboot.panel import attach_shell_panel
 from firstboot.theme import apply_session_theme, ensure_default_browser
 from firstboot.style import CSS
 from firstboot.sysinfo import SysinfoWindow
@@ -110,6 +111,7 @@ def run_window(
             self.shop = shop
             self.osinstall = osinstall
             self._app_procs: list = []
+            self._running_apps: dict[str, list] = {}
             self.shop_plan = live_plan(root)
             self.detail_distro: Distro | None = None
             self.detail_from_catalog = False
@@ -218,7 +220,23 @@ def run_window(
             )
             self.shell.allow_scan = not bool(self.screenshot)
             topbar, menus = self.shell.build()
-            column.append(topbar)
+            self.panel = None
+            if kiosk:
+                self.panel = attach_shell_panel(
+                    self,
+                    topbar,
+                    menus,
+                    on_key=self._on_key,
+                    dark=self.dark,
+                )
+                if self.panel is None:
+                    print(
+                        "firstboot-chooser: panel layer-shell unavailable",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+            if self.panel is None:
+                column.append(topbar)
 
             stage = Gtk.Overlay()
             stage.set_hexpand(True)
@@ -288,8 +306,9 @@ def run_window(
                 self.browser.build()
             stage.add_overlay(self.float_layer)
 
-            for widget in menus:
-                self.overlay.add_overlay(widget)
+            if self.panel is None:
+                for widget in menus:
+                    self.overlay.add_overlay(widget)
 
             key = Gtk.EventControllerKey()
             key.connect("key-pressed", self._on_key)
@@ -313,6 +332,9 @@ def run_window(
             self.shell.tick_clock()
             GLib.timeout_add_seconds(15, self.shell.tick_clock)
             GLib.timeout_add_seconds(5, self.shell.refresh_net)
+            if self.panel is not None:
+                self.panel.present()
+                print("firstboot-chooser: panel presented", file=sys.stderr, flush=True)
             self.win.present()
             self._announce_ready()
             if self.open_menu == "terminal":
@@ -386,6 +408,8 @@ def run_window(
             if proc is None:
                 return
             self._app_procs.append(proc)
+            self._running_apps.setdefault(kind, []).append(proc)
+            self.shell.set_app_running(kind, True)
             GLib.child_watch_add(
                 proc.pid, lambda pid, status: self._on_app_exit(kind, pid, status)
             )
@@ -400,6 +424,13 @@ def run_window(
                 file=sys.stderr,
                 flush=True,
             )
+            live = [
+                p
+                for p in self._running_apps.get(kind, [])
+                if p.pid != pid and p.poll() is None
+            ]
+            self._running_apps[kind] = live
+            self.shell.set_app_running(kind, bool(live))
             labels = {
                 "browser": "Web browser",
                 "terminal": "Terminal",
@@ -442,9 +473,13 @@ def run_window(
             if self.dark:
                 mgr.set_color_scheme(Adw.ColorScheme.FORCE_DARK)
                 self.win.remove_css_class("light")
+                if getattr(self, "panel", None) is not None:
+                    self.panel.remove_css_class("light")
             else:
                 mgr.set_color_scheme(Adw.ColorScheme.FORCE_LIGHT)
                 self.win.add_css_class("light")
+                if getattr(self, "panel", None) is not None:
+                    self.panel.add_css_class("light")
             path = (
                 self.payload.wallpaper_dark if self.dark else self.payload.wallpaper_light
             )
