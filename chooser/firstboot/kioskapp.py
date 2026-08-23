@@ -47,6 +47,7 @@ def child_env(*, unset: tuple[str, ...] = ()) -> dict[str, str]:
     env.setdefault("NO_AT_BRIDGE", "1")
     env["GTK_USE_PORTAL"] = "0"
     env["PYTHONUNBUFFERED"] = "1"
+    env["ADW_DISABLE_PORTAL"] = "1"
     # dconf so Dark Style and default-browser settings reach GNOME apps.
     env.pop("GSETTINGS_BACKEND", None)
     for key in unset:

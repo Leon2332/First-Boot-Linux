@@ -1000,3 +1000,34 @@ window.firstboot.light entry.epi-url {
   color: #1c1c1c;
 }
 """.encode("utf-8")
+
+# Standalone System details: layout only. Adwaita owns window/headerbar colors.
+SYSINFO_CSS = """
+.info-body {
+  padding: 8px 20px 20px;
+}
+
+.info-heading {
+  font-size: 15px;
+  font-weight: 700;
+  padding: 8px 0 8px;
+}
+
+.info-field {
+  padding: 6px 0;
+}
+
+.info-field-label {
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.info-field-value {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+picture.info-sw-brand {
+  margin: 0 0 8px;
+}
+""".encode("utf-8")

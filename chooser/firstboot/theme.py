@@ -7,6 +7,7 @@ import subprocess
 import sys
 
 INTERFACE_SCHEMA = "org.gnome.desktop.interface"
+CONSOLE_SCHEMA = "org.gnome.Console"
 EPIPHANY_SCHEMA = "org.gnome.Epiphany"
 EPIPHANY_DESKTOP = "org.gnome.Epiphany.desktop"
 
@@ -32,11 +33,41 @@ def apply_session_theme(dark: bool, env: dict[str, str] | None = None) -> None:
     scheme = "prefer-dark" if dark else "prefer-light"
     _set_gsettings(INTERFACE_SCHEMA, "color-scheme", scheme, env)
     _write_gtk_settings(dark, env)
+    apply_gtk_interface_scheme(dark)
 
 
 def ensure_default_browser(env: dict[str, str] | None = None) -> None:
     _set_gsettings(EPIPHANY_SCHEMA, "ask-for-default", False, env)
     _write_mimeapps(env)
+
+
+def ensure_console_follows_system(env: dict[str, str] | None = None) -> None:
+    # Schema default is night (Dark). QS Dark Style is the session control.
+    _set_gsettings(CONSOLE_SCHEMA, "theme", "auto", env)
+
+
+def apply_gtk_interface_scheme(dark: bool) -> None:
+    """Push light/dark into Gtk.Settings so Adwaita CSD restyles with QS."""
+    try:
+        import gi
+
+        gi.require_version("Gtk", "4.0")
+        from gi.repository import Gtk
+    except Exception:
+        return
+    settings = Gtk.Settings.get_default()
+    if settings is None:
+        return
+    if settings.find_property("gtk-interface-color-scheme") is None:
+        return
+    try:
+        value = (
+            Gtk.InterfaceColorScheme.DARK if dark else Gtk.InterfaceColorScheme.LIGHT
+        )
+        if settings.get_property("gtk-interface-color-scheme") != value:
+            settings.set_property("gtk-interface-color-scheme", value)
+    except Exception:
+        return
 
 
 def _gsettings_env(env: dict[str, str] | None) -> dict[str, str]:
@@ -91,7 +122,12 @@ def _set_gsettings(
 
 def _write_gtk_settings(dark: bool, env: dict[str, str] | None = None) -> None:
     flag = "true" if dark else "false"
-    body = "[Settings]\ngtk-application-prefer-dark-theme=" + flag + "\n"
+    scheme = "dark" if dark else "light"
+    body = (
+        "[Settings]\n"
+        "gtk-application-prefer-dark-theme=" + flag + "\n"
+        "gtk-interface-color-scheme=" + scheme + "\n"
+    )
     home = config_home(env)
     for sub in ("gtk-4.0", "gtk-3.0"):
         base = os.path.join(home, sub)

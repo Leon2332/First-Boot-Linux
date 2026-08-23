@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import sys
 import unittest
+from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CHOOSER_DIR = os.path.dirname(HERE)
@@ -58,6 +59,28 @@ class MemoryTests(unittest.TestCase):
         st = v.toggle_mute()
         self.assertEqual(st.level, 70)
         self.assertFalse(st.muted)
+
+
+class PactlTimeoutTests(unittest.TestCase):
+    def test_pactl_timeout_is_short(self) -> None:
+        text = Path(CHOOSER_DIR, "firstboot", "volume.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=0.4", text)
+
+    def test_autostart_does_not_spawn_pipewire(self) -> None:
+        path = Path(
+            CHOOSER_DIR,
+            "..",
+            "seed",
+            "overlay",
+            "usr",
+            "share",
+            "firstboot",
+            "labwc",
+            "autostart",
+        ).resolve()
+        text = path.read_text(encoding="utf-8")
+        self.assertNotIn("nohup", text)
+        self.assertNotRegex(text, r"(?m)^\s*(pipewire|pipewire-pulse|wireplumber)\b")
 
 
 if __name__ == "__main__":

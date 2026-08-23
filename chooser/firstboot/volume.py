@@ -108,7 +108,7 @@ def _pactl(args: list[str]) -> str:
         check=False,
         capture_output=True,
         text=True,
-        timeout=4,
+        timeout=0.4,
     )
     if proc.returncode != 0:
         raise RuntimeError((proc.stderr or proc.stdout or "pactl failed").strip())

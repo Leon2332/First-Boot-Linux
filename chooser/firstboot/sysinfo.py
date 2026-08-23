@@ -885,6 +885,15 @@ class SysinfoWindow:
 
     def apply_theme(self, dark: bool) -> None:
         self._dark = dark
+        from firstboot.theme import apply_gtk_interface_scheme
+
+        apply_gtk_interface_scheme(dark)
+        if self.win is not None:
+            if dark:
+                self.win.remove_css_class("light")
+            else:
+                self.win.add_css_class("light")
+            self.win.queue_draw()
         self._paint_chrome()
         self._paint_brand()
 
@@ -1065,7 +1074,7 @@ def run_sysinfo(argv: list[str] | None = None) -> int:
     from gi.repository import Adw, Gdk, Gtk
 
     from firstboot.payload import load_payload
-    from firstboot.style import CSS
+    from firstboot.style import SYSINFO_CSS
 
     payload_root = os.environ.get("FIRSTBOOT_PAYLOAD") or "/run/payload"
     try:
@@ -1085,7 +1094,7 @@ def run_sysinfo(argv: list[str] | None = None) -> int:
                 return
             Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.DEFAULT)
             provider = Gtk.CssProvider()
-            provider.load_from_data(CSS)
+            provider.load_from_data(SYSINFO_CSS)
             display = Gdk.Display.get_default()
             if display is not None:
                 Gtk.StyleContext.add_provider_for_display(

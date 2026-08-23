@@ -31,7 +31,7 @@ from firstboot.net import (
     wifi_row_actions,
 )
 from firstboot.brightness import BrightnessState, get_brightness_backend
-from firstboot.volume import MemoryVolume, VolumeState, get_volume_backend
+from firstboot.volume import MemoryVolume, Volume, VolumeState, get_volume_backend
 
 if TYPE_CHECKING:
     from gi.repository import Gtk
@@ -291,7 +291,8 @@ class Shell:
         self.on_menu_changed: Callable[[str | None], None] | None = None
         self.show_shop_install = show_shop_install
         self.dark = True
-        self.volume = get_volume_backend()
+        self.volume: Volume = MemoryVolume()
+        self._vol_gen = 0
         self.brightness = get_brightness_backend()
         self.net: NetSnapshot = empty_snapshot()
         self.open_menu: str | None = None
@@ -411,13 +412,30 @@ class Shell:
         return False
 
     def refresh_volume(self) -> bool:
-        if isinstance(self.volume, MemoryVolume):
-            self.volume = get_volume_backend()
-        try:
-            self._paint_volume(self.volume.get())
-        except Exception:
-            pass
+        self._vol_gen += 1
+        gen = self._vol_gen
+
+        def work() -> None:
+            from gi.repository import GLib
+
+            backend = self.volume
+            if isinstance(backend, MemoryVolume):
+                backend = get_volume_backend()
+            try:
+                st = backend.get()
+            except Exception:
+                return
+            GLib.idle_add(self._apply_volume, gen, backend, st)
+
+        threading.Thread(target=work, daemon=True).start()
         return True
+
+    def _apply_volume(self, gen: int, backend: Volume, st: VolumeState) -> bool:
+        if gen != self._vol_gen:
+            return False
+        self.volume = backend
+        self._paint_volume(st)
+        return False
 
     def set_app_running(self, action: str, running: bool) -> None:
         self._app_running[action] = running
@@ -1229,10 +1247,7 @@ class Shell:
                 if tex is not None:
                     self._app_download.set_from_paintable(tex)
         self._paint_net()
-        try:
-            self._paint_volume(self.volume.get())
-        except Exception:
-            pass
+        self.refresh_volume()
         try:
             self._paint_brightness(self.brightness.get())
         except Exception:

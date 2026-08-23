@@ -60,6 +60,7 @@ class ChildEnvTests(unittest.TestCase):
             self.assertNotIn("GSK_RENDERER", env)
             self.assertEqual(env.get("GDK_BACKEND"), "wayland")
             self.assertEqual(env.get("GTK_USE_PORTAL"), "0")
+            self.assertEqual(env.get("ADW_DISABLE_PORTAL"), "1")
         finally:
             os.environ.clear()
             os.environ.update(old)
@@ -84,6 +85,7 @@ class ChildEnvTests(unittest.TestCase):
             os.environ["PATH"] = "/bin"
             env = child_env()
             self.assertNotIn("GSETTINGS_BACKEND", env)
+            self.assertEqual(env.get("ADW_DISABLE_PORTAL"), "1")
         finally:
             os.environ.clear()
             os.environ.update(old)

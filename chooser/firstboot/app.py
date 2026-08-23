@@ -34,7 +34,11 @@ from firstboot.floatlayer import FloatLayer
 from firstboot.browser import BrowserWindow
 from firstboot.kioskapp import launch_console, launch_sysinfo, launch_web
 from firstboot.panel import attach_shell_panel
-from firstboot.theme import apply_session_theme, ensure_default_browser
+from firstboot.theme import (
+    apply_session_theme,
+    ensure_console_follows_system,
+    ensure_default_browser,
+)
 from firstboot.style import CSS
 from firstboot.sysinfo import SysinfoWindow
 from firstboot.term import TermWindow
@@ -317,6 +321,7 @@ def run_window(
             self._apply_theme()
             apply_session_theme(self.dark)
             ensure_default_browser()
+            ensure_console_follows_system()
             self._render_main()
             if self.open_catalog_list and not self.open_id:
                 self.open_catalog()

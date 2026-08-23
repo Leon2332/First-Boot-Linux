@@ -26,6 +26,7 @@ os.environ.setdefault("GDK_BACKEND", "wayland")
 os.environ.setdefault("GTK_A11Y", "none")
 os.environ.setdefault("NO_AT_BRIDGE", "1")
 os.environ.setdefault("GTK_USE_PORTAL", "0")
+os.environ["ADW_DISABLE_PORTAL"] = "1"
 os.environ.pop("GSETTINGS_BACKEND", None)
 
 HERE = os.path.dirname(os.path.abspath(__file__))

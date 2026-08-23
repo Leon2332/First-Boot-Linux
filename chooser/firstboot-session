@@ -9,6 +9,7 @@ export GDK_BACKEND=wayland
 export GTK_A11Y=none
 export NO_AT_BRIDGE=1
 export GTK_USE_PORTAL="${GTK_USE_PORTAL:-0}"
+export ADW_DISABLE_PORTAL=1
 
 LABWC_DIR=/usr/share/firstboot/labwc
 PYDIR=/usr/share/firstboot/python
