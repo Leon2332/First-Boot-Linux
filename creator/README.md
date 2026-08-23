@@ -2,7 +2,7 @@
 
 Payload composer and USB writer for the retailer’s Linux PC.
 
-It is not a remaster. Picking Mint instead of Fedora does not rebuild the live squashfs. The frozen seed stays in `../seed/`; this tool writes `retailer.conf`, shop `catalog.json`, wallpapers, staged ISOs, and a three-partition disk (same layout as `../image/write-live.sh`). Contracts: [`../schemas/README.md`](../schemas/README.md), [`../USB-LAYOUT.md`](../USB-LAYOUT.md).
+It is not a remaster. Picking Mint instead of Fedora does not rebuild the live squashfs. The frozen seed stays in `../seed/`; this tool writes `retailer.conf`, shop `catalog.json` (ticked → recommended and staged; other installable distros → Other options as downloads), wallpapers, staged ISOs, and a three-partition disk (same layout as `../image/write-live.sh`). Contracts: [`../schemas/README.md`](../schemas/README.md), [`../USB-LAYOUT.md`](../USB-LAYOUT.md).
 
 ```bash
 make

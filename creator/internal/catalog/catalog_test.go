@@ -30,11 +30,21 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 		t.Fatalf("ubuntu and mint should be suggested defaults")
 	}
 	f := cat.Distro("fedora")
-	if f == nil || f.Stageable() {
-		t.Fatalf("fedora must not be stageable")
+	if f == nil || !f.Stageable() {
+		t.Fatalf("fedora should be stageable")
 	}
-	if f.Install != nil {
-		t.Fatalf("fedora install should be null")
+	if f.Install == nil || *f.Install != "fedora-kickstart" {
+		t.Fatalf("fedora install %v", f.Install)
+	}
+	if f.SuggestedDefault {
+		t.Fatalf("fedora should not be a suggested default")
+	}
+	ed := f.DefaultEdition()
+	if ed == nil || ed.Filename != "Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso" {
+		t.Fatalf("fedora plasma filename %+v", ed)
+	}
+	if ed.SizeBytes == nil || *ed.SizeBytes != 3368683520 {
+		t.Fatalf("fedora size %v", ed.SizeBytes)
 	}
 }
 
@@ -47,8 +57,14 @@ func TestBuildShop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(shop.Recommended) != 2 || len(shop.Catalog) != 0 {
-		t.Fatalf("got rec=%d cat=%d", len(shop.Recommended), len(shop.Catalog))
+	if len(shop.Recommended) != 2 {
+		t.Fatalf("got rec=%d", len(shop.Recommended))
+	}
+	if len(shop.Catalog) != 1 || shop.Catalog[0].ID != "fedora" {
+		t.Fatalf("unticked fedora should be catalog, got %+v", shop.Catalog)
+	}
+	if shop.Catalog[0].Editions[0].Local || shop.Catalog[0].Editions[0].URL == "" {
+		t.Fatalf("catalog fedora must be download-only: %+v", shop.Catalog[0].Editions)
 	}
 	ub := shop.Recommended[0]
 	if !ub.Editions[0].Local || ub.Editions[0].File != "images/ubuntu-26.04-desktop-amd64.iso" {
@@ -79,11 +95,41 @@ func TestBuildShop(t *testing.T) {
 		t.Fatalf("mint editions local=%d remote=%d", local, remote)
 	}
 
-	if _, err := BuildShop(cat, []string{"fedora"}); err == nil {
-		t.Fatalf("fedora must be rejected")
+	if _, err := BuildShop(cat, []string{"fedora"}); err != nil {
+		t.Fatalf("fedora should be allowed: %v", err)
 	}
 	if _, err := BuildShop(cat, nil); err == nil {
 		t.Fatalf("empty selection must be rejected")
+	}
+}
+
+func TestBuildShopUntickedGoesToCatalog(t *testing.T) {
+	cat, err := LoadOfficial("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	shop, err := BuildShop(cat, []string{"linux-mint", "fedora"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(shop.Recommended) != 2 {
+		t.Fatalf("recommended %d", len(shop.Recommended))
+	}
+	if shop.Recommended[0].ID != "linux-mint" || shop.Recommended[1].ID != "fedora" {
+		t.Fatalf("recommended ids %s %s", shop.Recommended[0].ID, shop.Recommended[1].ID)
+	}
+	if !shop.Recommended[0].Editions[0].Local || !shop.Recommended[1].Editions[0].Local {
+		t.Fatal("ticked mint and fedora should be staged")
+	}
+	if len(shop.Catalog) != 1 || shop.Catalog[0].ID != "ubuntu" {
+		t.Fatalf("ubuntu should be the download catalog, got %+v", shop.Catalog)
+	}
+	ub := shop.Catalog[0].Editions[0]
+	if ub.Local || ub.File != "" || ub.URL == "" {
+		t.Fatalf("ubuntu catalog edition must be download-only: %+v", ub)
+	}
+	if ub.URL != "https://releases.ubuntu.com/26.04/ubuntu-26.04-desktop-amd64.iso" {
+		t.Fatalf("ubuntu url %s", ub.URL)
 	}
 }
 

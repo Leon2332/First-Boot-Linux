@@ -1,4 +1,4 @@
-"""Fullscreen GTK4 chooser. Reads /run/payload. Shop USB→disk. Ubuntu autoinstall."""
+"""Fullscreen GTK4 chooser. Reads /run/payload. Shop USB→disk. Customer OS install."""
 
 from __future__ import annotations
 
@@ -18,7 +18,10 @@ from firstboot.assets import (
 from firstboot.disk import HelperEvent, live_plan
 from firstboot.install import InstallError, run_apply
 from firstboot.osinstall import (
+    DRIVER_FEDORA,
+    DRIVER_MINT,
     DRIVER_UBUNTU,
+    DRIVERS_READY,
     OsIdentity,
     OsInstallError,
     live_os_plan,
@@ -842,7 +845,7 @@ def run_window(
                     f"Download is not available yet ({distro.name} {ed.name})."
                 )
                 return
-            if distro.install != DRIVER_UBUNTU:
+            if distro.install not in DRIVERS_READY:
                 self._toast(
                     f"{distro.name} install is not available yet."
                 )
@@ -1139,7 +1142,10 @@ def run_window(
             de = f" ({ed.name})" if ed.name else ""
             dialog = Adw.AlertDialog(
                 heading=f"Install {distro.name}{de}?",
-                body="This will erase this computer and install Ubuntu. Create the account you will use after restart.",
+                body=(
+                    f"This will erase this computer and install {distro.name}. "
+                    "Create the account you will use after restart."
+                ),
             )
             dialog.add_response("cancel", "Cancel")
             dialog.add_response("ok", "Install")
@@ -1162,7 +1168,11 @@ def run_window(
             user_e = Gtk.Entry()
             user_e.set_placeholder_text("username")
             host_e = Gtk.Entry()
-            host_e.set_text("ubuntu")
+            host_default = {
+                DRIVER_MINT: "mint",
+                DRIVER_FEDORA: "fedora",
+            }.get(distro.install, "ubuntu")
+            host_e.set_text(host_default)
             pw_e = Gtk.Entry()
             pw_e.set_visibility(False)
             pw_e.set_input_purpose(Gtk.InputPurpose.PASSWORD)
@@ -1180,7 +1190,7 @@ def run_window(
             def on_name(*_a: object) -> None:
                 user_e.set_text(suggest_username(name_e.get_text()))
                 suggested = suggest_hostname(user_e.get_text())
-                if host_e.get_text() in ("", "ubuntu") and suggested:
+                if host_e.get_text() in ("", "ubuntu", "mint", "fedora") and suggested:
                     host_e.set_text(suggested)
 
             def refresh(*_a: object) -> None:
@@ -1269,7 +1279,7 @@ def run_window(
                 f"{distro.name}{de} will install after restart. This computer will be erased."
             )
             if reboot and not self.screenshot:
-                self._set_shop_progress(100, "Restarting to install Ubuntu…")
+                self._set_shop_progress(100, f"Restarting to install {distro.name}…")
                 GLib.timeout_add(1200, self._reboot_now)
                 return False
             self._show_shop_done()

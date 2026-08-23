@@ -4,7 +4,7 @@ How a First Boot Linux **shop USB** is laid out after the creator writes it.
 
 This is a partitioned disk, not a single ISO9660 image. The UI may still say “write ISO.” On the stick it is GPT + three partitions. The same layout is copied onto the PC’s internal disk when the shop installs First Boot.
 
-The normative v1 example below is a shop that staged Ubuntu and Linux Mint. The `docs/` mockup still shows a larger recommended set (Fedora, Pop!_OS, Bazzite, …); those are not `can_stage` until an install driver exists.
+The normative v1 example below is a shop that staged Ubuntu and Linux Mint. Official catalog is Ubuntu, Mint, and Fedora Plasma. The `docs/` mockup still shows a larger set; that is vision, not the creator menu.
 
 ## Partitions
 
@@ -73,7 +73,7 @@ USB
         └── linuxmint-22.3-cinnamon-64bit.iso
 ```
 
-`images/` only contains redistributable ISOs this retailer staged. Recommended can include a download-only row (official `redistributable: false`) with nothing under `images/`. Distros that are catalog-only are also not on the stick; the chooser downloads those later. v1 may stage only distros with official `can_stage`, `redistributable`, and `install` (Ubuntu, then Mint). Basenames come from `schemas/official-catalog.json` `filename` fields.
+`images/` only contains redistributable ISOs this retailer staged. Recommended can include a download-only row (official `redistributable: false`) with nothing under `images/`. Distros the shop did not tick, but that already have an install driver, go in `catalog.json` `catalog` (Other options, Download). v1 may stage only distros with official `can_stage`, `redistributable`, and `install` (Ubuntu, Mint, Fedora Plasma). Basenames come from `schemas/official-catalog.json` `filename` fields.
 
 ## What each payload file is
 

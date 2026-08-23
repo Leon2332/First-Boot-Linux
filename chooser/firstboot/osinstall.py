@@ -1,11 +1,18 @@
-"""Customer OS install. Step 9 is Ubuntu autoinstall from a staged ISO.
+"""Customer OS install from a staged ISO.
 
-Subiquity is not on this live image. The helper verifies the ISO, copies
-the signed kernel plus Ubuntu's initrd onto FBL-SYS (GRUB-readable),
-injects autoinstall.yaml into the initrd's main archive, and rewrites
-GRUB so the next boot is Ubuntu's installer with `autoinstall` and, when
-the ISO lives on the target disk, `toram`. Secure Boot stays on
-Canonical's chain; kexec is not used (lockdown).
+The helper verifies the ISO, copies the installer kernel plus initrd
+onto FBL-SYS (GRUB-readable; FBL-DATA is not), injects the installer
+seed into the initrd's main archive, and rewrites GRUB so the next boot
+is that installer. Same-disk installs copy the live image to RAM.
+kexec is not used (lockdown).
+
+Ubuntu (driver `ubuntu-autoinstall`) is Subiquity + autoinstall.yaml.
+Mint 22.3 (driver `mint`) is Ubiquity + preseed.cfg. Do not feed Mint
+an autoinstall YAML. Fedora Plasma (driver `fedora-kickstart`) is
+Anaconda from the KDE live ISO + a kickstart. Do not feed Fedora
+autoinstall YAML or a casper cmdline. Live `liveinst` rejects
+`inst.ks` — pass `liveinst` without it and replace `/usr/sbin/liveinst`
+so livesys-late starts Anaconda with the kickstart.
 """
 
 from __future__ import annotations
@@ -41,7 +48,15 @@ from firstboot.payload import Distro, Edition
 
 HELPER = "/usr/libexec/firstboot/install-os"
 DRIVER_UBUNTU = "ubuntu-autoinstall"
+DRIVER_MINT = "mint"
+DRIVER_FEDORA = "fedora-kickstart"
+DRIVERS_READY = frozenset({DRIVER_UBUNTU, DRIVER_MINT, DRIVER_FEDORA})
 OSINSTALL_REL = "boot/osinstall"
+UBUNTU_LINUX_EXTRA = "autoinstall subiquity.autoinstallpath=/autoinstall.yaml"
+MINT_LINUX_EXTRA = "username=mint hostname=mint automatic-ubiquity"
+FEDORA_LIVE_LABEL = "Fedora-KDE-Live-44"
+FEDORA_LINUX_FLAG = "fbl.install"
+FEDORA_BOOTNEXT_LABEL = "Install Fedora"
 MIN_TARGET_BYTES = 16 * 1024 * 1024 * 1024
 TORAM_HEADROOM = 2 * 1024 * 1024 * 1024
 USER_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
@@ -161,7 +176,132 @@ exit 0
 """
 )
 
-OSINSTALL_GRUB = """# First Boot Linux — one-shot Ubuntu autoinstall
+MINT_EFI_CLEANUP = """#!/bin/sh
+for n in $(efibootmgr 2>/dev/null | sed -n 's/^Boot\\([0-9A-Fa-f]\\{4\\}\\).*First Boot Linux.*/\\1/p'); do
+  efibootmgr -b "$n" -B || true
+done
+exit 0
+"""
+
+MINT_CASPER_BOTTOM = """#!/bin/sh
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case $1 in
+prereqs) prereqs; exit 0 ;;
+esac
+
+mkdir -p /root/var/log /root/usr/lib
+log=/root/var/log/firstboot-mint.log
+{
+  echo "cmdline: $(cat /proc/cmdline 2>/dev/null)"
+  cat /root/etc/hostname 2>/dev/null
+  ls -l /preseed.cfg /scripts/casper-bottom/29fbl-mint 2>&1
+  lsblk -o NAME,LABEL,MOUNTPOINT,TYPE 2>/dev/null
+} > "$log"
+
+if [ -f /preseed.cfg ]; then
+  cp /preseed.cfg /root/preseed.cfg
+  chmod 644 /root/preseed.cfg
+fi
+
+if [ -f /usr/lib/firstboot-efi-cleanup ]; then
+  cp /usr/lib/firstboot-efi-cleanup /root/usr/lib/firstboot-efi-cleanup
+  chmod 755 /root/usr/lib/firstboot-efi-cleanup
+fi
+
+if grep -qw toram /proc/cmdline; then
+  {
+    echo "=== drop FBL-DATA after toram ==="
+    findmnt 2>/dev/null
+    losetup -a 2>/dev/null
+  } >> "$log" 2>&1
+  if command -v losetup >/dev/null; then
+    losetup -ln -O NAME,BACK-FILE 2>/dev/null | while read -r _name _back; do
+      [ -n "$_name" ] || continue
+      case "$_back" in
+        *isodevice*|*FBL-DATA*)
+          umount -l "$_name" 2>/dev/null || true
+          losetup -d "$_name" 2>/dev/null || true
+          ;;
+      esac
+    done
+  fi
+  for _mp in /isodevice /root/isodevice /run/payload; do
+    umount -l "$_mp" 2>/dev/null || true
+  done
+  _dev=$(blkid -L FBL-DATA 2>/dev/null) || true
+  if [ -n "$_dev" ]; then
+    umount -l "$_dev" 2>/dev/null || true
+  fi
+  swapoff -a 2>/dev/null || true
+  {
+    echo "=== after ==="
+    findmnt 2>/dev/null
+    losetup -a 2>/dev/null
+    lsblk -o NAME,LABEL,MOUNTPOINT,TYPE 2>/dev/null
+  } >> "$log" 2>&1
+fi
+
+echo "live_preseed=$(test -f /root/preseed.cfg && echo yes || echo no)" >> "$log"
+exit 0
+"""
+
+FEDORA_LIVEINST_WRAPPER = """#!/bin/bash
+# livesys-late runs this. Official liveinst rejects inst.ks on Live media.
+log=/var/log/firstboot-fedora.log
+{
+  echo "=== fbl liveinst wrapper ==="
+  date
+  cat /proc/cmdline 2>/dev/null
+  ls -l /ks.cfg /usr/sbin/anaconda /usr/bin/anaconda /usr/sbin/liveinst.real 2>/dev/null
+} >> "$log" 2>&1
+ana=
+for p in /usr/sbin/anaconda /usr/bin/anaconda /usr/libexec/anaconda/anaconda; do
+  if [ -x "$p" ]; then
+    ana=$p
+    break
+  fi
+done
+if [ -z "$ana" ]; then
+  echo "anaconda missing" >> "$log"
+  if [ -x /usr/sbin/liveinst.real ]; then
+    exec /usr/sbin/liveinst.real "$@"
+  fi
+  exit 1
+fi
+exec "$ana" --liveinst --kickstart=/ks.cfg --graphical "$@"
+"""
+
+FEDORA_DRACUT_HOOK = """#!/bin/sh
+# Overlay kickstart + liveinst wrapper onto the live root.
+# Fedora dracut keeps hooks in var/lib/dracut/hooks (lib/dracut/hooks is a symlink).
+root="${NEWROOT:-/sysroot}"
+log="$root/var/log/firstboot-fedora.log"
+mkdir -p "$root/var/log" "$root/usr/sbin"
+{
+  echo "=== fbl fedora pre-pivot ==="
+  cat /proc/cmdline 2>/dev/null
+  ls -l /ks.cfg /fbl-liveinst /var/lib/dracut/hooks/pre-pivot 2>/dev/null
+} > "$log" 2>&1
+if [ -f /ks.cfg ]; then
+  cp /ks.cfg "$root/ks.cfg"
+  chmod 644 "$root/ks.cfg"
+fi
+if [ -f /fbl-liveinst ]; then
+  if [ -e "$root/usr/sbin/liveinst" ] && [ ! -e "$root/usr/sbin/liveinst.real" ]; then
+    mv "$root/usr/sbin/liveinst" "$root/usr/sbin/liveinst.real" || true
+  fi
+  cp /fbl-liveinst "$root/usr/sbin/liveinst"
+  chmod 755 "$root/usr/sbin/liveinst"
+fi
+if command -v restorecon >/dev/null; then
+  restorecon -F "$root/ks.cfg" "$root/usr/sbin/liveinst" 2>/dev/null || true
+fi
+echo "ks=$(test -f "$root/ks.cfg" && echo yes || echo no) liveinst=$(test -x "$root/usr/sbin/liveinst" && echo yes || echo no)" >> "$log"
+exit 0
+"""
+
+OSINSTALL_GRUB = """# First Boot Linux — one-shot customer OS install
 set default=0
 set timeout=2
 set timeout_style=menu
@@ -172,13 +312,28 @@ if [ ! -f /boot/osinstall/vmlinuz ]; then
 fi
 
 menuentry "Install {name}" {{
-    linux /boot/osinstall/vmlinuz boot=casper iso-scan/filename={iso_rel} live-media-path=casper ignore_uuid nopersistent noprompt {toram}autoinstall subiquity.autoinstallpath=/autoinstall.yaml ---
+    linux /boot/osinstall/vmlinuz {linux_args} ---
     initrd /boot/osinstall/initrd
 }}
 
 menuentry "First Boot Linux" {{
     linux /casper/vmlinuz boot=casper live-media=/dev/disk/by-uuid/{sys_uuid} live-media-path=casper ignore_uuid nopersistent noprompt console=tty1 console=ttyS0,115200n8 ---
     initrd /casper/initrd
+}}
+"""
+
+FEDORA_SHIM_GRUB = """# First Boot Linux — Fedora shim (Secure Boot)
+set default=0
+set timeout=2
+
+search --no-floppy --set=root --fs-uuid {sys_uuid}
+if [ ! -f /boot/osinstall/vmlinuz ]; then
+	search --no-floppy --set=root --label FBL-SYS
+fi
+
+menuentry "Install {name}" {{
+    linux /boot/osinstall/vmlinuz {linux_args} ---
+    initrd /boot/osinstall/initrd
 }}
 """
 
@@ -489,7 +644,7 @@ def plan_os_install(
 ) -> OsInstallPlan:
     if not edition.on_disk or not edition.file:
         return OsInstallPlan(False, "This edition is not on disk.")
-    if distro.install != DRIVER_UBUNTU:
+    if distro.install not in DRIVERS_READY:
         return OsInstallPlan(
             False,
             f"{distro.name} install is not available yet.",
@@ -675,16 +830,208 @@ def cloud_config_user_data(
     return "#cloud-config\n" + autoinstall_yaml(identity, target_path, serial=serial)
 
 
-def osinstall_grub(sys_uuid: str, iso_rel: str, name: str, *, toram: bool) -> str:
+def preseed_line(owner: str, key: str, kind: str, value: str) -> str:
+    return f"{owner} {key} {kind} {value}"
+
+
+def mint_preseed(identity: OsIdentity, target_path: str) -> str:
+    """Ubiquity preseed for Mint 22.3. Not Subiquity autoinstall."""
+    disk = kernel_disk_path(target_path)
+    lines = [
+        preseed_line("d-i", "debian-installer/locale", "string", "en_US.UTF-8"),
+        preseed_line("d-i", "debian-installer/language", "string", "en"),
+        preseed_line("d-i", "debian-installer/country", "string", "US"),
+        preseed_line("d-i", "localechooser/languagelist", "string", "en"),
+        preseed_line("d-i", "languagechooser/language-name", "string", "English"),
+        preseed_line("d-i", "countrychooser/shortlist", "select", "US"),
+        preseed_line(
+            "d-i", "localechooser/supported-locales", "multiselect", "en_US.UTF-8"
+        ),
+        preseed_line("d-i", "keyboard-configuration/layoutcode", "string", "us"),
+        preseed_line("d-i", "keyboard-configuration/xkb-keymap", "select", "us"),
+        preseed_line("d-i", "keyboard-configuration/modelcode", "string", "pc105"),
+        preseed_line("d-i", "console-setup/ask_detect", "boolean", "false"),
+        preseed_line("d-i", "console-setup/layoutcode", "string", "us"),
+        preseed_line("d-i", "time/zone", "string", "UTC"),
+        preseed_line("d-i", "clock-setup/utc", "boolean", "true"),
+        preseed_line("d-i", "clock-setup/ntp", "boolean", "false"),
+        preseed_line("d-i", "netcfg/get_hostname", "string", identity.hostname),
+        preseed_line("d-i", "passwd/user-fullname", "string", identity.realname),
+        preseed_line("d-i", "passwd/username", "string", identity.username),
+        preseed_line(
+            "d-i", "passwd/user-password-crypted", "password", identity.password_hash
+        ),
+        preseed_line("d-i", "passwd/auto-login", "boolean", "false"),
+        preseed_line("d-i", "user-setup/allow-password-weak", "boolean", "true"),
+        preseed_line("d-i", "user-setup/encrypt-home", "boolean", "false"),
+        preseed_line("d-i", "partman-auto/method", "string", "regular"),
+        preseed_line("d-i", "partman-auto/disk", "string", disk),
+        preseed_line(
+            "d-i", "partman-auto/init_automatically_partition", "select", "regular"
+        ),
+        preseed_line("d-i", "partman-auto/choose_recipe", "select", "atomic"),
+        preseed_line("d-i", "partman-auto/purge_lvm_from_device", "boolean", "true"),
+        preseed_line("d-i", "partman-lvm/device_remove_lvm", "boolean", "true"),
+        preseed_line("d-i", "partman-md/device_remove_md", "boolean", "true"),
+        preseed_line("d-i", "partman-lvm/confirm", "boolean", "true"),
+        preseed_line("d-i", "partman-md/confirm", "boolean", "true"),
+        preseed_line("d-i", "partman-lvm/confirm_nooverwrite", "boolean", "true"),
+        preseed_line(
+            "d-i", "partman-partitioning/confirm_write_new_label", "boolean", "true"
+        ),
+        preseed_line("d-i", "partman/choose_partition", "select", "finish"),
+        preseed_line("d-i", "partman/confirm", "boolean", "true"),
+        preseed_line("d-i", "partman/confirm_nooverwrite", "boolean", "true"),
+        preseed_line("d-i", "partman/confirm_write_new_label", "boolean", "true"),
+        preseed_line("d-i", "grub-installer/only_debian", "boolean", "true"),
+        preseed_line("d-i", "grub-installer/with_other_os", "boolean", "false"),
+        preseed_line("ubiquity", "ubiquity/use_nonfree", "boolean", "false"),
+        preseed_line("ubiquity", "ubiquity/download_updates", "boolean", "false"),
+        preseed_line("ubiquity", "ubiquity/partman-skip-unmount", "boolean", "true"),
+        preseed_line("ubiquity", "ubiquity/summary", "string", ""),
+        preseed_line("ubiquity", "ubiquity/reboot", "boolean", "true"),
+        preseed_line("ubiquity", "ubiquity/reboot_on_failure", "boolean", "false"),
+        preseed_line(
+            "ubiquity",
+            "ubiquity/success_command",
+            "string",
+            "/usr/lib/firstboot-efi-cleanup",
+        ),
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def kickstart_disk_id(dev: str) -> str:
+    return os.path.basename(kernel_disk_path(dev))
+
+
+def kickstart_gecos(realname: str) -> str:
+    cleaned = realname.replace('"', " ").replace("'", " ").replace("\n", " ").strip()
+    return " ".join(cleaned.split())
+
+
+def fedora_kickstart(identity: OsIdentity, target_path: str) -> str:
+    """Anaconda kickstart for Fedora 44 KDE Live. Not Ubiquity, not autoinstall."""
+    disk = kernel_disk_path(target_path)
+    drive = kickstart_disk_id(target_path)
+    gecos = kickstart_gecos(identity.realname or identity.username)
+    user = identity.username
+    host = identity.hostname
+    hashed = identity.password_hash
+    return (
+        "#version=F44\n"
+        "# First Boot Linux — Fedora Plasma live install\n"
+        "graphical\n"
+        "lang en_US.UTF-8\n"
+        "keyboard --vckeymap=us --xlayouts='us'\n"
+        "timezone UTC\n"
+        f"network --hostname={host}\n"
+        "rootpw --lock\n"
+        f'user --name={user} --gecos="{gecos}" --password="{hashed}" '
+        "--iscrypted --groups=wheel\n"
+        "firstboot --disable\n"
+        f"ignoredisk --only-use={drive}\n"
+        "zerombr\n"
+        f"clearpart --all --initlabel --disklabel=gpt --drives={drive}\n"
+        "autopart --type=btrfs\n"
+        f"bootloader --location=mbr --boot-drive={drive}\n"
+        "reboot\n"
+        "%addon com_redhat_kdump --disable\n"
+        "%end\n"
+        "%pre --interpreter=/bin/bash\n"
+        f"disk={disk}\n"
+        "log=/tmp/firstboot-fedora-pre.log\n"
+        "{\n"
+        "  echo '=== fbl fedora pre ==='\n"
+        "  date\n"
+        "  cat /proc/cmdline 2>/dev/null\n"
+        "  lsblk -o NAME,LABEL,MOUNTPOINT,TYPE 2>/dev/null\n"
+        "  findmnt 2>/dev/null\n"
+        "  losetup -a 2>/dev/null\n"
+        "} > \"$log\" 2>&1\n"
+        "if command -v losetup >/dev/null; then\n"
+        "  losetup -ln -O NAME,BACK-FILE 2>/dev/null | while read -r name back; do\n"
+        "    case \"$back\" in\n"
+        "      *isodevice*|*FBL-DATA*) umount -l \"$name\" 2>/dev/null || true; "
+        "losetup -d \"$name\" 2>/dev/null || true ;;\n"
+        "    esac\n"
+        "  done\n"
+        "fi\n"
+        "if [ -b \"$disk\" ]; then\n"
+        "  lsblk -ln -o PATH,MOUNTPOINT \"$disk\" 2>/dev/null | while read -r path mp; do\n"
+        "    [ -n \"$mp\" ] && [ \"$mp\" != \"/\" ] && umount -l \"$mp\" 2>/dev/null || true\n"
+        "  done\n"
+        "fi\n"
+        "umount -l /isodevice /run/payload 2>/dev/null || true\n"
+        "dev=$(blkid -L FBL-DATA 2>/dev/null) || true\n"
+        "[ -n \"$dev\" ] && umount -l \"$dev\" 2>/dev/null || true\n"
+        "swapoff -a 2>/dev/null || true\n"
+        "udevadm settle 2>/dev/null || true\n"
+        "{\n"
+        "  echo '=== after ==='\n"
+        "  lsblk -o NAME,LABEL,MOUNTPOINT,TYPE 2>/dev/null\n"
+        "  findmnt 2>/dev/null\n"
+        "  losetup -a 2>/dev/null\n"
+        "} >> \"$log\" 2>&1\n"
+        "%end\n"
+        "%post --interpreter=/bin/bash\n"
+        "for n in $(efibootmgr 2>/dev/null | "
+        "sed -n 's/^Boot\\([0-9A-Fa-f]\\{4\\}\\).*\\(First Boot Linux\\|Install Fedora\\).*/\\1/p');\n"
+        "do\n"
+        "  efibootmgr -b \"$n\" -B || true\n"
+        "done\n"
+        f"if ! getent passwd {user} >/dev/null 2>&1; then\n"
+        f"  useradd -m -G wheel -c '{gecos}' {user} || true\n"
+        f"  echo '{user}:{hashed}' | chpasswd -e || true\n"
+        "fi\n"
+        "systemctl disable --global plasma-setup.service 2>/dev/null || true\n"
+        "rm -f /etc/xdg/autostart/plasma-setup*.desktop "
+        "/usr/lib/systemd/user/plasma-setup.service 2>/dev/null || true\n"
+        "mkdir -p /var/lib/plasma-setup\n"
+        "touch /var/lib/plasma-setup/completed\n"
+        "%end\n"
+    )
+
+
+def fedora_kernel_args(iso_rel: str, label: str, *, toram: bool) -> str:
+    ram = "rd.live.ram=1 " if toram else ""
+    vol = (label or FEDORA_LIVE_LABEL).strip() or FEDORA_LIVE_LABEL
+    return (
+        f"root=live:CDLABEL={vol} rd.live.image iso-scan/filename={iso_rel} "
+        f"{ram}{FEDORA_LINUX_FLAG} liveinst"
+    )
+
+
+def casper_kernel_args(
+    iso_rel: str, *, toram: bool, extra: str | None = None
+) -> str:
     flag = "toram " if toram else ""
+    args = extra if extra is not None else UBUNTU_LINUX_EXTRA
+    return (
+        f"boot=casper iso-scan/filename={iso_rel} live-media-path=casper "
+        f"ignore_uuid nopersistent noprompt {flag}{args}"
+    )
+
+
+def osinstall_grub(
+    sys_uuid: str,
+    iso_rel: str,
+    name: str,
+    *,
+    toram: bool,
+    extra: str | None = None,
+    linux_args: str | None = None,
+) -> str:
+    args = linux_args or casper_kernel_args(iso_rel, toram=toram, extra=extra)
     return OSINSTALL_GRUB.format(
-        sys_uuid=sys_uuid, iso_rel=iso_rel, name=name, toram=flag
+        sys_uuid=sys_uuid, name=name, linux_args=args
     )
 
 
 CPIO_MAGIC = (b"070701", b"070702")
 ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
 GZIP_MAGIC = b"\x1f\x8b"
+XZ_MAGIC = b"\xfd7zXZ\x00"
 
 
 def _cpio_archive_end(data: bytes, start: int) -> int:
@@ -719,7 +1066,11 @@ def split_initrd(data: bytes) -> list[bytes]:
             off += 1
         if off >= n:
             break
-        if data[off : off + 4] == ZSTD_MAGIC or data[off : off + 2] == GZIP_MAGIC:
+        if (
+            data[off : off + 4] == ZSTD_MAGIC
+            or data[off : off + 2] == GZIP_MAGIC
+            or data[off : off + 6] == XZ_MAGIC
+        ):
             parts.append(data[off:])
             break
         if data[off : off + 6] in CPIO_MAGIC:
@@ -742,10 +1093,20 @@ def _decompress_member(blob: bytes) -> tuple[str, bytes]:
             capture_output=True,
         )
         if proc.returncode != 0:
-            raise OsInstallError("could not decompress Ubuntu initrd (zstd)")
+            raise OsInstallError("could not decompress installer initrd (zstd)")
         return "zstd", proc.stdout
     if blob.startswith(GZIP_MAGIC):
         return "gzip", gzip.decompress(blob)
+    if blob.startswith(XZ_MAGIC):
+        proc = subprocess.run(
+            ["xz", "-d", "-c"],
+            input=blob,
+            check=False,
+            capture_output=True,
+        )
+        if proc.returncode != 0:
+            raise OsInstallError("could not decompress installer initrd (xz)")
+        return "xz", proc.stdout
     if blob[:6] in CPIO_MAGIC:
         return "cpio", blob
     raise OsInstallError("unrecognised initrd compression")
@@ -760,10 +1121,20 @@ def _compress_member(kind: str, blob: bytes) -> bytes:
             capture_output=True,
         )
         if proc.returncode != 0:
-            raise OsInstallError("could not recompress Ubuntu initrd (zstd)")
+            raise OsInstallError("could not recompress installer initrd (zstd)")
         return proc.stdout
     if kind == "gzip":
         return gzip.compress(blob, compresslevel=6)
+    if kind == "xz":
+        proc = subprocess.run(
+            ["xz", "-1", "-c"],
+            input=blob,
+            check=False,
+            capture_output=True,
+        )
+        if proc.returncode != 0:
+            raise OsInstallError("could not recompress installer initrd (xz)")
+        return proc.stdout
     return blob
 
 
@@ -778,7 +1149,7 @@ def _unpack_cpio_blob(blob: bytes, dest: str) -> None:
     )
     if proc.returncode != 0:
         err = (proc.stderr or b"").decode("utf-8", "replace").strip()
-        raise OsInstallError(err or "could not unpack Ubuntu initrd")
+        raise OsInstallError(err or "could not unpack installer initrd")
 
 
 def _pack_cpio_tree(src: str) -> bytes:
@@ -799,11 +1170,12 @@ def _pack_cpio_tree(src: str) -> bytes:
     )
     if proc.returncode != 0:
         err = (proc.stderr or b"").decode("utf-8", "replace").strip()
-        raise OsInstallError(err or "could not pack Ubuntu initrd")
+        raise OsInstallError(err or "could not pack installer initrd")
     return proc.stdout
 
 
 def _write_tree_files(root: str, files: dict[str, str | bytes]) -> None:
+    order_lines: list[str] = []
     for rel, content in files.items():
         rel = rel.lstrip("/")
         dest = os.path.join(root, rel)
@@ -814,15 +1186,28 @@ def _write_tree_files(root: str, files: dict[str, str | bytes]) -> None:
         else:
             with open(dest, "w", encoding="utf-8", newline="\n") as fh:
                 fh.write(content)
-        os.chmod(dest, 0o755 if "casper-bottom" in rel else 0o644)
+        executable = (
+            "casper-bottom" in rel
+            or "dracut/hooks/" in rel
+            or rel.endswith("firstboot-efi-cleanup")
+            or rel.endswith("fbl-liveinst")
+            or rel.endswith("/liveinst")
+        )
+        os.chmod(dest, 0o755 if executable else 0o644)
+        if rel.startswith("scripts/casper-bottom/") and not rel.endswith("/ORDER"):
+            order_lines.append("/" + rel)
     order = os.path.join(root, "scripts", "casper-bottom", "ORDER")
-    if os.path.isfile(order):
+    if os.path.isfile(order) and order_lines:
+        with open(order, encoding="ascii") as fh:
+            existing = fh.read()
         with open(order, "a", encoding="ascii") as fh:
-            fh.write("/scripts/casper-bottom/29fbl-autoinstall\n")
+            for line in order_lines:
+                if line not in existing:
+                    fh.write(line + "\n")
 
 
 def inject_into_initrd(path: str, files: dict[str, str | bytes]) -> None:
-    """Add files to the last (main) cpio of a concatenated Ubuntu initrd.
+    """Add files to the last (main) cpio of a concatenated casper initrd.
 
     Trailing extra archives after a zstd member are ignored by the kernel —
     that is why append / a second GRUB initrd never reached casper-bottom.
@@ -927,6 +1312,197 @@ def _remount_rw(mp: str) -> None:
         raise OsInstallError("Could not write the boot partition.")
 
 
+def _casper_boot_files(iso_mnt: str) -> tuple[str, str]:
+    vmlinuz = os.path.join(iso_mnt, "casper", "vmlinuz")
+    for name in ("initrd", "initrd.lz", "initrd.gz"):
+        initrd = os.path.join(iso_mnt, "casper", name)
+        if os.path.isfile(vmlinuz) and os.path.isfile(initrd):
+            return vmlinuz, initrd
+    raise OsInstallError("This image is not a live ISO.")
+
+
+def _fedora_boot_files(iso_mnt: str) -> tuple[str, str]:
+    candidates = (
+        ("boot/x86_64/loader/linux", "boot/x86_64/loader/initrd"),
+        ("images/pxeboot/vmlinuz", "images/pxeboot/initrd.img"),
+    )
+    for vrel, irel in candidates:
+        vmlinuz = os.path.join(iso_mnt, vrel)
+        initrd = os.path.join(iso_mnt, irel)
+        if os.path.isfile(vmlinuz) and os.path.isfile(initrd):
+            return vmlinuz, initrd
+    raise OsInstallError("This image is not a Fedora live ISO.")
+
+
+def _installer_boot_files(driver: str, iso_mnt: str) -> tuple[str, str]:
+    if driver == DRIVER_FEDORA:
+        return _fedora_boot_files(iso_mnt)
+    return _casper_boot_files(iso_mnt)
+
+
+def _live_image_size(iso_mnt: str, fallback: int) -> int:
+    for rel in (
+        os.path.join("casper", "filesystem.squashfs"),
+        os.path.join("LiveOS", "squashfs.img"),
+        os.path.join("LiveOS", "rootfs.img"),
+    ):
+        path = os.path.join(iso_mnt, rel)
+        if os.path.isfile(path):
+            return os.path.getsize(path)
+    return fallback
+
+
+def iso_volume_id(path: str) -> str:
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(32768 + 40)
+            raw = fh.read(32)
+    except OSError:
+        return ""
+    return raw.decode("ascii", "replace").strip(" \x00")
+
+
+def efi_part_number(part: str) -> str:
+    base = os.path.basename(part)
+    if "p" in base and base.rsplit("p", 1)[-1].isdigit():
+        return base.rsplit("p", 1)[-1]
+    i = len(base)
+    while i and base[i - 1].isdigit():
+        i -= 1
+    return base[i:] if i < len(base) else "1"
+
+
+def _seed_files(
+    plan: OsInstallPlan, identity: OsIdentity, serial: str
+) -> tuple[dict[str, str | bytes], str]:
+    if plan.target is None:
+        raise OsInstallError("Cannot install.")
+    if plan.driver == DRIVER_UBUNTU:
+        yaml = autoinstall_yaml(identity, plan.target.path, serial=serial)
+        user_data = cloud_config_user_data(
+            identity, plan.target.path, serial=serial
+        )
+        return (
+            {
+                "autoinstall.yaml": yaml,
+                "user-data": user_data,
+                "scripts/casper-bottom/29fbl-autoinstall": CASPER_BOTTOM,
+            },
+            UBUNTU_LINUX_EXTRA,
+        )
+    if plan.driver == DRIVER_MINT:
+        return (
+            {
+                "preseed.cfg": mint_preseed(identity, plan.target.path),
+                "usr/lib/firstboot-efi-cleanup": MINT_EFI_CLEANUP,
+                "scripts/casper-bottom/29fbl-mint": MINT_CASPER_BOTTOM,
+            },
+            MINT_LINUX_EXTRA,
+        )
+    if plan.driver == DRIVER_FEDORA:
+        return (
+            {
+                "ks.cfg": fedora_kickstart(identity, plan.target.path),
+                "fbl-liveinst": FEDORA_LIVEINST_WRAPPER,
+                "var/lib/dracut/hooks/pre-pivot/90-fbl-ks.sh": FEDORA_DRACUT_HOOK,
+            },
+            FEDORA_LINUX_FLAG,
+        )
+    raise OsInstallError(f"{plan.driver} is not available yet.")
+
+
+def _install_fedora_shim(
+    iso_mnt: str,
+    plan: OsInstallPlan,
+    sys_uuid: str,
+    name: str,
+    linux_args: str,
+) -> None:
+    """Copy Fedora's Microsoft-signed shim to FBL-ESP and BootNext it.
+
+    Canonical GRUB will not load a Fedora kernel with Secure Boot on.
+    Firmware BootNext of Fedora shim is the signed path.
+    """
+    if plan.live is None:
+        return
+    esp_part = plan.live.part_named("FBL-ESP")
+    if esp_part is None:
+        return
+    src_shim = os.path.join(iso_mnt, "EFI", "BOOT", "BOOTX64.EFI")
+    src_grub = os.path.join(iso_mnt, "EFI", "BOOT", "grubx64.efi")
+    if not os.path.isfile(src_shim) or not os.path.isfile(src_grub):
+        return
+    mounted = False
+    esp_mp = ""
+    if esp_part.mountpoints:
+        esp_mp = esp_part.mountpoints[0]
+    else:
+        esp_mp = tempfile.mkdtemp(prefix="fbl-esp-")
+        run_checked(["mount", esp_part.path, esp_mp], what="mount the EFI partition")
+        mounted = True
+    try:
+        dest = os.path.join(esp_mp, "EFI", "osinstall")
+        os.makedirs(dest, exist_ok=True)
+        shutil.copy2(src_shim, os.path.join(dest, "shimx64.efi"))
+        shutil.copy2(src_grub, os.path.join(dest, "grubx64.efi"))
+        mm = os.path.join(iso_mnt, "EFI", "BOOT", "mmx64.efi")
+        if os.path.isfile(mm):
+            shutil.copy2(mm, os.path.join(dest, "mmx64.efi"))
+        with open(os.path.join(dest, "grub.cfg"), "w", encoding="utf-8") as fh:
+            fh.write(
+                FEDORA_SHIM_GRUB.format(
+                    sys_uuid=sys_uuid, name=name, linux_args=linux_args
+                )
+            )
+    finally:
+        if mounted:
+            subprocess.run(["umount", esp_mp], check=False, capture_output=True)
+            shutil.rmtree(esp_mp, ignore_errors=True)
+    if not shutil.which("efibootmgr"):
+        return
+    partnum = efi_part_number(esp_part.path)
+    from firstboot.install import efi_ids_for_label
+
+    def _efi_list() -> str:
+        proc = subprocess.run(
+            ["efibootmgr"], check=False, capture_output=True, text=True
+        )
+        return proc.stdout or ""
+
+    for bootnum in efi_ids_for_label(_efi_list(), FEDORA_BOOTNEXT_LABEL):
+        subprocess.run(
+            ["efibootmgr", "--bootnum", bootnum, "--delete-bootnum"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    subprocess.run(
+        [
+            "efibootmgr",
+            "--create",
+            "--disk",
+            plan.live.path,
+            "--part",
+            partnum,
+            "--label",
+            FEDORA_BOOTNEXT_LABEL,
+            "--loader",
+            r"\EFI\osinstall\shimx64.efi",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    created = efi_ids_for_label(_efi_list(), FEDORA_BOOTNEXT_LABEL)
+    if created:
+        subprocess.run(
+            ["efibootmgr", "--bootnext", created[-1]],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+
 def prepare_ubuntu(
     plan: OsInstallPlan,
     identity: OsIdentity,
@@ -954,28 +1530,25 @@ def prepare_ubuntu(
     )
     prog(50)
 
-    emit("STEP", "Preparing Ubuntu…")
+    label = plan.distro_name or "the system"
+    emit("STEP", f"Preparing {label}…")
     iso_mnt = tempfile.mkdtemp(prefix="fbl-iso-")
     mounted = False
     try:
         run_checked(
             ["mount", "-o", "loop,ro", plan.iso_path, iso_mnt],
-            what="mount the Ubuntu image",
+            what=f"mount the {label} image",
         )
         mounted = True
-        vmlinuz = os.path.join(iso_mnt, "casper", "vmlinuz")
-        initrd = os.path.join(iso_mnt, "casper", "initrd")
-        squash = os.path.join(iso_mnt, "casper", "filesystem.squashfs")
-        if not os.path.isfile(vmlinuz) or not os.path.isfile(initrd):
-            raise OsInstallError("This image is not an Ubuntu live ISO.")
-        squash_size = os.path.getsize(squash) if os.path.isfile(squash) else plan.size_bytes
+        vmlinuz, initrd = _installer_boot_files(plan.driver, iso_mnt)
+        squash_size = _live_image_size(iso_mnt, plan.size_bytes)
         need = squash_size + TORAM_HEADROOM
         have = mem_available()
         toram = have >= need
         if plan.same_disk and not toram:
             raise OsInstallError(
                 "This computer needs about "
-                f"{format_size(need)} of memory to install Ubuntu from the internal disk."
+                f"{format_size(need)} of memory to install {label} from the internal disk."
             )
         prog(58)
 
@@ -992,20 +1565,22 @@ def prepare_ubuntu(
         prog(78)
 
         serial = disk_udev_serial(plan.target.path)
-        yaml = autoinstall_yaml(identity, plan.target.path, serial=serial)
-        user_data = cloud_config_user_data(
-            identity, plan.target.path, serial=serial
+        files, extra = _seed_files(plan, identity, serial)
+        seed_copy = (
+            files.get("autoinstall.yaml")
+            or files.get("preseed.cfg")
+            or files.get("ks.cfg")
         )
-        with open(os.path.join(dest, "autoinstall.yaml"), "w", encoding="utf-8") as fh:
-            fh.write(yaml)
-        inject_into_initrd(
-            os.path.join(dest, "initrd"),
-            {
-                "autoinstall.yaml": yaml,
-                "user-data": user_data,
-                "scripts/casper-bottom/29fbl-autoinstall": CASPER_BOTTOM,
-            },
-        )
+        if isinstance(seed_copy, str):
+            if "autoinstall.yaml" in files:
+                seed_name = "autoinstall.yaml"
+            elif "preseed.cfg" in files:
+                seed_name = "preseed.cfg"
+            else:
+                seed_name = "ks.cfg"
+            with open(os.path.join(dest, seed_name), "w", encoding="utf-8") as fh:
+                fh.write(seed_copy)
+        inject_into_initrd(os.path.join(dest, "initrd"), files)
         prog(88)
 
         sys_part = plan.live.part_named("FBL-SYS")
@@ -1021,17 +1596,30 @@ def prepare_ubuntu(
         if not sys_dev:
             raise OsInstallError("Could not find FBL-SYS.")
         sys_uuid = blkid_uuid(sys_dev)
-        label = plan.distro_name
         if plan.edition_name:
             label = f"{plan.distro_name} ({plan.edition_name})"
-        grub = osinstall_grub(sys_uuid, plan.iso_rel, label, toram=toram)
+        if plan.driver == DRIVER_FEDORA:
+            vol = iso_volume_id(plan.iso_path) or FEDORA_LIVE_LABEL
+            linux_args = fedora_kernel_args(plan.iso_rel, vol, toram=toram)
+        else:
+            linux_args = casper_kernel_args(plan.iso_rel, toram=toram, extra=extra)
+        grub = osinstall_grub(
+            sys_uuid,
+            plan.iso_rel,
+            label,
+            toram=toram,
+            extra=extra,
+            linux_args=linux_args,
+        )
         grub_path = os.path.join(sys_mp, "boot", "grub", "grub.cfg")
         os.makedirs(os.path.dirname(grub_path), exist_ok=True)
         with open(grub_path, "w", encoding="utf-8") as fh:
             fh.write(grub)
+        if plan.driver == DRIVER_FEDORA:
+            _install_fedora_shim(iso_mnt, plan, sys_uuid, label, linux_args)
         os.sync()
         prog(100)
-        emit("STEP", "Restarting to install Ubuntu…")
+        emit("STEP", f"Restarting to install {plan.distro_name or label}…")
         emit("REBOOT")
     finally:
         if mounted:
@@ -1163,7 +1751,7 @@ def main(argv: list[str] | None = None) -> int:
         if not getattr(args, key.replace("-", "_")):
             emit("ERROR", f"missing --{key.replace('_', '-')}")
             return 2
-    if args.driver != DRIVER_UBUNTU:
+    if args.driver not in DRIVERS_READY:
         emit("ERROR", f"{args.driver} is not available yet.")
         return 2
     if not ISO_REL_RE.fullmatch(args.iso_rel):

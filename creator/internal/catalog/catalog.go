@@ -216,8 +216,10 @@ func sanitizeValue(s string) string {
 // BuildShop turns the ticked official ids into a shop catalog.json.
 // Each ticked distro is recommended. Stageable defaults become local; a
 // non-redistributable row is recommended with every edition as a download.
-// Other pinned editions of a staged distro stay as downloads. Unticked rows
-// are omitted (shop catalog cannot carry install: null).
+// Other pinned editions of a staged distro stay as downloads.
+// Unticked but offerable distros (install driver + pinned default) go in
+// catalog as download-only — Other options on the chooser. Rows with
+// install: null stay out.
 func BuildShop(off *Official, selectedIDs []string) (*Shop, error) {
 	if len(selectedIDs) == 0 {
 		return nil, fmt.Errorf("pick at least one distro to keep on the USB")
@@ -236,16 +238,30 @@ func BuildShop(off *Official, selectedIDs []string) (*Shop, error) {
 		if !d.Offerable() {
 			return nil, fmt.Errorf("%s cannot be offered yet", d.Name)
 		}
-		sd, err := shopDistro(d)
+		sd, err := shopDistro(d, true)
 		if err != nil {
 			return nil, err
 		}
 		shop.Recommended = append(shop.Recommended, sd)
 	}
+	for i := range off.Distros {
+		d := &off.Distros[i]
+		if seen[d.ID] {
+			continue
+		}
+		if !d.Offerable() {
+			continue
+		}
+		sd, err := shopDistro(d, false)
+		if err != nil {
+			return nil, err
+		}
+		shop.Catalog = append(shop.Catalog, sd)
+	}
 	return shop, nil
 }
 
-func shopDistro(d *Distro) (ShopDistro, error) {
+func shopDistro(d *Distro, stageDefault bool) (ShopDistro, error) {
 	sd := ShopDistro{
 		ID:          d.ID,
 		Name:        d.Name,
@@ -270,7 +286,7 @@ func shopDistro(d *Distro) (ShopDistro, error) {
 			SHA256:    *ed.SHA256,
 			SizeBytes: *ed.SizeBytes,
 		}
-		if d.Stageable() && ed.Default {
+		if stageDefault && d.Stageable() && ed.Default {
 			se.Local = true
 			se.File = "images/" + ed.Filename
 			haveDefault = true

@@ -246,9 +246,8 @@ async function init() {
   $("dark-preview").src = "/api/wallpaper/dark";
   $("light-preview").src = "/api/wallpaper/light";
   const ready = $("ready");
-  const later = $("later");
   state.distros.forEach((d) => {
-    (d.stageable ? ready : later).appendChild(card(d, d.stageable));
+    if (d.stageable) ready.appendChild(card(d, true));
   });
   await refreshDisks();
   render();

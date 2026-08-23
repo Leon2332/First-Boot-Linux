@@ -8,7 +8,7 @@ Two files on every shop USB (`payload/`). One file in this repo for the creator.
 | `catalog.json` | USB `payload/` | Creator, per shop | What this shop offers (self-contained) |
 | `official-catalog.json` | This repo / creator | Us | Menu of distros we support |
 
-The live chooser reads only `/run/payload/retailer.conf` and `/run/payload/catalog.json`. It does not need `official-catalog.json`. That file is how the creator knows what may be ticked, staged, or offered as a download.
+The live chooser reads only `/run/payload/retailer.conf` and `/run/payload/catalog.json`. It does not need `official-catalog.json`. That file is how the creator knows what may be ticked (recommended, ISO on disk), left as Other options (download), or hidden until an install driver exists.
 
 First Boot’s own version is **not** in `retailer.conf`. In the live session it is `/etc/os-release` inside the squashfs. On the `fbl` partition the file is `fbl/.disk/info`.
 
@@ -62,8 +62,8 @@ Rules:
 - `can_stage` is true only when `install` is set **and** `redistributable` is true. Do not stage an ISO we cannot install or may not copy.
 - `redistributable: false` forces `can_stage: false`. The shop may still put that distro in `recommended` as download-only once `install` is set. The creator must never write its ISO to `images/`.
 - `suggested_default` requires `install`. It may be true when `redistributable` is false (pre-tick as download-only recommended).
-- v1 **install** is Ubuntu (`ubuntu-autoinstall`) then Linux Mint (`mint`). `windows` and `freebsd` are reserved driver ids with no implementation. Other entries stay `install: null` until a driver exists. The creator must not offer a row until `install` is set.
-- Pin `url`, `sha256`, and `size_bytes` before the creator downloads that edition. Ubuntu 26.04 desktop and Mint 22.3 (Cinnamon, MATE, Xfce) are pinned. Other rows stay `null` until an install driver exists.
+- Official catalog is only distros with a working install driver: Ubuntu (`ubuntu-autoinstall`), Linux Mint (`mint`), Fedora Plasma (`fedora-kickstart`). `windows` and `freebsd` stay reserved in the schema. The mockup in `docs/` is the longer future list.
+- Pin `url`, `sha256`, and `size_bytes` before the creator downloads that edition.
 
 ## `catalog.json` (on the USB)
 

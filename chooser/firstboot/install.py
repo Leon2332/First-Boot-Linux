@@ -446,6 +446,7 @@ STALE_EFI_LABELS = (
     "Ubuntu",
     "Fedora",
     "fedora",
+    "Install Fedora",
     "Windows Boot Manager",
     "debian",
     "Linux Mint",
