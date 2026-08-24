@@ -105,7 +105,7 @@ Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either lo
       "tagline": "Popular and well-supported",
       "description": "A polished desktop with excellent hardware support and a large software library. A safe default for most laptops.",
       "family": "ubuntu",
-      "install": "ubuntu-autoinstall",
+      "install": "ubuntu-2604",
       "editions": [
         {
           "id": "gnome",
@@ -125,7 +125,7 @@ Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either lo
       "tagline": "Familiar and easy",
       "description": "A stable desktop that feels at home for people coming from Windows. Multimedia and drivers work out of the box.",
       "family": "mint",
-      "install": "mint",
+      "install": "mint-223",
       "editions": [
         {
           "id": "cinnamon",

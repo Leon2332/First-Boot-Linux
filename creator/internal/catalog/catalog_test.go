@@ -33,7 +33,7 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	if f == nil || !f.Stageable() {
 		t.Fatalf("fedora should be stageable")
 	}
-	if f.Install == nil || *f.Install != "fedora-kickstart" {
+	if f.Install == nil || *f.Install != "fedora-44-plasma" {
 		t.Fatalf("fedora install %v", f.Install)
 	}
 	if f.SuggestedDefault {
@@ -70,7 +70,7 @@ func TestBuildShop(t *testing.T) {
 	if !ub.Editions[0].Local || ub.Editions[0].File != "images/ubuntu-26.04-desktop-amd64.iso" {
 		t.Fatalf("ubuntu edition %+v", ub.Editions[0])
 	}
-	if ub.Install != "ubuntu-autoinstall" {
+	if ub.Install != "ubuntu-2604" {
 		t.Fatalf("install %s", ub.Install)
 	}
 	mint := shop.Recommended[1]

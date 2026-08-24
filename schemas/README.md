@@ -62,7 +62,7 @@ Rules:
 - `can_stage` is true only when `install` is set **and** `redistributable` is true. Do not stage an ISO we cannot install or may not copy.
 - `redistributable: false` forces `can_stage: false`. The shop may still put that distro in `recommended` as download-only once `install` is set. The creator must never write its ISO to `images/`.
 - `suggested_default` requires `install`. It may be true when `redistributable` is false (pre-tick as download-only recommended).
-- Official catalog is only distros with a working install driver: Ubuntu (`ubuntu-autoinstall`), Linux Mint (`mint`), Fedora Plasma (`fedora-kickstart`). `windows` and `freebsd` stay reserved in the schema. The mockup in `docs/` is the longer future list.
+- Official catalog is only distros with a working install driver: Ubuntu (`ubuntu-2604`), Linux Mint (`mint-223`), Fedora Plasma (`fedora-44-plasma`). Older sticks may still say `ubuntu-autoinstall` / `mint` / `fedora-kickstart` (aliases). `windows` and `freebsd` stay reserved in the schema. The mockup in `docs/` is the longer future list. Driver Python lives in `chooser/firstboot/osinstall/`.
 - Pin `url`, `sha256`, and `size_bytes` before the creator downloads that edition.
 
 ## `catalog.json` (on the USB)

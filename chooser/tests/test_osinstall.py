@@ -21,9 +21,16 @@ from firstboot.osinstall import (  # noqa: E402
     DRIVER_FEDORA,
     DRIVER_MINT,
     DRIVER_UBUNTU,
+    canonical_driver_id,
+    get_driver,
+    FEDORA_AUTOSTART_DESKTOP,
+    FEDORA_DRACUT_HOOK,
+    FEDORA_LINK_SERVICE,
+    FEDORA_LINK_SQUASH,
     FEDORA_LIVEINST_WRAPPER,
     FEDORA_LINUX_FLAG,
     FEDORA_LIVE_LABEL,
+    FEDORA_SQUASH_LINK,
     ISO_REL_RE,
     MINT_LINUX_EXTRA,
     OsIdentity,
@@ -193,6 +200,21 @@ def fedora_distro(root: str, *, present: bool = True) -> Distro:
     )
 
 
+class RegistryTests(unittest.TestCase):
+    def test_catalog_ids_and_old_aliases(self) -> None:
+        self.assertEqual(DRIVER_UBUNTU, "ubuntu-2604")
+        self.assertEqual(DRIVER_MINT, "mint-223")
+        self.assertEqual(DRIVER_FEDORA, "fedora-44-plasma")
+        self.assertIs(get_driver("ubuntu-autoinstall"), get_driver("ubuntu-2604"))
+        self.assertIs(get_driver("mint"), get_driver("mint-223"))
+        self.assertIs(get_driver("fedora-kickstart"), get_driver("fedora-44-plasma"))
+        self.assertEqual(canonical_driver_id("ubuntu-autoinstall"), "ubuntu-2604")
+        self.assertEqual(get_driver("ubuntu-2604").default_hostname, "ubuntu")
+        self.assertEqual(get_driver("mint-223").default_hostname, "mint")
+        self.assertEqual(get_driver("fedora-44-plasma").default_hostname, "fedora")
+        self.assertIsNone(get_driver("deepin-25"))
+
+
 class HashTests(unittest.TestCase):
     def test_known_vector(self) -> None:
         got = sha512_crypt("ubuntu", "exDY1mhS4KUYCE/2")
@@ -279,6 +301,8 @@ class YamlTests(unittest.TestCase):
         self.assertNotIn("boot=casper", text)
         self.assertIn("graphical\n", text)
         self.assertNotIn("cmdline\n", text)
+        self.assertIn(f"liveimg --url=file://{FEDORA_SQUASH_LINK}", text)
+        self.assertNotIn("%packages", text)
         self.assertIn("ignoredisk --only-use=sda", text)
         self.assertIn("clearpart --all --initlabel --disklabel=gpt --drives=sda", text)
         self.assertIn("autopart --type=btrfs", text)
@@ -286,8 +310,16 @@ class YamlTests(unittest.TestCase):
         self.assertIn(UBUNTU_HASH, text)
         self.assertIn("network --hostname=shop-pc", text)
         self.assertIn("rootpw --lock", text)
-        self.assertIn('--kickstart=/ks.cfg --graphical', FEDORA_LIVEINST_WRAPPER)
-        self.assertIn("--liveinst", FEDORA_LIVEINST_WRAPPER)
+        self.assertIn("liveinst.real", FEDORA_LIVEINST_WRAPPER)
+        self.assertIn("root without display", FEDORA_LIVEINST_WRAPPER)
+        self.assertNotIn("exec \"$ana\"", FEDORA_LIVEINST_WRAPPER)
+        self.assertNotIn("--kickstart=/ks.cfg --graphical", FEDORA_LIVEINST_WRAPPER)
+        self.assertIn("--kickstart=/ks.cfg", FEDORA_DRACUT_HOOK)
+        self.assertIn("liveinst.real", FEDORA_DRACUT_HOOK)
+        self.assertIn("squashfs.img", FEDORA_LINK_SQUASH)
+        self.assertIn(FEDORA_SQUASH_LINK, FEDORA_LINK_SQUASH)
+        self.assertIn("ExecStart=/usr/libexec/fbl-link-squashfs", FEDORA_LINK_SERVICE)
+        self.assertIn("Exec=/usr/sbin/liveinst", FEDORA_AUTOSTART_DESKTOP)
         self.assertIn("%pre", text)
         self.assertIn("%post", text)
         self.assertIn("First Boot Linux", text)
@@ -304,7 +336,8 @@ class YamlTests(unittest.TestCase):
         self.assertIn("rd.live.ram=1", args)
         self.assertIn("iso-scan/filename=/images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso", args)
         self.assertIn(FEDORA_LINUX_FLAG, args)
-        self.assertIn("liveinst", args.split())
+        self.assertNotIn("liveinst", args.split())
+        self.assertNotIn("inst.ks", args.split())
         self.assertNotIn("systemd.unit=multi-user.target", args)
         self.assertNotIn("boot=casper", args)
         self.assertNotIn("inst.ks", args)
@@ -382,7 +415,7 @@ class YamlTests(unittest.TestCase):
         self.assertNotIn("autoinstall", install_line)
         self.assertNotIn("subiquity", install_line)
         self.assertNotIn("inst.ks", install_line)
-        self.assertIn("liveinst", install_line.split())
+        self.assertNotIn("liveinst", install_line.split())
         self.assertNotIn("systemd.unit=multi-user.target", install_line)
         self.assertIn("/boot/osinstall/vmlinuz", cfg)
         self.assertIn("initrd /boot/osinstall/initrd", cfg)
@@ -702,6 +735,8 @@ class CpioTests(unittest.TestCase):
                 {
                     "ks.cfg": "graphical\n",
                     "fbl-liveinst": "#!/bin/bash\nexit 0\n",
+                    "usr/libexec/fbl-link-squashfs": "#!/bin/bash\nexit 0\n",
+                    "etc/xdg/autostart/fbl-liveinst.desktop": "[Desktop Entry]\n",
                     "var/lib/dracut/hooks/pre-pivot/90-fbl-ks.sh": "#!/bin/sh\nexit 0\n",
                 },
             )
@@ -726,6 +761,14 @@ class CpioTests(unittest.TestCase):
             wrapper = os.path.join(unpacked, "fbl-liveinst")
             self.assertTrue(os.path.isfile(wrapper))
             self.assertTrue(os.access(wrapper, os.X_OK))
+            link = os.path.join(unpacked, "usr/libexec/fbl-link-squashfs")
+            self.assertTrue(os.path.isfile(link))
+            self.assertTrue(os.access(link, os.X_OK))
+            desktop = os.path.join(
+                unpacked, "etc/xdg/autostart/fbl-liveinst.desktop"
+            )
+            self.assertTrue(os.path.isfile(desktop))
+            self.assertEqual(os.stat(desktop).st_mode & 0o111, 0)
 
 
 class CasperBootTests(unittest.TestCase):

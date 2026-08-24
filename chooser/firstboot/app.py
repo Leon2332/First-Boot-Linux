@@ -18,12 +18,12 @@ from firstboot.assets import (
 from firstboot.disk import HelperEvent, live_plan
 from firstboot.install import InstallError, run_apply
 from firstboot.osinstall import (
-    DRIVER_FEDORA,
-    DRIVER_MINT,
     DRIVER_UBUNTU,
     DRIVERS_READY,
     OsIdentity,
     OsInstallError,
+    canonical_driver_id,
+    get_driver,
     live_os_plan,
     run_os_install,
     sha512_crypt,
@@ -1106,7 +1106,7 @@ def run_window(
 
         def _preview_os_distro(self) -> Distro | None:
             for distro in self.payload.recommended:
-                if distro.install == DRIVER_UBUNTU:
+                if canonical_driver_id(distro.install) == DRIVER_UBUNTU:
                     return distro
             return None
 
@@ -1168,11 +1168,8 @@ def run_window(
             user_e = Gtk.Entry()
             user_e.set_placeholder_text("username")
             host_e = Gtk.Entry()
-            host_default = {
-                DRIVER_MINT: "mint",
-                DRIVER_FEDORA: "fedora",
-            }.get(distro.install, "ubuntu")
-            host_e.set_text(host_default)
+            drv = get_driver(distro.install)
+            host_e.set_text(drv.default_hostname if drv is not None else "ubuntu")
             pw_e = Gtk.Entry()
             pw_e.set_visibility(False)
             pw_e.set_input_purpose(Gtk.InputPurpose.PASSWORD)

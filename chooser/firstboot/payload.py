@@ -18,8 +18,11 @@ FAMILIES = frozenset(
 )
 INSTALL_DRIVERS = frozenset(
     {
+        "ubuntu-2604",
         "ubuntu-autoinstall",
+        "mint-223",
         "mint",
+        "fedora-44-plasma",
         "fedora-kickstart",
         "debian-preseed",
         "windows",
