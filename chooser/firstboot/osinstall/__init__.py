@@ -671,6 +671,7 @@ def _write_tree_files(root: str, files: dict[str, str | bytes]) -> None:
             or rel.endswith("firstboot-efi-cleanup")
             or rel.endswith("fbl-liveinst")
             or rel.endswith("fbl-link-squashfs")
+            or rel.endswith("fbl-selinux")
             or rel.endswith("/liveinst")
         )
         os.chmod(dest, 0o755 if executable else 0o644)

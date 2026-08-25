@@ -5,10 +5,10 @@ precomputed casefolded fields and an incremental AND-of-tokens scan that
 stays linear in the current hit list, not in widget count. Five thousand
 short strings is a sub-millisecond pass.
 
-A token matches a distro if it is a substring of the display name, id,
-version, or a desktop/edition name. Taglines and descriptions are not
-searched — "v" must not hit Lubuntu just because the tagline is "Very
-lightweight".
+A token matches a distro if it is a substring of the display name
+(catalog_name / name: Ubuntu, Fedora, Linux Mint, Microsoft Windows).
+Ids, versions, desktop/edition names, taglines, and descriptions are
+not searched — "plasma" must not hit Fedora, "v" must not hit Lubuntu.
 """
 
 from __future__ import annotations
@@ -28,16 +28,15 @@ Fields = tuple[str, ...]
 
 
 def fields(distro: Distro) -> Fields:
-    parts = [
-        distro.catalog_name,
-        distro.name,
-        distro.id,
-        distro.version,
-    ]
-    for ed in distro.editions:
-        parts.append(ed.name)
-        parts.append(ed.id)
-    return tuple(part.casefold() for part in parts if part)
+    parts = [distro.catalog_name, distro.name]
+    seen: set[str] = set()
+    out: list[str] = []
+    for part in parts:
+        key = part.casefold()
+        if part and key not in seen:
+            seen.add(key)
+            out.append(key)
+    return tuple(out)
 
 
 def tokens(query: str) -> tuple[str, ...]:

@@ -110,11 +110,12 @@ class HaystackTests(unittest.TestCase):
         )
         flds = fields(win)
         self.assertIn("microsoft windows", flds)
-        self.assertIn("ms-windows", flds)
-        self.assertIn("windows 11", flds)
+        self.assertIn("ms windows", flds)
+        self.assertNotIn("ms-windows", flds)
+        self.assertNotIn("windows 11", flds)
         self.assertFalse(any("familiar" in f for f in flds))
 
-    def test_editions_are_searchable(self) -> None:
+    def test_name_only_not_version_or_edition(self) -> None:
         mint = _distro(
             id="linux-mint",
             name="Linux Mint",
@@ -128,8 +129,11 @@ class HaystackTests(unittest.TestCase):
             recommended=True,
         )
         flds = fields(mint)
-        self.assertIn("cinnamon", flds)
-        self.assertIn("mate", flds)
+        self.assertEqual(flds, ("linux mint",))
+        self.assertNotIn("cinnamon", flds)
+        self.assertNotIn("mate", flds)
+        self.assertNotIn("22.3", flds)
+        self.assertNotIn("linux-mint", flds)
 
     def test_tagline_is_not_searched(self) -> None:
         lubuntu = _distro(
@@ -145,8 +149,9 @@ class HaystackTests(unittest.TestCase):
         self.assertEqual(idx.search("v"), [])
         self.assertEqual(idx.search("very"), [])
         self.assertEqual(idx.search("light"), [])
+        self.assertEqual(idx.search("lxqt"), [])
+        self.assertEqual(idx.search("26.04"), [])
         self.assertEqual([d.id for d in idx.search("lubu")], ["lubuntu"])
-        self.assertEqual([d.id for d in idx.search("lxqt")], ["lubuntu"])
 
 
 class IndexTests(unittest.TestCase):
@@ -180,9 +185,12 @@ class IndexTests(unittest.TestCase):
         hits = self.index.search("MiNt")
         self.assertEqual([d.id for d in hits], ["linux-mint"])
 
-    def test_version_and_edition_tokens(self) -> None:
-        hits = self.index.search("44 plasma")
-        self.assertEqual([d.id for d in hits], ["fedora"])
+    def test_version_and_edition_tokens_are_ignored(self) -> None:
+        self.assertEqual(self.index.search("44 plasma"), [])
+        self.assertEqual(self.index.search("plasma"), [])
+        self.assertEqual(self.index.search("22.3"), [])
+        self.assertEqual(self.index.search("cinnamon"), [])
+        self.assertEqual([d.id for d in self.index.search("fedora")], ["fedora"])
 
     def test_no_match(self) -> None:
         self.assertEqual(self.index.search("windows"), [])

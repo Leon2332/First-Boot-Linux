@@ -32,11 +32,17 @@ BOOTNEXT_LABEL = "Install Fedora"
 SQUASH_LINK = "/run/fbl-squashfs.img"
 
 LIVEINST_WRAPPER = """#!/bin/bash
-# Session front door. Official liveinst does pkexec + WAYLAND_DISPLAY.
-# Do not exec anaconda here (0.6.41: no display, then DNF). LIVECMD does
-# not survive pkexec — pre-pivot patches liveinst.real's ANACONDA default.
+# Session front door. Official liveinst pkexecs $0 (this path — the
+# polkit rule is /usr/bin/liveinst). Do not exec anaconda here (0.6.41:
+# no display, then DNF). LIVECMD does not survive pkexec — pre-pivot
+# patches liveinst.real's ANACONDA default.
+#
+# 0.6.44 ran the linker as liveuser via sudo -n / pkexec of the helper.
+# Polkit allows liveinst, not fbl-link-squashfs, so that failed and
+# zenity fired before we ever became root. Become root first, then link.
 log=/var/log/firstboot-fedora.log
 link=/usr/libexec/fbl-link-squashfs
+wayland_socket=/tmp/anaconda-wldisplay
 mkdir -p /var/log /run
 {
   echo "=== fbl liveinst wrapper ==="
@@ -47,24 +53,39 @@ mkdir -p /var/log /run
 } >> "$log" 2>&1
 
 ensure_link() {
-  if [ -e /run/fbl-squashfs.img ]; then
+  if [ -e /run/fbl-squashfs.img ] && [ -s /run/fbl-squashfs.img ]; then
     return 0
   fi
   if [ ! -x "$link" ]; then
     echo "fbl-link-squashfs missing" >> "$log"
     return 1
   fi
-  if [ "$(id -u)" -eq 0 ]; then
-    "$link" >> "$log" 2>&1 || true
-  else
-    sudo -n "$link" >> "$log" 2>&1 || pkexec "$link" >> "$log" 2>&1 || true
+  if [ "$(id -u)" -ne 0 ]; then
+    echo "ensure_link skipped; not root" >> "$log"
+    return 1
   fi
-  [ -e /run/fbl-squashfs.img ]
+  "$link" >> "$log" 2>&1 || true
+  [ -e /run/fbl-squashfs.img ] && [ -s /run/fbl-squashfs.img ]
 }
+
+# liveinst.real restores WAYLAND_DISPLAY from this file after pkexec.
+if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+  rm -f "$wayland_socket"
+  echo "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/${WAYLAND_DISPLAY}" > "$wayland_socket"
+fi
+
+# Polkit exec.path is /usr/bin/liveinst. pkexec that path, not the linker.
+if [ "$(id -u)" -ne 0 ]; then
+  echo "pkexec $0 (not root)" >> "$log"
+  pkexec /usr/bin/liveinst "$@"
+  rc=$?
+  echo "pkexec returned $rc" >> "$log"
+  exit $rc
+fi
 
 # livesys-late may still call us as root before SDDM. Make the liveimg
 # alias now; do not start Anaconda without a compositor.
-if [ "$(id -u)" -eq 0 ] && [ -z "${PKEXEC_UID:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ] && [ -z "${DISPLAY:-}" ]; then
+if [ -z "${PKEXEC_UID:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ] && [ -z "${DISPLAY:-}" ]; then
   ensure_link || true
   echo "root without display; session autostart will start liveinst" >> "$log"
   exit 0
@@ -77,6 +98,10 @@ if ! ensure_link; then
     zenity --error --no-markup --text="First Boot Linux could not find the Fedora live image." || true
   fi
   exit 1
+fi
+
+if [ -x /usr/libexec/fbl-selinux ]; then
+  /usr/libexec/fbl-selinux >> "$log" 2>&1 || true
 fi
 
 real=
@@ -95,31 +120,43 @@ exec "$real" "$@"
 """
 
 LINK_SQUASH = """#!/bin/bash
-# Root oneshot: alias the live image so kickstart liveimg cannot DNF.
-# Same-disk boots use rd.live.ram=1; dracut then copies squashfs.img to
-# /run/initramfs/squashed.img (not LiveOS/squashfs.img). 0.6.43 only
-# looked for squashfs.img and required a systemd oneshot that often
-# never ran — wrapper then zenity-refused.
-log=/var/log/firstboot-fedora.log
-mkdir -p /var/log /run
+# Alias the live image so kickstart liveimg cannot DNF.
+# Same-disk boots use rd.live.ram=1; F44 dmsquash then copies to
+# /run/initramfs/squashed.img. 0.6.43 only looked for squashfs.img and
+# waited for a systemd oneshot. 0.6.44 still zenity-failed: the wrapper
+# ran the linker as liveuser (polkit denies it) and never created the
+# alias in pre-pivot, while /run still had the image. Run this from
+# pre-pivot (initramfs /run survives switch_root) and again as root.
+root=${FBL_LIVE_ROOT:-}
+log="$root/var/log/firstboot-fedora.log"
+dest="$root/run/fbl-squashfs.img"
+mkdir -p "$root/var/log" "$root/run"
 sq=
+
+is_image() {
+  [ -f "$1" ] && [ -s "$1" ]
+}
+
 for p in \\
-  /run/initramfs/squashed.img \\
-  /run/initramfs/live/LiveOS/squashfs.img \\
-  /run/initramfs/live/LiveOS/rootfs.img \\
-  /run/initramfs/live/squashfs.img \\
-  /run/initramfs/rootfs.img \\
-  /run/initramfs/squashfs.img \\
-  /run/live/medium/LiveOS/squashfs.img
+  "$root/run/initramfs/squashed.img" \\
+  "$root/run/initramfs/live/LiveOS/squashfs.img" \\
+  "$root/run/initramfs/live/LiveOS/rootfs.img" \\
+  "$root/run/initramfs/live/squashfs.img" \\
+  "$root/run/initramfs/rootfs.img" \\
+  "$root/run/initramfs/squashfs.img" \\
+  "$root/run/live/medium/LiveOS/squashfs.img" \\
+  "$root/run/rootfsbase"
 do
-  if [ -f "$p" ] && [ -s "$p" ]; then
+  if is_image "$p"; then
     sq=$p
     break
   fi
 done
 if [ -z "$sq" ]; then
-  for p in /run/initramfs/isoscan/images/*.iso /run/initramfs/isoscan/*.iso; do
-    if [ -f "$p" ] && [ -s "$p" ]; then
+  for p in "$root"/run/initramfs/isoscan/images/*.iso \\
+           "$root"/run/initramfs/isoscan/*.iso \\
+           "$root"/run/initramfs/isoscan/*/*.iso; do
+    if is_image "$p"; then
       sq=$p
       break
     fi
@@ -127,21 +164,27 @@ if [ -z "$sq" ]; then
 fi
 if [ -z "$sq" ] && command -v losetup >/dev/null; then
   while IFS= read -r back; do
-    case "$back" in
-      *.iso|*squashfs.img|*squashed.img|*rootfs.img)
-        if [ -f "$back" ] && [ -s "$back" ]; then
-          sq=$back
-          break
-        fi
-        ;;
-    esac
+    [ -z "$back" ] && continue
+    if is_image "$back"; then
+      sq=$back
+      break
+    fi
   done <<EOF
 $(losetup -ln -O BACK-FILE 2>/dev/null)
 EOF
 fi
+if [ -z "$sq" ] && command -v findmnt >/dev/null; then
+  src=$(findmnt -n -o SOURCE /run/rootfsbase 2>/dev/null || true)
+  if [ -n "$src" ] && command -v losetup >/dev/null; then
+    back=$(losetup -n -O BACK-FILE "$src" 2>/dev/null || true)
+    if is_image "$back"; then
+      sq=$back
+    fi
+  fi
+fi
 if [ -z "$sq" ]; then
-  sq=$(find /run/initramfs /run/live /mnt -type f \\
-    \\( -name squashfs.img -o -name squashed.img -o -name rootfs.img \\) \\
+  sq=$(find "$root/run/initramfs" "$root/run/live" "$root/mnt" -type f \\
+    \\( -name squashfs.img -o -name squashed.img -o -name rootfs.img -o -name '*.iso' \\) \\
     2>/dev/null | head -n 1)
 fi
 {
@@ -149,13 +192,22 @@ fi
   date
   echo "squashfs=${sq:-missing}"
   cat /proc/cmdline 2>/dev/null
-  ls -la /run/initramfs /run/initramfs/live /run/initramfs/live/LiveOS /run/initramfs/isoscan /run/initramfs/isoscan/images 2>/dev/null
-  findmnt /run/initramfs/live /run/initramfs/isoscan 2>/dev/null
+  ls -la "$root/run/initramfs" "$root/run/initramfs/live" \\
+    "$root/run/initramfs/live/LiveOS" "$root/run/initramfs/isoscan" \\
+    "$root/run/initramfs/isoscan/images" 2>/dev/null
+  findmnt /run/initramfs/live /run/initramfs/isoscan /run/rootfsbase 2>/dev/null
   losetup -a 2>/dev/null
 } >> "$log" 2>&1
 if [ -n "$sq" ]; then
-  ln -sfn "$sq" /run/fbl-squashfs.img
-  echo "linked $sq -> /run/fbl-squashfs.img" >> "$log"
+  rm -f "$dest"
+  if ln "$sq" "$dest" 2>/dev/null; then
+    echo "hardlinked $sq -> $dest" >> "$log"
+  elif cp -f --reflink=auto "$sq" "$dest" 2>/dev/null; then
+    echo "copied $sq -> $dest" >> "$log"
+  else
+    ln -sfn "$sq" "$dest"
+    echo "symlinked $sq -> $dest" >> "$log"
+  fi
 fi
 exit 0
 """
@@ -167,12 +219,106 @@ Before=display-manager.service
 
 [Service]
 Type=oneshot
+# Labeled Fedora binaries first: unlabeled copies AVC if we exec them
+# while still enforcing. Official liveinst also setenforce 0.
+ExecStart=-/usr/sbin/setenforce 0
+ExecStart=-/usr/sbin/restorecon -F /ks.cfg /usr/bin/liveinst /usr/bin/liveinst.real /usr/sbin/liveinst /usr/sbin/liveinst.real /usr/libexec/fbl-link-squashfs /usr/libexec/fbl-selinux /etc/systemd/system/fbl-link-squashfs.service /etc/xdg/autostart/fbl-liveinst.desktop /var/log/firstboot-fedora.log
 ExecStart=/usr/libexec/fbl-link-squashfs
+ExecStart=/usr/libexec/fbl-selinux
 RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
 WantedBy=graphical.target
+"""
+
+FBL_SELINUX = """#!/bin/bash
+# Live overlay only — liveimg copies squashfs.img, not this layer.
+# Pre-pivot cp leaves unlabeled_t. restorecon in the initramfs used
+# /sysroot/usr/bin/liveinst, which matches no file_contexts rule, so
+# pkexec liveinst and Anaconda liveimg AVC'd. 0.6.45: setroubleshoot
+# balloon on Plasma. Relabel after pivot; setenforce 0 like official
+# liveinst; hide the applet so leftover AVCs stay off the desktop.
+log=/var/log/firstboot-fedora.log
+mkdir -p /var/log /etc/xdg/autostart /etc/systemd/system
+{
+  echo "=== fbl selinux ==="
+  date
+  echo "uid=$(id -u) getenforce=$(getenforce 2>/dev/null || echo missing)"
+  ls -Z /ks.cfg /usr/bin/liveinst /usr/bin/liveinst.real \\
+    /usr/libexec/fbl-link-squashfs /run/fbl-squashfs.img 2>/dev/null || true
+} >> "$log" 2>&1
+
+if [ -x /usr/sbin/setenforce ]; then
+  /usr/sbin/setenforce 0 >> "$log" 2>&1 || true
+fi
+
+if command -v restorecon >/dev/null; then
+  restorecon -F /ks.cfg \\
+    /usr/bin/liveinst /usr/bin/liveinst.real \\
+    /usr/sbin/liveinst /usr/sbin/liveinst.real \\
+    /usr/libexec/fbl-link-squashfs /usr/libexec/fbl-selinux \\
+    /etc/systemd/system/fbl-link-squashfs.service \\
+    /etc/xdg/autostart/fbl-liveinst.desktop \\
+    /var/log/firstboot-fedora.log >> "$log" 2>&1 || true
+fi
+
+if [ -e /run/fbl-squashfs.img ]; then
+  ref=
+  for p in /run/initramfs/squashed.img \\
+           /run/initramfs/live/LiveOS/squashfs.img \\
+           /run/initramfs/live/LiveOS/rootfs.img; do
+    if [ -e "$p" ]; then
+      ref=$p
+      break
+    fi
+  done
+  if [ -n "$ref" ]; then
+    chcon --reference="$ref" /run/fbl-squashfs.img >> "$log" 2>&1 || true
+  else
+    chcon -t iso9660_t /run/fbl-squashfs.img >> "$log" 2>&1 || true
+  fi
+fi
+
+for name in sealertauto setroubleshoot seapplet setroubleshoot-applet \\
+            org.fedorahosted.setroubleshoot org.fedoraproject.setroubleshoot; do
+  printf '%s\\n' '[Desktop Entry]' 'Hidden=true' > "/etc/xdg/autostart/${name}.desktop"
+done
+ln -sfn /dev/null /etc/systemd/system/setroubleshootd.service
+if command -v systemctl >/dev/null; then
+  systemctl mask setroubleshootd.service >> "$log" 2>&1 || true
+fi
+pkill -x seapplet >/dev/null 2>&1 || true
+
+# liveuser has a blank password; auth_admin cannot complete unattended.
+mkdir -p /etc/polkit-1/rules.d /usr/share/polkit-1/rules.d
+if [ -f /etc/polkit-1/rules.d/00-fbl-liveinst.rules ]; then
+  cp -f /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
+    /usr/share/polkit-1/rules.d/00-fbl-liveinst.rules 2>/dev/null || true
+fi
+pol=/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy
+if [ -f "$pol" ]; then
+  sed -i \\
+    -e 's|<allow_any>auth_admin</allow_any>|<allow_any>yes</allow_any>|' \\
+    -e 's|<allow_inactive>auth_admin</allow_inactive>|<allow_inactive>yes</allow_inactive>|' \\
+    -e 's|<allow_active>auth_admin</allow_active>|<allow_active>yes</allow_active>|' \\
+    "$pol" >> "$log" 2>&1 || true
+fi
+if command -v restorecon >/dev/null; then
+  restorecon -F /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
+    /usr/share/polkit-1/rules.d/00-fbl-liveinst.rules "$pol" >> "$log" 2>&1 || true
+fi
+if command -v systemctl >/dev/null; then
+  systemctl reload polkit.service >> "$log" 2>&1 \\
+    || systemctl reload polkitd.service >> "$log" 2>&1 || true
+fi
+
+{
+  echo "getenforce=$(getenforce 2>/dev/null || echo missing)"
+  ls -Z /ks.cfg /usr/bin/liveinst /usr/libexec/fbl-link-squashfs \\
+    /run/fbl-squashfs.img 2>/dev/null || true
+} >> "$log" 2>&1
+exit 0
 """
 
 AUTOSTART_DESKTOP = """[Desktop Entry]
@@ -185,6 +331,17 @@ X-GNOME-Autostart-enabled=true
 OnlyShowIn=KDE;
 """
 
+POLKIT_RULE = """// First Boot Linux — unattended liveinst. Overlay only.
+// Official policy is auth_admin; liveuser has a blank password, so
+// pkexec shows "Authentication is required to run the installer"
+// (0.6.46). Allow this action without a prompt.
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.fedoraproject.pkexec.liveinst") {
+        return polkit.Result.YES;
+    }
+});
+"""
+
 DRACUT_HOOK = """#!/bin/sh
 # Overlay kickstart + official liveinst (patched) onto the live root.
 # Fedora dracut keeps hooks in var/lib/dracut/hooks (lib/dracut/hooks is a symlink).
@@ -192,6 +349,8 @@ root="${NEWROOT:-/sysroot}"
 log="$root/var/log/firstboot-fedora.log"
 mkdir -p "$root/var/log" "$root/usr/sbin" "$root/usr/libexec" \\
   "$root/etc/xdg/autostart" \\
+  "$root/etc/polkit-1/rules.d" \\
+  "$root/usr/share/polkit-1/rules.d" \\
   "$root/etc/systemd/system/multi-user.target.wants" \\
   "$root/etc/systemd/system/graphical.target.wants"
 {
@@ -235,6 +394,15 @@ fi
 if [ -f /usr/libexec/fbl-link-squashfs ]; then
   cp /usr/libexec/fbl-link-squashfs "$root/usr/libexec/fbl-link-squashfs"
   chmod 755 "$root/usr/libexec/fbl-link-squashfs"
+  # Initramfs /run survives switch_root. Create the liveimg alias now,
+  # while squashed.img / LiveOS / isoscan are still visible. 0.6.44 waited
+  # for a systemd oneshot + liveuser sudo and still zenity-failed.
+  /usr/libexec/fbl-link-squashfs >> "$log" 2>&1 || true
+  ls -l /run/fbl-squashfs.img >> "$log" 2>&1 || true
+fi
+if [ -f /usr/libexec/fbl-selinux ]; then
+  cp /usr/libexec/fbl-selinux "$root/usr/libexec/fbl-selinux"
+  chmod 755 "$root/usr/libexec/fbl-selinux"
 fi
 if [ -f /etc/systemd/system/fbl-link-squashfs.service ]; then
   cp /etc/systemd/system/fbl-link-squashfs.service \\
@@ -248,11 +416,52 @@ if [ -f /etc/xdg/autostart/fbl-liveinst.desktop ]; then
   cp /etc/xdg/autostart/fbl-liveinst.desktop \\
     "$root/etc/xdg/autostart/fbl-liveinst.desktop"
 fi
-if command -v restorecon >/dev/null; then
-  restorecon -F "$root/ks.cfg" "$root/usr/bin/liveinst" "$root/usr/sbin/liveinst" \\
-    "$root/usr/bin/liveinst.real" "$root/usr/sbin/liveinst.real" \\
-    "$root/usr/libexec/fbl-link-squashfs" 2>/dev/null || true
+if [ -f /etc/polkit-1/rules.d/00-fbl-liveinst.rules ]; then
+  cp /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
+    "$root/etc/polkit-1/rules.d/00-fbl-liveinst.rules"
+  cp /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
+    "$root/usr/share/polkit-1/rules.d/00-fbl-liveinst.rules"
+  chmod 644 "$root/etc/polkit-1/rules.d/00-fbl-liveinst.rules" \\
+    "$root/usr/share/polkit-1/rules.d/00-fbl-liveinst.rules"
 fi
+pol="$root/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy"
+if [ -f "$pol" ]; then
+  sed -i \\
+    -e 's|<allow_any>auth_admin</allow_any>|<allow_any>yes</allow_any>|' \\
+    -e 's|<allow_inactive>auth_admin</allow_inactive>|<allow_inactive>yes</allow_inactive>|' \\
+    -e 's|<allow_active>auth_admin</allow_active>|<allow_active>yes</allow_active>|' \\
+    "$pol" >> "$log" 2>&1 || true
+fi
+# restorecon on /sysroot/usr/bin/liveinst matches no file_contexts rule
+# (0.6.45 unlabeled_t → setroubleshoot). setfiles -r NEWROOT uses the
+# live policy. After pivot the oneshot restorecon's again.
+fc="$root/etc/selinux/targeted/contexts/files/file_contexts"
+sf=
+for p in "$root/usr/sbin/setfiles" "$root/sbin/setfiles"; do
+  if [ -x "$p" ]; then
+    sf=$p
+    break
+  fi
+done
+if [ -n "$sf" ] && [ -f "$fc" ]; then
+  LD_LIBRARY_PATH="$root/usr/lib64:$root/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \\
+    "$sf" -F -r "$root" "$fc" \\
+    "$root/ks.cfg" "$root/usr/bin/liveinst" "$root/usr/bin/liveinst.real" \\
+    "$root/usr/sbin/liveinst" "$root/usr/sbin/liveinst.real" \\
+    "$root/usr/libexec/fbl-link-squashfs" "$root/usr/libexec/fbl-selinux" \\
+    "$root/etc/systemd/system/fbl-link-squashfs.service" \\
+    "$root/etc/xdg/autostart/fbl-liveinst.desktop" \\
+    "$root/etc/polkit-1/rules.d/00-fbl-liveinst.rules" \\
+    "$root/usr/share/polkit-1/rules.d/00-fbl-liveinst.rules" \\
+    "$root/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy" \\
+    "$root/var/log/firstboot-fedora.log" >> "$log" 2>&1 || true
+fi
+mkdir -p "$root/etc/xdg/autostart" "$root/etc/systemd/system"
+for name in sealertauto setroubleshoot seapplet setroubleshoot-applet \\
+            org.fedorahosted.setroubleshoot org.fedoraproject.setroubleshoot; do
+  printf '%s\\n' '[Desktop Entry]' 'Hidden=true' > "$root/etc/xdg/autostart/${name}.desktop"
+done
+ln -sfn /dev/null "$root/etc/systemd/system/setroubleshootd.service"
 echo "ks=$(test -f "$root/ks.cfg" && echo yes || echo no) liveinst=$(test -x "$root/usr/bin/liveinst" && echo yes || echo no) real=$(test -f "$root/usr/bin/liveinst.real" -o -f "$root/usr/sbin/liveinst.real" && echo yes || echo no)" >> "$log"
 exit 0
 """
@@ -486,8 +695,10 @@ class Fedora44Plasma:
             "ks.cfg": fedora_kickstart(identity, target_path),
             "fbl-liveinst": LIVEINST_WRAPPER,
             "usr/libexec/fbl-link-squashfs": LINK_SQUASH,
+            "usr/libexec/fbl-selinux": FBL_SELINUX,
             "etc/systemd/system/fbl-link-squashfs.service": LINK_SERVICE,
             "etc/xdg/autostart/fbl-liveinst.desktop": AUTOSTART_DESKTOP,
+            "etc/polkit-1/rules.d/00-fbl-liveinst.rules": POLKIT_RULE,
             "var/lib/dracut/hooks/pre-pivot/90-fbl-ks.sh": DRACUT_HOOK,
         }
 

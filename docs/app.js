@@ -1487,17 +1487,16 @@
   let catalogIndex = null;
 
   function catalogFields(d) {
-    const fields = [
-      catalogName(d),
-      d.name,
-      d.id,
-      d.version || "",
-      d.desktop || "",
-    ];
-    for (const de of d.desktops || []) {
-      fields.push(de.name, de.id);
+    const seen = new Set();
+    const fields = [];
+    for (const part of [catalogName(d), d.name]) {
+      const key = String(part || "").toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        fields.push(key);
+      }
     }
-    return fields.map((s) => String(s).toLowerCase()).filter(Boolean);
+    return fields;
   }
 
   function catalogTokens(query) {
