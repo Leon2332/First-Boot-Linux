@@ -33,7 +33,8 @@ build/
 creator/bin/
 creator/.link/
 
-# Local working notes
+# Local working notes (not shipped)
 GROK.md
 REPORT.md
+GROK-NOTES.md
 COMMS.md

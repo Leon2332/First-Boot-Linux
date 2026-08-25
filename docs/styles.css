@@ -1200,14 +1200,98 @@ html[data-theme="light"] .other-option-card .logo-light {
 }
 
 .catalog-popover .detail-card > h1 {
-  margin: 0 0 16px;
+  margin: 0 0 12px;
   text-align: left;
   font-size: 1rem;
   line-height: 1.2;
 }
 
+.catalog-search-wrap {
+  position: relative;
+  margin: 0 0 12px;
+}
+
+.catalog-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.catalog-search {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: 8px 12px 8px 36px;
+  border-radius: 10px;
+  border: 1px solid var(--card-glass-border);
+  background-color: rgba(0, 0, 0, 0.28);
+  color: inherit;
+  font: inherit;
+  font-size: 0.95rem;
+  cursor: var(--cursor-text);
+}
+
+.catalog-search::placeholder {
+  color: var(--text-muted);
+}
+
+.catalog-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.catalog-search::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  cursor: var(--cursor-pointer);
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='black' d='M1.2 1.2l9.6 9.6M10.8 1.2L1.2 10.8' stroke='black' stroke-width='1.6' stroke-linecap='round'/></svg>") center / contain no-repeat;
+}
+
+html[data-theme="light"] .catalog-search {
+  background-color: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+.catalog-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 24px 16px;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  text-align: center;
+  pointer-events: none;
+}
+
+.catalog-empty[hidden] {
+  display: none !important;
+}
+
 .catalog-popover .catalog-scroll {
-  max-height: min(480px, 56vh);
+  position: relative;
+  max-height: min(400px, 50vh);
+}
+
+.catalog-popover .catalog-scroll.is-empty {
+  min-height: 200px;
+}
+
+.catalog-popover .catalog-scroll.is-empty .catalog-list {
+  display: none;
 }
 
 @keyframes fade-up {
@@ -1239,16 +1323,24 @@ html[data-theme="light"] .other-option-card .logo-light {
 }
 
 .catalog-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  position: relative;
+  display: block;
+}
+
+.catalog-row[hidden] {
+  display: none !important;
 }
 
 .catalog-row {
   display: flex;
   align-items: center;
   gap: 14px;
+  position: absolute;
+  left: 0;
+  right: 0;
   width: 100%;
+  height: 60px;
+  box-sizing: border-box;
   padding: 10px 14px;
   background-color: var(--card-glass);
   border: 1px solid var(--card-glass-border);

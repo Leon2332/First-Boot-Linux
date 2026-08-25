@@ -1,8 +1,10 @@
 # OS install drivers
 
 First Boot Linux copies a staged ISO’s kernel and initrd onto `FBL-SYS`,
-injects a seed, and reboots into that installer. This directory is those
-seeds. Shop USB→disk copy is `firstboot/install.py`, not here.
+injects a seed, and reboots into that installer. Catalog rows that are
+not on disk are fetched onto `payload/images/` first (`install-os --fetch`),
+then the same path. This directory is those seeds. Shop USB→disk copy is
+`firstboot/install.py`, not here.
 
 ## Layout
 

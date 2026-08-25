@@ -28,6 +28,7 @@ from collections.abc import Callable
 from firstboot.disk import (
     LIVE_MOUNTS,
     PAYLOAD_MOUNT,
+    HelperEvent,
     disk_for_device,
     emit,
     find_source_disk,
@@ -37,6 +38,7 @@ from firstboot.disk import (
     live_mounts,
     parse_helper_line,
 )
+from firstboot.isodownload import DownloadError, dest_is_payload_image, download_iso
 from firstboot.install import blkid_uuid
 from firstboot.payload import Distro, Edition
 
@@ -1015,10 +1017,111 @@ def _plan_from_args(args: argparse.Namespace) -> OsInstallPlan:
     )
 
 
+def fetch_iso(
+    url: str,
+    dest: str,
+    sha256: str,
+    size_bytes: int,
+    payload_root: str,
+    *,
+    on_progress: Callable[[int], None] | None = None,
+) -> None:
+    if not dest_is_payload_image(payload_root, dest):
+        raise OsInstallError("The image path is not a staged ISO.")
+    emit("STEP", "Downloading…")
+
+    def prog(n: int) -> None:
+        if on_progress:
+            on_progress(n)
+        else:
+            emit("PROGRESS", n)
+
+    try:
+        download_iso(url, dest, sha256, size_bytes, on_progress=prog)
+    except DownloadError as exc:
+        raise OsInstallError(str(exc)) from exc
+    emit("STEP", "Ready")
+    emit("DONE")
+
+
+def run_iso_fetch(
+    url: str,
+    dest: str,
+    sha256: str,
+    size_bytes: int,
+    payload_root: str,
+    on_event: Callable[..., None] | None = None,
+) -> None:
+    dest = os.path.abspath(dest)
+    parent = os.path.dirname(dest)
+    try:
+        os.makedirs(parent, exist_ok=True)
+    except OSError:
+        pass
+    if os.access(parent, os.W_OK):
+        def prog(n: int) -> None:
+            if on_event is not None:
+                on_event(HelperEvent("progress", progress=n))
+
+        try:
+            if on_event is not None:
+                on_event(HelperEvent("step", text="Downloading…"))
+            download_iso(url, dest, sha256, size_bytes, on_progress=prog)
+            if on_event is not None:
+                on_event(HelperEvent("done", progress=100))
+            return
+        except DownloadError as exc:
+            raise OsInstallError(str(exc)) from exc
+        except PermissionError:
+            pass
+    cmd = [
+        *privilege_prefix(),
+        helper_path(),
+        "--fetch",
+        "--url",
+        url,
+        "--iso",
+        dest,
+        "--sha256",
+        sha256,
+        "--size",
+        str(size_bytes),
+        "--payload",
+        payload_root,
+    ]
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    except OSError as exc:
+        raise OsInstallError(str(exc)) from exc
+    assert proc.stdout is not None
+    err: str | None = None
+    for raw in proc.stdout:
+        event = parse_helper_line(raw)
+        if event is None:
+            continue
+        if event.kind == "error":
+            err = event.text
+        if on_event is not None:
+            on_event(event)
+    status = proc.wait()
+    if err:
+        raise OsInstallError(err)
+    if status != 0:
+        raise OsInstallError(f"Download failed ({status}).")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Install a staged OS onto this computer")
     parser.add_argument("--plan", action="store_true", help="print a JSON stub (privilege probe)")
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--fetch", action="store_true")
+    parser.add_argument("--url")
+    parser.add_argument("--payload", default=PAYLOAD_MOUNT)
     parser.add_argument("--iso")
     parser.add_argument("--iso-rel")
     parser.add_argument("--sha256")
@@ -1034,11 +1137,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--edition", default="")
     parser.add_argument("--same-disk", action="store_true")
     args = parser.parse_args(argv)
+    if args.fetch:
+        if not args.url or not args.iso or not args.sha256:
+            emit("ERROR", "missing --url / --iso / --sha256")
+            return 2
+        try:
+            fetch_iso(
+                args.url,
+                args.iso,
+                args.sha256,
+                int(args.size or 0),
+                args.payload or PAYLOAD_MOUNT,
+            )
+        except OsInstallError as exc:
+            emit("ERROR", str(exc))
+            return 1
+        return 0
     if args.plan and not args.apply:
         print(json.dumps({"available": False, "reason": "pass --apply to install"}))
         return 1
     if not args.apply:
-        parser.error("need --plan or --apply")
+        parser.error("need --plan, --apply, or --fetch")
     for key in ("iso", "iso_rel", "sha256", "driver", "target", "hostname", "username", "password_hash"):
         if not getattr(args, key.replace("-", "_")):
             emit("ERROR", f"missing --{key.replace('_', '-')}")

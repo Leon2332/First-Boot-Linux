@@ -25,12 +25,24 @@ from firstboot.osinstall import (
     canonical_driver_id,
     get_driver,
     live_os_plan,
+    run_iso_fetch,
     run_os_install,
     sha512_crypt,
     suggest_hostname,
     suggest_username,
     validate_identity,
 )
+from firstboot.catalog_search import (
+    DIFFERENT,
+    LESS_STRICT,
+    MORE_STRICT,
+    SAME,
+    fields as catalog_fields,
+    filter_delta,
+    matches,
+    tokens,
+)
+from firstboot.isodownload import DownloadError, edition_dest
 from firstboot.payload import Distro, Edition, Payload, load_payload
 from firstboot.shell import Shell
 from firstboot.floatlayer import FloatLayer
@@ -126,6 +138,16 @@ def run_window(
             self.other_logo = None
             self._installing = False
             self._os_logo = False
+            self._catalog_search: Gtk.SearchEntry | None = None
+            self._catalog_view: Gtk.ListView | None = None
+            self._catalog_scroll: Gtk.ScrolledWindow | None = None
+            self._catalog_empty: Gtk.Label | None = None
+            self._catalog_filter: Gtk.CustomFilter | None = None
+            self._catalog_model = None
+            self._catalog_by_id: dict[str, Distro] = {}
+            self._catalog_fields: dict[str, tuple[str, ...]] = {}
+            self._catalog_query = ""
+            self._catalog_tokens: tuple[str, ...] = ()
             self.connect("activate", self.on_activate)
 
         def on_activate(self, _app: Adw.Application) -> None:
@@ -466,6 +488,13 @@ def run_window(
             if self.shell.handle_key(keyval):
                 return True
             if keyval == Gdk.KEY_Escape and self.detail_host.get_visible():
+                if (
+                    self.overlay_mode == "catalog"
+                    and self._catalog_search is not None
+                    and self._catalog_search.get_text()
+                ):
+                    self._catalog_search.set_text("")
+                    return True
                 self._overlay_back()
                 return True
             return False
@@ -710,6 +739,7 @@ def run_window(
             self.overlay_mode = None
             self.detail_distro = None
             self.detail_from_catalog = False
+            self._reset_catalog_search()
             self._set_dimmed(False)
             self.detail_host.set_visible(False)
 
@@ -723,8 +753,13 @@ def run_window(
             self.shell.close_menus()
             self.detail_distro = None
             self.detail_from_catalog = False
-            self._fill_catalog()
+            if self.catalog_page.get_first_child() is None:
+                self._fill_catalog()
+            else:
+                self._reset_catalog_search()
             self._show_overlay("catalog", slide=False)
+            if self.screenshot is None and self._catalog_search is not None:
+                self._catalog_search.grab_focus()
 
         def _fill_catalog(self) -> None:
             self._clear(self.catalog_page)
@@ -735,22 +770,202 @@ def run_window(
             title = Gtk.Label(label="Other options", xalign=0)
             title.add_css_class("catalog-title")
             card.append(title)
-            listing = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+
+            search = Gtk.SearchEntry()
+            search.add_css_class("catalog-search")
+            search.set_placeholder_text("Search")
+            search.set_hexpand(True)
+            if hasattr(search, "set_search_delay"):
+                search.set_search_delay(0)
+            search.connect("search-changed", self._on_catalog_search)
+            search.connect("activate", self._on_catalog_search_activate)
+            key = Gtk.EventControllerKey()
+            key.connect("key-pressed", self._on_catalog_search_key)
+            search.add_controller(key)
+            self._catalog_search = search
+            card.append(search)
+
             distros = sorted(
                 self.payload.others,
                 key=lambda d: (d.catalog_name.casefold(), d.id),
             )
-            for distro in distros:
-                listing.append(self._row(distro))
+            self._catalog_by_id = {d.id: d for d in distros}
+            self._catalog_fields = {d.id: catalog_fields(d) for d in distros}
+            self._catalog_query = ""
+            self._catalog_tokens = ()
+
+            store = Gtk.StringList.new([d.id for d in distros])
+            filt = Gtk.CustomFilter()
+            filt.set_filter_func(self._catalog_match)
+            self._catalog_filter = filt
+            model = Gtk.FilterListModel.new(store, filt)
+            self._catalog_model = model
+
+            factory = Gtk.SignalListItemFactory()
+            factory.connect("setup", self._catalog_setup)
+            factory.connect("bind", self._catalog_bind)
+            view = Gtk.ListView(
+                model=Gtk.NoSelection.new(model),
+                factory=factory,
+            )
+            view.add_css_class("catalog-list")
+            view.set_hexpand(True)
+            view.set_single_click_activate(True)
+            view.connect("activate", self._on_catalog_activate)
+            self._catalog_view = view
+
             scroll = Gtk.ScrolledWindow()
+            scroll.add_css_class("catalog-scroll")
             scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-            scroll.set_max_content_height(480)
+            scroll.set_max_content_height(400)
             scroll.set_propagate_natural_height(True)
             scroll.set_hexpand(True)
             scroll.set_has_frame(False)
-            scroll.set_child(listing)
+            scroll.set_child(view)
+            self._catalog_scroll = scroll
             card.append(scroll)
+
+            empty = Gtk.Label(label="No matching systems", xalign=0)
+            empty.add_css_class("catalog-empty")
+            empty.set_visible(False)
+            self._catalog_empty = empty
+            card.append(empty)
+
             self.catalog_page.append(self._overlay_wrap(self._hide_overlay, card))
+            self._sync_catalog_list()
+
+        def _catalog_row_widget(self) -> Gtk.Button:
+            btn = Gtk.Button()
+            btn.add_css_class("catalog-row")
+            btn.set_has_frame(False)
+            btn.set_hexpand(True)
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+            logo = Gtk.Image()
+            logo.set_pixel_size(40)
+            logo.set_halign(Gtk.Align.CENTER)
+            logo.set_valign(Gtk.Align.CENTER)
+            logo.set_size_request(40, 40)
+            name = Gtk.Label(xalign=0)
+            name.add_css_class("row-name")
+            name.set_hexpand(True)
+            meta = Gtk.Label()
+            meta.add_css_class("row-meta")
+            row.append(logo)
+            row.append(name)
+            row.append(meta)
+            btn.set_child(row)
+            btn.connect("clicked", self._on_catalog_row_clicked)
+            return btn
+
+        def _catalog_setup(self, _factory: object, list_item: Gtk.ListItem) -> None:
+            list_item.set_child(self._catalog_row_widget())
+
+        def _catalog_bind(self, _factory: object, list_item: Gtk.ListItem) -> None:
+            item = list_item.get_item()
+            btn = list_item.get_child()
+            if item is None or btn is None:
+                return
+            distro = self._catalog_by_id.get(item.get_string())
+            if distro is None:
+                return
+            btn._fb_id = distro.id  # type: ignore[attr-defined]
+            row = btn.get_child()
+            if row is None:
+                return
+            logo = row.get_first_child()
+            name = logo.get_next_sibling() if logo is not None else None
+            meta = name.get_next_sibling() if name is not None else None
+            path = find_logo(distro.id)
+            if isinstance(logo, Gtk.Image):
+                if path:
+                    logo.set_from_file(path)
+                else:
+                    logo.clear()
+            if isinstance(name, Gtk.Label):
+                name.set_label(distro.catalog_name)
+            if isinstance(meta, Gtk.Label):
+                meta.set_label(distro.version)
+
+        def _catalog_match(self, item: object) -> bool:
+            get_string = getattr(item, "get_string", None)
+            if get_string is None:
+                return False
+            return matches(
+                self._catalog_fields.get(get_string(), ()), self._catalog_tokens
+            )
+
+        def _on_catalog_row_clicked(self, btn: Gtk.Button) -> None:
+            did = getattr(btn, "_fb_id", None)
+            distro = self._catalog_by_id.get(did) if isinstance(did, str) else None
+            if distro is not None:
+                self.open_detail(distro, from_catalog=True)
+
+        def _on_catalog_activate(self, _view: Gtk.ListView, pos: int) -> None:
+            distro = self._catalog_distro_at(pos)
+            if distro is not None:
+                self.open_detail(distro, from_catalog=True)
+
+        def _catalog_distro_at(self, pos: int) -> Distro | None:
+            model = self._catalog_model
+            if model is None or pos < 0 or pos >= model.get_n_items():
+                return None
+            item = model.get_item(pos)
+            if item is None:
+                return None
+            return self._catalog_by_id.get(item.get_string())
+
+        def _on_catalog_search(self, entry: Gtk.SearchEntry) -> None:
+            query = entry.get_text()
+            delta = filter_delta(self._catalog_query, query)
+            self._catalog_query = query
+            self._catalog_tokens = tokens(query)
+            if delta != SAME and self._catalog_filter is not None:
+                change = {
+                    MORE_STRICT: Gtk.FilterChange.MORE_STRICT,
+                    LESS_STRICT: Gtk.FilterChange.LESS_STRICT,
+                    DIFFERENT: Gtk.FilterChange.DIFFERENT,
+                }[delta]
+                self._catalog_filter.changed(change)
+            self._sync_catalog_list()
+
+        def _on_catalog_search_activate(self, *_args: object) -> None:
+            distro = self._catalog_distro_at(0)
+            if distro is not None:
+                self.open_detail(distro, from_catalog=True)
+
+        def _on_catalog_search_key(
+            self, _c: Gtk.EventControllerKey, keyval: int, *_rest: object
+        ) -> bool:
+            if keyval in (Gdk.KEY_Down, Gdk.KEY_KP_Down) and self._catalog_view is not None:
+                if self._catalog_model is not None and self._catalog_model.get_n_items() > 0:
+                    self._catalog_view.grab_focus()
+                    return True
+            return False
+
+        def _reset_catalog_search(self) -> None:
+            if self._catalog_search is None:
+                return
+            if self._catalog_search.get_text():
+                self._catalog_search.set_text("")
+                return
+            if self._catalog_tokens:
+                self._catalog_query = ""
+                self._catalog_tokens = ()
+                if self._catalog_filter is not None:
+                    self._catalog_filter.changed(Gtk.FilterChange.LESS_STRICT)
+                self._sync_catalog_list()
+
+        def _sync_catalog_list(self) -> None:
+            model = self._catalog_model
+            n = 0 if model is None else model.get_n_items()
+            empty = n == 0
+            if self._catalog_empty is not None:
+                self._catalog_empty.set_visible(empty)
+            if self._catalog_scroll is not None:
+                self._catalog_scroll.set_visible(not empty)
+                if n > 0:
+                    row_px = 66
+                    self._catalog_scroll.set_size_request(-1, min(400, n * row_px))
 
         def open_detail(self, distro: Distro, *, from_catalog: bool) -> None:
             self.shell.close_menus()
@@ -840,17 +1055,96 @@ def run_window(
             self._hide_overlay()
 
         def _act(self, distro: Distro, ed: Edition) -> None:
-            if not ed.on_disk:
+            if distro.install not in DRIVERS_READY:
+                self._toast(f"{distro.name} install is not available yet.")
+                return
+            if ed.on_disk:
+                self._confirm_os_install(distro, ed)
+                return
+            if not ed.url:
                 self._toast(
                     f"Download is not available yet ({distro.name} {ed.name})."
                 )
                 return
-            if distro.install not in DRIVERS_READY:
-                self._toast(
-                    f"{distro.name} install is not available yet."
-                )
+            if not self.shell.net.connected:
+                self._toast("Connect to a network first")
+                self.shell.show_menu("network")
                 return
+            self._start_download(distro, ed)
+
+        def _lookup_edition(
+            self, distro_id: str, edition_id: str
+        ) -> tuple[Distro | None, Edition | None]:
+            for distro in [*self.payload.recommended, *self.payload.catalog]:
+                if distro.id != distro_id:
+                    continue
+                for ed in distro.editions:
+                    if ed.id == edition_id:
+                        return distro, ed
+            return None, None
+
+        def _start_download(self, distro: Distro, ed: Edition) -> None:
+            try:
+                dest = edition_dest(self.payload_root, ed)
+            except DownloadError as exc:
+                self._toast(str(exc))
+                return
+            self._show_install_overlay()
+            self._set_os_brand(distro, ed)
+            de = f" ({ed.name})" if ed.name else ""
+            self.install_title.set_label(f"Downloading {distro.name}{de}")
+            self._set_shop_progress(0, "Downloading…")
+            distro_id, ed_id = distro.id, ed.id
+            from_catalog = self.detail_from_catalog
+            url = ed.url or ""
+            sha256 = ed.sha256
+            size = ed.size_bytes
+            payload_root = self.payload_root
+
+            def work() -> None:
+                err: str | None = None
+                try:
+                    run_iso_fetch(
+                        url,
+                        dest,
+                        sha256,
+                        size,
+                        payload_root,
+                        on_event=self._shop_event,
+                    )
+                except (OsInstallError, DownloadError, InstallError) as exc:
+                    err = str(exc)
+                except Exception as exc:
+                    err = str(exc)
+                GLib.idle_add(
+                    self._download_finished, err, distro_id, ed_id, from_catalog
+                )
+
+            threading.Thread(target=work, daemon=True).start()
+
+        def _download_finished(
+            self,
+            err: str | None,
+            distro_id: str,
+            edition_id: str,
+            from_catalog: bool,
+        ) -> bool:
+            if err:
+                self._hide_shop_overlays()
+                self._toast(err)
+                return False
+            self.payload = load_payload(self.payload_root)
+            if self.catalog_page.get_first_child() is not None:
+                self._fill_catalog()
+            distro, ed = self._lookup_edition(distro_id, edition_id)
+            self._hide_shop_overlays()
+            if distro is None or ed is None or not ed.on_disk:
+                self._toast("Download finished, but the image is missing.")
+                return False
+            if from_catalog:
+                self.open_detail(distro, from_catalog=True)
             self._confirm_os_install(distro, ed)
+            return False
 
         def _toast(self, text: str) -> None:
             self.toasts.add_toast(Adw.Toast.new(text))

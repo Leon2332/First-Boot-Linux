@@ -36,73 +36,132 @@ LIVEINST_WRAPPER = """#!/bin/bash
 # Do not exec anaconda here (0.6.41: no display, then DNF). LIVECMD does
 # not survive pkexec — pre-pivot patches liveinst.real's ANACONDA default.
 log=/var/log/firstboot-fedora.log
+link=/usr/libexec/fbl-link-squashfs
 mkdir -p /var/log /run
 {
   echo "=== fbl liveinst wrapper ==="
   date
   echo "uid=$(id -u) WAYLAND_DISPLAY=${WAYLAND_DISPLAY-} DISPLAY=${DISPLAY-} PKEXEC_UID=${PKEXEC_UID-}"
   cat /proc/cmdline 2>/dev/null
-  ls -l /ks.cfg /usr/sbin/liveinst.real /run/fbl-squashfs.img 2>/dev/null
+  ls -l /ks.cfg /usr/bin/liveinst /usr/bin/liveinst.real /usr/sbin/liveinst.real /run/fbl-squashfs.img "$link" 2>/dev/null
 } >> "$log" 2>&1
 
-# livesys-late may still call us as root before SDDM. Leave it to autostart.
+ensure_link() {
+  if [ -e /run/fbl-squashfs.img ]; then
+    return 0
+  fi
+  if [ ! -x "$link" ]; then
+    echo "fbl-link-squashfs missing" >> "$log"
+    return 1
+  fi
+  if [ "$(id -u)" -eq 0 ]; then
+    "$link" >> "$log" 2>&1 || true
+  else
+    sudo -n "$link" >> "$log" 2>&1 || pkexec "$link" >> "$log" 2>&1 || true
+  fi
+  [ -e /run/fbl-squashfs.img ]
+}
+
+# livesys-late may still call us as root before SDDM. Make the liveimg
+# alias now; do not start Anaconda without a compositor.
 if [ "$(id -u)" -eq 0 ] && [ -z "${PKEXEC_UID:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ] && [ -z "${DISPLAY:-}" ]; then
+  ensure_link || true
   echo "root without display; session autostart will start liveinst" >> "$log"
   exit 0
 fi
 
-if [ ! -e /run/fbl-squashfs.img ]; then
+if ! ensure_link; then
   echo "squashfs link missing; refusing to start (would DNF)" >> "$log"
+  ls -la /run/initramfs /run/initramfs/live /run/initramfs/live/LiveOS /run/initramfs/isoscan 2>> "$log" || true
   if command -v zenity >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
     zenity --error --no-markup --text="First Boot Linux could not find the Fedora live image." || true
   fi
   exit 1
 fi
 
-if [ ! -x /usr/sbin/liveinst.real ]; then
+real=
+for p in /usr/bin/liveinst.real /usr/sbin/liveinst.real; do
+  if [ -x "$p" ]; then
+    real=$p
+    break
+  fi
+done
+if [ -z "$real" ]; then
   echo "liveinst.real missing" >> "$log"
   exit 1
 fi
 
-exec /usr/sbin/liveinst.real "$@"
+exec "$real" "$@"
 """
 
 LINK_SQUASH = """#!/bin/bash
-# Root oneshot: alias squashfs.img so kickstart liveimg cannot DNF.
+# Root oneshot: alias the live image so kickstart liveimg cannot DNF.
+# Same-disk boots use rd.live.ram=1; dracut then copies squashfs.img to
+# /run/initramfs/squashed.img (not LiveOS/squashfs.img). 0.6.43 only
+# looked for squashfs.img and required a systemd oneshot that often
+# never ran — wrapper then zenity-refused.
 log=/var/log/firstboot-fedora.log
 mkdir -p /var/log /run
 sq=
 for p in \\
+  /run/initramfs/squashed.img \\
   /run/initramfs/live/LiveOS/squashfs.img \\
   /run/initramfs/live/LiveOS/rootfs.img \\
   /run/initramfs/live/squashfs.img \\
-  /run/live/medium/LiveOS/squashfs.img \\
-  /run/initramfs/squashfs.img
+  /run/initramfs/rootfs.img \\
+  /run/initramfs/squashfs.img \\
+  /run/live/medium/LiveOS/squashfs.img
 do
-  if [ -f "$p" ]; then
+  if [ -f "$p" ] && [ -s "$p" ]; then
     sq=$p
     break
   fi
 done
 if [ -z "$sq" ]; then
-  sq=$(find /run/initramfs /run/live /mnt -name squashfs.img -type f 2>/dev/null | head -n 1)
+  for p in /run/initramfs/isoscan/images/*.iso /run/initramfs/isoscan/*.iso; do
+    if [ -f "$p" ] && [ -s "$p" ]; then
+      sq=$p
+      break
+    fi
+  done
+fi
+if [ -z "$sq" ] && command -v losetup >/dev/null; then
+  while IFS= read -r back; do
+    case "$back" in
+      *.iso|*squashfs.img|*squashed.img|*rootfs.img)
+        if [ -f "$back" ] && [ -s "$back" ]; then
+          sq=$back
+          break
+        fi
+        ;;
+    esac
+  done <<EOF
+$(losetup -ln -O BACK-FILE 2>/dev/null)
+EOF
+fi
+if [ -z "$sq" ]; then
+  sq=$(find /run/initramfs /run/live /mnt -type f \\
+    \\( -name squashfs.img -o -name squashed.img -o -name rootfs.img \\) \\
+    2>/dev/null | head -n 1)
 fi
 {
   echo "=== fbl link squashfs ==="
   date
   echo "squashfs=${sq:-missing}"
-  findmnt /run/initramfs/live 2>/dev/null
-  ls -l /run/initramfs/live/LiveOS 2>/dev/null
+  cat /proc/cmdline 2>/dev/null
+  ls -la /run/initramfs /run/initramfs/live /run/initramfs/live/LiveOS /run/initramfs/isoscan /run/initramfs/isoscan/images 2>/dev/null
+  findmnt /run/initramfs/live /run/initramfs/isoscan 2>/dev/null
+  losetup -a 2>/dev/null
 } >> "$log" 2>&1
 if [ -n "$sq" ]; then
   ln -sfn "$sq" /run/fbl-squashfs.img
+  echo "linked $sq -> /run/fbl-squashfs.img" >> "$log"
 fi
 exit 0
 """
 
 LINK_SERVICE = """[Unit]
 Description=First Boot Linux Fedora live image
-DefaultDependencies=no
 After=local-fs.target
 Before=display-manager.service
 
@@ -113,13 +172,14 @@ RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
+WantedBy=graphical.target
 """
 
 AUTOSTART_DESKTOP = """[Desktop Entry]
 Type=Application
 Name=Install Fedora
 Comment=First Boot Linux unattended installer
-Exec=/usr/sbin/liveinst
+Exec=/usr/bin/liveinst
 X-KDE-autostart-phase=2
 X-GNOME-Autostart-enabled=true
 OnlyShowIn=KDE;
@@ -131,7 +191,9 @@ DRACUT_HOOK = """#!/bin/sh
 root="${NEWROOT:-/sysroot}"
 log="$root/var/log/firstboot-fedora.log"
 mkdir -p "$root/var/log" "$root/usr/sbin" "$root/usr/libexec" \\
-  "$root/etc/xdg/autostart" "$root/etc/systemd/system/multi-user.target.wants"
+  "$root/etc/xdg/autostart" \\
+  "$root/etc/systemd/system/multi-user.target.wants" \\
+  "$root/etc/systemd/system/graphical.target.wants"
 {
   echo "=== fbl fedora pre-pivot ==="
   cat /proc/cmdline 2>/dev/null
@@ -143,19 +205,31 @@ if [ -f /ks.cfg ]; then
   chmod 644 "$root/ks.cfg"
 fi
 if [ -f /fbl-liveinst ]; then
-  if [ -e "$root/usr/sbin/liveinst" ] && [ ! -L "$root/usr/sbin/liveinst" ] \\
-      && [ ! -e "$root/usr/sbin/liveinst.real" ]; then
-    mv "$root/usr/sbin/liveinst" "$root/usr/sbin/liveinst.real" || true
+  # F44 anaconda-live ships /usr/bin/liveinst. Fedora 42+ usr-merge makes
+  # /usr/sbin a symlink to bin, so those two paths are one file. 0.6.42
+  # replaced bin/liveinst with a symlink to ../sbin/liveinst — circular.
+  # KDE: "Could not find the program 'liveinst'".
+  bin="$root/usr/bin/liveinst"
+  sbin="$root/usr/sbin/liveinst"
+  mkdir -p "$root/usr/bin"
+  if [ -f "$bin" ] && [ ! -L "$bin" ] && [ ! -e "$bin.real" ]; then
+    mv "$bin" "$bin.real" || true
   fi
-  if [ -f "$root/usr/sbin/liveinst.real" ] \\
-      && ! grep -q -- '--kickstart=/ks.cfg' "$root/usr/sbin/liveinst.real"; then
-    sed -i 's|anaconda --liveinst --graphical|anaconda --liveinst --graphical --kickstart=/ks.cfg|' \\
-      "$root/usr/sbin/liveinst.real" || true
+  if [ -f "$sbin" ] && [ ! -L "$sbin" ] && [ ! -e "$sbin.real" ]; then
+    mv "$sbin" "$sbin.real" || true
   fi
-  cp /fbl-liveinst "$root/usr/sbin/liveinst"
-  chmod 755 "$root/usr/sbin/liveinst"
-  if [ -f "$root/usr/bin/liveinst" ] && [ ! -L "$root/usr/bin/liveinst" ]; then
-    ln -sfn ../sbin/liveinst "$root/usr/bin/liveinst"
+  for real in "$bin.real" "$sbin.real"; do
+    if [ -f "$real" ] && ! grep -q -- '--kickstart=/ks.cfg' "$real"; then
+      sed -i 's|anaconda --liveinst --graphical|anaconda --liveinst --graphical --kickstart=/ks.cfg|' \\
+        "$real" || true
+    fi
+  done
+  cp /fbl-liveinst "$bin"
+  chmod 755 "$bin"
+  if [ -d "$root/usr/sbin" ] && [ ! "$root/usr/sbin" -ef "$root/usr/bin" ]; then
+    if [ ! -e "$sbin" ] || [ -L "$sbin" ]; then
+      ln -sfn ../bin/liveinst "$sbin"
+    fi
   fi
 fi
 if [ -f /usr/libexec/fbl-link-squashfs ]; then
@@ -167,17 +241,19 @@ if [ -f /etc/systemd/system/fbl-link-squashfs.service ]; then
     "$root/etc/systemd/system/fbl-link-squashfs.service"
   ln -sfn /etc/systemd/system/fbl-link-squashfs.service \\
     "$root/etc/systemd/system/multi-user.target.wants/fbl-link-squashfs.service"
+  ln -sfn /etc/systemd/system/fbl-link-squashfs.service \\
+    "$root/etc/systemd/system/graphical.target.wants/fbl-link-squashfs.service"
 fi
 if [ -f /etc/xdg/autostart/fbl-liveinst.desktop ]; then
   cp /etc/xdg/autostart/fbl-liveinst.desktop \\
     "$root/etc/xdg/autostart/fbl-liveinst.desktop"
 fi
 if command -v restorecon >/dev/null; then
-  restorecon -F "$root/ks.cfg" "$root/usr/sbin/liveinst" \\
-    "$root/usr/sbin/liveinst.real" "$root/usr/libexec/fbl-link-squashfs" \\
-    2>/dev/null || true
+  restorecon -F "$root/ks.cfg" "$root/usr/bin/liveinst" "$root/usr/sbin/liveinst" \\
+    "$root/usr/bin/liveinst.real" "$root/usr/sbin/liveinst.real" \\
+    "$root/usr/libexec/fbl-link-squashfs" 2>/dev/null || true
 fi
-echo "ks=$(test -f "$root/ks.cfg" && echo yes || echo no) liveinst=$(test -x "$root/usr/sbin/liveinst" && echo yes || echo no) real=$(test -f "$root/usr/sbin/liveinst.real" && echo yes || echo no)" >> "$log"
+echo "ks=$(test -f "$root/ks.cfg" && echo yes || echo no) liveinst=$(test -x "$root/usr/bin/liveinst" && echo yes || echo no) real=$(test -f "$root/usr/bin/liveinst.real" -o -f "$root/usr/sbin/liveinst.real" && echo yes || echo no)" >> "$log"
 exit 0
 """
 

@@ -335,6 +335,9 @@
     volume: 70,
     muted: false,
     brightness: 100,
+    catalogQueryJoined: "",
+    catalogHits: [],
+    catalogPaneMin: 0,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -366,6 +369,8 @@
     recommendedGrid: $("recommended-grid"),
     catalogScroll: $("catalog-scroll"),
     catalogList: $("catalog-list"),
+    catalogSearch: $("catalog-search"),
+    catalogEmpty: $("catalog-empty"),
     catalogBack: $("catalog-back"),
     catalogPopover: $("catalog-popover"),
     detailPopover: $("detail-popover"),
@@ -1476,34 +1481,184 @@
     return d.id === "ms-windows" ? "Microsoft Windows" : d.name;
   }
 
+  const CATALOG_ROW_PX = 66;
+  const CATALOG_OVERSCAN = 8;
+  const catalogRowPool = [];
+  let catalogIndex = null;
+
+  function catalogFields(d) {
+    const fields = [
+      catalogName(d),
+      d.name,
+      d.id,
+      d.version || "",
+      d.desktop || "",
+    ];
+    for (const de of d.desktops || []) {
+      fields.push(de.name, de.id);
+    }
+    return fields.map((s) => String(s).toLowerCase()).filter(Boolean);
+  }
+
+  function catalogTokens(query) {
+    return query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  }
+
+  function ensureCatalogIndex() {
+    if (catalogIndex) return catalogIndex;
+    catalogIndex = CATALOG.slice()
+      .sort((a, b) =>
+        catalogName(a).localeCompare(catalogName(b), undefined, {
+          sensitivity: "base",
+        })
+      )
+      .map((d) => {
+        d._fields = catalogFields(d);
+        return d;
+      });
+    state.catalogHits = catalogIndex;
+    return catalogIndex;
+  }
+
+  function applyCatalogQuery(query) {
+    const all = ensureCatalogIndex();
+    const toks = catalogTokens(query);
+    const joined = toks.join(" ");
+    if (!toks.length) {
+      state.catalogHits = all;
+      state.catalogQueryJoined = "";
+    } else {
+      const source =
+        state.catalogQueryJoined && joined.startsWith(state.catalogQueryJoined)
+          ? state.catalogHits
+          : all;
+      state.catalogHits = source.filter((d) =>
+        toks.every((t) => d._fields.some((f) => f.includes(t)))
+      );
+      state.catalogQueryJoined = joined;
+    }
+    if (els.catalogScroll) els.catalogScroll.scrollTop = 0;
+    paintCatalogWindow();
+    syncPopoverHeight();
+  }
+
+  function resetCatalogSearch() {
+    if (els.catalogSearch && els.catalogSearch.value) {
+      els.catalogSearch.value = "";
+    }
+    applyCatalogQuery("");
+  }
+
+  function makeCatalogRow() {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "catalog-row";
+    btn.setAttribute("role", "listitem");
+    const img = document.createElement("img");
+    img.className = "distro-logo";
+    img.alt = "";
+    img.draggable = false;
+    const title = document.createElement("h3");
+    const meta = document.createElement("span");
+    meta.className = "meta";
+    btn.appendChild(img);
+    btn.appendChild(title);
+    btn.appendChild(meta);
+    btn.addEventListener("click", () => {
+      if (btn.dataset.id) openDetail(btn.dataset.id, "catalog");
+    });
+    return btn;
+  }
+
+  function bindCatalogRow(btn, d) {
+    btn.dataset.id = d.id;
+    const img = btn.querySelector(".distro-logo");
+    if (img && img.getAttribute("src") !== d.logo) img.src = d.logo;
+    const title = btn.querySelector("h3");
+    if (title) title.textContent = catalogName(d);
+    const meta = btn.querySelector(".meta");
+    if (meta) meta.textContent = d.version;
+  }
+
+  function paintCatalogWindow() {
+    if (!els.catalogList) return;
+    const hits = state.catalogHits;
+    const scroll = els.catalogScroll;
+    const empty = hits.length === 0;
+    if (scroll) {
+      scroll.classList.toggle("is-empty", empty);
+      if (empty) {
+        const hold = Math.max(state.catalogPaneMin, 200);
+        scroll.style.minHeight = `${hold}px`;
+      } else {
+        scroll.style.minHeight = "";
+      }
+    }
+    const viewH = scroll ? Math.max(scroll.clientHeight, 1) : 320;
+    const top = scroll ? scroll.scrollTop : 0;
+    const start = empty
+      ? 0
+      : Math.max(0, Math.floor(top / CATALOG_ROW_PX) - CATALOG_OVERSCAN);
+    const end = empty
+      ? 0
+      : Math.min(
+          hits.length,
+          Math.ceil((top + viewH) / CATALOG_ROW_PX) + CATALOG_OVERSCAN
+        );
+    const needed = Math.max(end - start, 0);
+
+    els.catalogList.style.height = empty
+      ? "0px"
+      : `${hits.length * CATALOG_ROW_PX}px`;
+    while (catalogRowPool.length < needed) {
+      const row = makeCatalogRow();
+      catalogRowPool.push(row);
+      els.catalogList.appendChild(row);
+    }
+    for (let i = 0; i < catalogRowPool.length; i++) {
+      const btn = catalogRowPool[i];
+      if (i < needed) {
+        const d = hits[start + i];
+        bindCatalogRow(btn, d);
+        btn.style.top = `${(start + i) * CATALOG_ROW_PX}px`;
+        btn.hidden = false;
+      } else {
+        btn.hidden = true;
+      }
+    }
+    if (els.catalogEmpty) {
+      els.catalogEmpty.hidden = !empty;
+    }
+    if (!empty && scroll) {
+      const h = scroll.clientHeight;
+      if (h > 0) state.catalogPaneMin = Math.max(state.catalogPaneMin, h);
+    }
+  }
+
   function openCatalog() {
     closeMenus();
-    renderCatalog();
+    resetCatalogSearch();
     showScreen("catalog");
+    requestAnimationFrame(() => {
+      paintCatalogWindow();
+      syncPopoverHeight();
+      if (els.catalogSearch) els.catalogSearch.focus();
+    });
   }
 
   function closeDetail() {
     showScreen(state.detailMode === "catalog" ? "catalog" : "chooser");
+    if (state.detailMode === "catalog") {
+      requestAnimationFrame(() => {
+        paintCatalogWindow();
+        syncPopoverHeight();
+      });
+    }
   }
 
   function renderCatalog() {
-    els.catalogList.innerHTML = "";
-    const sorted = CATALOG.slice().sort((a, b) =>
-      catalogName(a).localeCompare(catalogName(b), undefined, { sensitivity: "base" })
-    );
-    sorted.forEach((d) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "catalog-row";
-      btn.setAttribute("role", "listitem");
-      btn.innerHTML = `
-        <img class="distro-logo" src="${d.logo}" alt="" draggable="false" />
-        <h3>${escapeHtml(catalogName(d))}</h3>
-        <span class="meta">${escapeHtml(d.version)}</span>
-      `;
-      btn.addEventListener("click", () => openDetail(d.id, "catalog"));
-      els.catalogList.appendChild(btn);
-    });
+    ensureCatalogIndex();
+    paintCatalogWindow();
   }
 
   function recommendedEdition(d) {
@@ -1956,6 +2111,27 @@
     });
     els.powerModalConfirm.addEventListener("click", confirmPower);
 
+    if (els.catalogSearch) {
+      els.catalogSearch.addEventListener("input", () => {
+        applyCatalogQuery(els.catalogSearch.value);
+      });
+      els.catalogSearch.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const first = state.catalogHits[0];
+          if (first) openDetail(first.id, "catalog");
+        }
+      });
+    }
+    if (els.catalogScroll) {
+      els.catalogScroll.addEventListener("scroll", paintCatalogWindow, {
+        passive: true,
+      });
+      if (typeof ResizeObserver !== "undefined") {
+        new ResizeObserver(() => paintCatalogWindow()).observe(els.catalogScroll);
+      }
+    }
+
     els.detailBack.addEventListener("click", closeDetail);
     els.installBtn.addEventListener("click", () => startInstall(null));
     els.rebootBtn.addEventListener("click", resetChooser);
@@ -2028,6 +2204,16 @@
         }
         closeMenus();
         if (els.screenOverlay && !els.screenOverlay.hidden) {
+          if (
+            els.catalogSearch &&
+            els.catalogSearch.value &&
+            els.popoverTrack &&
+            !els.popoverTrack.classList.contains("is-detail")
+          ) {
+            resetCatalogSearch();
+            els.catalogSearch.focus();
+            return;
+          }
           if (
             els.popoverTrack &&
             els.popoverTrack.classList.contains("is-detail") &&

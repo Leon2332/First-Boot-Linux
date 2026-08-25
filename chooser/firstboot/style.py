@@ -583,14 +583,81 @@ window.firstboot.light .other-option-card .card-name {
   font-size: 16px;
   font-weight: 600;
   color: #eef1f6;
-  margin-bottom: 10px;
+  margin-bottom: 4px;
 }
 
 window.firstboot.light .catalog-title {
   color: #1c1c1c;
 }
 
+entry.catalog-search {
+  min-height: 36px;
+  margin: 2px 0 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 10px;
+  background-color: rgba(0, 0, 0, 0.28);
+  color: #eef1f6;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+  outline: none;
+}
+
+entry.catalog-search:focus-within,
+entry.catalog-search:focus {
+  border-color: #3584e4;
+}
+
+window.firstboot.light entry.catalog-search {
+  background-color: rgba(0, 0, 0, 0.04);
+  color: #1c1c1c;
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+.catalog-empty {
+  font-size: 14px;
+  color: #9aa3b2;
+  padding: 8px 2px 4px;
+}
+
+window.firstboot.light .catalog-empty {
+  color: #5e6772;
+}
+
+scrolledwindow.catalog-scroll {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+listview.catalog-list {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+listview.catalog-list > row {
+  padding: 0;
+  margin: 0 0 6px 0;
+  min-height: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  outline: none;
+}
+
+listview.catalog-list > row:hover,
+listview.catalog-list > row:selected,
+listview.catalog-list > row:active,
+listview.catalog-list > row:focus {
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+}
+
 .catalog-row {
+  min-height: 60px;
   padding: 10px 14px;
   border-radius: 12px;
   background-color: rgba(255, 255, 255, 0.04);
