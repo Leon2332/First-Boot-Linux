@@ -19,9 +19,15 @@ from firstboot.theme import (  # noqa: E402
     CURSOR_SIZE,
     CURSOR_THEME,
     EPIPHANY_DESKTOP,
+    EPIPHANY_SCHEMA,
     apply_session_theme,
     config_home,
     ensure_default_browser,
+)
+from firstboot.browser import (  # noqa: E402
+    DEFAULT_SEARCH_ENGINE,
+    START_PAGE_URI,
+    search_engine_providers_variant,
 )
 
 
@@ -93,6 +99,52 @@ class ChooserEnvTests(unittest.TestCase):
         self.assertIn("XCURSOR_SIZE=24", text)
         self.assertIn("XCURSOR_THEME=", session)
         self.assertIn("First Boot Cursor", session)
+
+
+class EpiphanyDefaultTests(unittest.TestCase):
+    def test_override_homepage_and_search(self) -> None:
+        path = Path(
+            CHOOSER_DIR,
+            "..",
+            "seed",
+            "overlay",
+            "usr",
+            "share",
+            "glib-2.0",
+            "schemas",
+            "20-firstboot-epiphany.gschema.override",
+        ).resolve()
+        self.assertTrue(path.is_file(), path)
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("[org.gnome.Epiphany]", text)
+        self.assertIn("ask-for-default=false", text)
+        self.assertIn(f"homepage-url='{START_PAGE_URI}'", text)
+        self.assertIn(f"default-search-engine='{DEFAULT_SEARCH_ENGINE}'", text)
+        self.assertIn(f"incognito-search-engine='{DEFAULT_SEARCH_ENGINE}'", text)
+        self.assertIn("restore-session-policy='crashed'", text)
+        self.assertIn(
+            f"search-engine-providers={search_engine_providers_variant()}", text
+        )
+        self.assertNotIn("Bing", text)
+        self.assertNotIn("Ecosia", text)
+        self.assertNotIn("Baidu", text)
+
+    def test_chooser_sets_epiphany_search(self) -> None:
+        app = Path(CHOOSER_DIR, "firstboot", "app.py").read_text(encoding="utf-8")
+        theme = Path(CHOOSER_DIR, "firstboot", "theme.py").read_text(encoding="utf-8")
+        self.assertIn("ensure_default_browser", app)
+        self.assertIn(EPIPHANY_SCHEMA, theme)
+        self.assertIn('"homepage-url"', theme)
+        self.assertIn('"default-search-engine"', theme)
+        self.assertIn('"search-engine-providers"', theme)
+        kiosk = Path(CHOOSER_DIR, "firstboot", "kioskapp.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("START_PAGE_URI", kiosk)
+        seed = Path(
+            CHOOSER_DIR, "..", "seed", "build-seed.sh"
+        ).resolve().read_text(encoding="utf-8")
+        self.assertIn("write_start_page", seed)
 
 
 class ConsoleDefaultTests(unittest.TestCase):

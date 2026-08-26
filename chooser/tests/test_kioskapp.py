@@ -12,6 +12,7 @@ CHOOSER_DIR = os.path.dirname(HERE)
 if CHOOSER_DIR not in sys.path:
     sys.path.insert(0, CHOOSER_DIR)
 
+from firstboot.browser import START_PAGE_PATH, START_PAGE_URI  # noqa: E402
 from firstboot.kioskapp import (  # noqa: E402
     CONSOLE_BINS,
     SYSINFO_BIN,
@@ -32,6 +33,8 @@ class ResolveTests(unittest.TestCase):
 
     def test_web_names(self) -> None:
         self.assertEqual(WEB_BINS, ("epiphany", "epiphany-browser"))
+        self.assertEqual(START_PAGE_PATH, "/usr/share/firstboot/start.html")
+        self.assertEqual(START_PAGE_URI, "file:///usr/share/firstboot/start.html")
 
     def test_console_names(self) -> None:
         self.assertEqual(CONSOLE_BINS, ("kgx",))

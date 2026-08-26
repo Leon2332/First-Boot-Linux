@@ -258,6 +258,8 @@ install_chooser() {
       fi
     done
   fi
+  PYTHONPATH="$REPO_DIR/chooser${PYTHONPATH:+:$PYTHONPATH}" python3 -c \
+    "from firstboot.browser import write_start_page; write_start_page('$ROOTFS/usr/share/firstboot/start.html')"
   chown -R root:root "$ROOTFS/usr/share/firstboot"
   find "$ROOTFS/usr/share/firstboot" -type d -exec chmod 755 {} +
   find "$ROOTFS/usr/share/firstboot" -type f -exec chmod 644 {} +

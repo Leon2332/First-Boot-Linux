@@ -9,7 +9,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from html import escape
-from typing import Any
+from typing import Any, NamedTuple
 
 BROWSER_BIN = "firstboot-browser"
 
@@ -77,10 +77,45 @@ def drop_process_caps() -> None:
 
 START_TITLE = "First Boot Linux"
 START_URIS = frozenset({"", "about:blank", "about:start"})
+START_PAGE_PATH = "/usr/share/firstboot/start.html"
+START_PAGE_URI = "file:///usr/share/firstboot/start.html"
+DEFAULT_SEARCH_ENGINE = "Brave"
+
+
+class SearchEngine(NamedTuple):
+    ident: str
+    name: str
+    home: str
+    search: str
+    icon: str
+    bang: str
+
+
 SEARCH_ENGINES = (
-    ("google", "Google", "https://www.google.com/", "google.png"),
-    ("brave", "Brave", "https://search.brave.com/", "brave.png"),
-    ("duckduckgo", "DuckDuckGo", "https://duckduckgo.com/", "duckduckgo.png"),
+    SearchEngine(
+        "google",
+        "Google",
+        "https://www.google.com/",
+        "https://www.google.com/search?q=%s",
+        "google.png",
+        "!g",
+    ),
+    SearchEngine(
+        "brave",
+        "Brave",
+        "https://search.brave.com/",
+        "https://search.brave.com/search?q=%s",
+        "brave.png",
+        "!b",
+    ),
+    SearchEngine(
+        "duckduckgo",
+        "DuckDuckGo",
+        "https://duckduckgo.com/",
+        "https://duckduckgo.com/search?q=%s",
+        "duckduckgo.png",
+        "!ddg",
+    ),
 )
 
 
@@ -88,7 +123,8 @@ def start_html() -> str:
     from firstboot.assets import find_search_icon
 
     tiles: list[str] = []
-    for _ident, name, url, icon in SEARCH_ENGINES:
+    for engine in SEARCH_ENGINES:
+        name, url, icon = engine.name, engine.home, engine.icon
         path = find_search_icon(icon)
         src = ""
         if path:
@@ -186,6 +222,27 @@ def start_html() -> str:
 
 
 START_HTML = start_html()
+
+
+def search_engine_providers_variant() -> str:
+    """GVariant text for org.gnome.Epiphany search-engine-providers."""
+    parts: list[str] = []
+    for engine in SEARCH_ENGINES:
+        name = engine.name.replace("\\", "\\\\").replace("'", "\\'")
+        url = engine.search.replace("\\", "\\\\").replace("'", "\\'")
+        bang = engine.bang.replace("\\", "\\\\").replace("'", "\\'")
+        parts.append(
+            "{'name': <'" + name + "'>, 'url': <'" + url + "'>, 'bang': <'" + bang + "'>}"
+        )
+    return "[" + ", ".join(parts) + "]"
+
+
+def write_start_page(path: str) -> None:
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(start_html())
 
 
 def apply_webkit_env() -> None:

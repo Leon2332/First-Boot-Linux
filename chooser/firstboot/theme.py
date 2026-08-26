@@ -41,7 +41,25 @@ def apply_session_theme(dark: bool, env: dict[str, str] | None = None) -> None:
 
 
 def ensure_default_browser(env: dict[str, str] | None = None) -> None:
+    from firstboot.browser import (
+        DEFAULT_SEARCH_ENGINE,
+        START_PAGE_URI,
+        search_engine_providers_variant,
+    )
+
     _set_gsettings(EPIPHANY_SCHEMA, "ask-for-default", False, env)
+    _set_gsettings(EPIPHANY_SCHEMA, "homepage-url", START_PAGE_URI, env)
+    _set_gsettings(EPIPHANY_SCHEMA, "default-search-engine", DEFAULT_SEARCH_ENGINE, env)
+    _set_gsettings(
+        EPIPHANY_SCHEMA, "incognito-search-engine", DEFAULT_SEARCH_ENGINE, env
+    )
+    _set_gsettings_variant(EPIPHANY_SCHEMA, "restore-session-policy", "crashed", env)
+    _set_gsettings_variant(
+        EPIPHANY_SCHEMA,
+        "search-engine-providers",
+        search_engine_providers_variant(),
+        env,
+    )
     _write_mimeapps(env)
 
 
@@ -131,7 +149,44 @@ def _set_gsettings(
     if isinstance(value, bool):
         cli_val = "true" if value else "false"
     else:
-        cli_val = str(value)
+        text = str(value)
+        cli_val = "'" + text.replace("\\", "\\\\").replace("'", "\\'") + "'"
+    _gsettings_set(schema, key, cli_val, env)
+
+
+def _set_gsettings_variant(
+    schema: str,
+    key: str,
+    gvariant_text: str,
+    env: dict[str, str] | None = None,
+) -> None:
+    try:
+        from gi.repository import Gio, GLib
+    except Exception:
+        Gio = None
+        GLib = None
+    if Gio is not None and GLib is not None:
+        try:
+            source = Gio.SettingsSchemaSource.get_default()
+            if source is not None:
+                info = source.lookup(schema, True)
+                if info is not None:
+                    settings = Gio.Settings.new_full(info, None, None)
+                    parsed = GLib.Variant.parse(None, gvariant_text, None, None)
+                    if settings.get_value(key) != parsed:
+                        settings.set_value(key, parsed)
+                    Gio.Settings.sync()
+        except Exception:
+            pass
+    _gsettings_set(schema, key, gvariant_text, env)
+
+
+def _gsettings_set(
+    schema: str,
+    key: str,
+    cli_val: str,
+    env: dict[str, str] | None = None,
+) -> None:
     try:
         subprocess.run(
             ["gsettings", "set", schema, key, cli_val],

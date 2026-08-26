@@ -14,8 +14,11 @@ if CHOOSER_DIR not in sys.path:
 
 from firstboot.browser import (  # noqa: E402
     BROWSER_BIN,
+    DEFAULT_SEARCH_ENGINE,
     HELPER_ENV,
     SEARCH_ENGINES,
+    START_PAGE_PATH,
+    START_PAGE_URI,
     START_TITLE,
     WEBKIT_API,
     WEBKIT_SAFE_ENV,
@@ -25,9 +28,11 @@ from firstboot.browser import (  # noqa: E402
     is_start_uri,
     launch_env,
     normalize_url,
+    search_engine_providers_variant,
     start_html,
     url_bar_text,
     webkit_available,
+    write_start_page,
 )
 from firstboot.assets import find_search_icon  # noqa: E402
 from firstboot.shell import APP_ITEMS, APP_TOASTS  # noqa: E402
@@ -72,17 +77,52 @@ class StartPageTests(unittest.TestCase):
         self.assertNotIn("Baidu", html)
         self.assertNotIn("preview for first boot only", html)
         self.assertEqual(START_TITLE, "First Boot Linux")
-        names = [row[1] for row in SEARCH_ENGINES]
-        urls = [row[2] for row in SEARCH_ENGINES]
+        names = [engine.name for engine in SEARCH_ENGINES]
+        homes = [engine.home for engine in SEARCH_ENGINES]
+        searches = [engine.search for engine in SEARCH_ENGINES]
         self.assertEqual(names, ["Google", "Brave", "DuckDuckGo"])
-        for name, url, icon in (
-            (row[1], row[2], row[3]) for row in SEARCH_ENGINES
-        ):
-            self.assertIn(name, html)
-            self.assertIn(url, html)
-            self.assertIsNotNone(find_search_icon(icon))
+        self.assertEqual(DEFAULT_SEARCH_ENGINE, "Brave")
+        self.assertEqual(
+            searches,
+            [
+                "https://www.google.com/search?q=%s",
+                "https://search.brave.com/search?q=%s",
+                "https://duckduckgo.com/search?q=%s",
+            ],
+        )
+        for engine in SEARCH_ENGINES:
+            self.assertIn(engine.name, html)
+            self.assertIn(engine.home, html)
+            self.assertIsNotNone(find_search_icon(engine.icon))
         self.assertIn("data:image/png;base64,", html)
-        self.assertEqual(len(urls), 3)
+        self.assertEqual(len(homes), 3)
+        self.assertEqual(START_PAGE_PATH, "/usr/share/firstboot/start.html")
+        self.assertEqual(START_PAGE_URI, "file:///usr/share/firstboot/start.html")
+
+    def test_search_engine_providers_variant(self) -> None:
+        text = search_engine_providers_variant()
+        self.assertIn("'Google'", text)
+        self.assertIn("'Brave'", text)
+        self.assertIn("'DuckDuckGo'", text)
+        self.assertIn("https://www.google.com/search?q=%s", text)
+        self.assertIn("https://search.brave.com/search?q=%s", text)
+        self.assertIn("https://duckduckgo.com/search?q=%s", text)
+        self.assertNotIn("Bing", text)
+        self.assertNotIn("Ecosia", text)
+        self.assertNotIn("Baidu", text)
+
+    def test_write_start_page(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "start.html")
+            write_start_page(path)
+            with open(path, encoding="utf-8") as fh:
+                body = fh.read()
+            self.assertIn("Search or type an address.", body)
+            self.assertIn("Google", body)
+            self.assertIn("Brave", body)
+            self.assertIn("DuckDuckGo", body)
 
 
 class WebKitHelperTests(unittest.TestCase):

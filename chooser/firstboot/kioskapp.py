@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 
-from firstboot.browser import drop_process_caps
+from firstboot.browser import START_PAGE_PATH, START_PAGE_URI, drop_process_caps
 
 WEB_BINS = ("epiphany", "epiphany-browser")
 CONSOLE_BINS = ("kgx",)
@@ -95,8 +95,11 @@ def launch_web() -> tuple[str | None, subprocess.Popen | None]:
     cmd = resolve_command(*WEB_BINS)
     if not cmd:
         return "Web browser is not on this image yet.", None
+    argv = [cmd]
+    if os.path.isfile(START_PAGE_PATH):
+        argv.append(START_PAGE_URI)
     return spawn_app(
-        [cmd],
+        argv,
         env=child_env(unset=WEBKIT_CHILD_UNSET),
         log_name="firstboot-web.log",
     )

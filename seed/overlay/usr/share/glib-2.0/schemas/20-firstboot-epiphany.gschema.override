@@ -1,2 +1,7 @@
 [org.gnome.Epiphany]
 ask-for-default=false
+homepage-url='file:///usr/share/firstboot/start.html'
+default-search-engine='Brave'
+incognito-search-engine='Brave'
+restore-session-policy='crashed'
+search-engine-providers=[{'name': <'Google'>, 'url': <'https://www.google.com/search?q=%s'>, 'bang': <'!g'>}, {'name': <'Brave'>, 'url': <'https://search.brave.com/search?q=%s'>, 'bang': <'!b'>}, {'name': <'DuckDuckGo'>, 'url': <'https://duckduckgo.com/search?q=%s'>, 'bang': <'!ddg'>}]
