@@ -28,6 +28,7 @@ import datetime as dt
 class AssetTests(unittest.TestCase):
     def test_repo_logos_and_status(self) -> None:
         self.assertTrue(find_logo("ubuntu"))
+        self.assertTrue(find_logo("linux-mint"))
         self.assertTrue(find_status("network-wired-symbolic.svg"))
         self.assertTrue(find_status("view-app-grid-symbolic.svg"))
         self.assertTrue(find_app_icon("epiphany.png"))

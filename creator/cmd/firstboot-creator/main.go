@@ -44,7 +44,7 @@ func usage(w io.Writer) {
 compose / estimate options:
   --name NAME
   --support TEXT
-  --stage id,id          official catalog ids (default: ubuntu,linux-mint)
+  --stage spec,spec      desktops to stage (distro:edition; bare distro = its default)
   --seed DIR             First Boot seed (default: build/seed)
   --out FILE             disk image (compose only)
   --cache DIR            ISO cache (default: ~/.cache/firstboot/images)
@@ -57,7 +57,7 @@ compose / estimate options:
 
 func runEstimate(args []string) int {
 	fs := flag.NewFlagSet("estimate", flag.ContinueOnError)
-	stage := fs.String("stage", "ubuntu,linux-mint", "")
+	stage := fs.String("stage", "", "")
 	seedDir := fs.String("seed", "", "")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -78,7 +78,7 @@ func runCompose(args []string) int {
 	fs := flag.NewFlagSet("compose", flag.ContinueOnError)
 	name := fs.String("name", "", "")
 	support := fs.String("support", "", "")
-	stage := fs.String("stage", "ubuntu,linux-mint", "")
+	stage := fs.String("stage", "", "")
 	seedDir := fs.String("seed", "", "")
 	out := fs.String("out", "", "")
 	cacheDir := fs.String("cache", "", "")

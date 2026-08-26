@@ -13,6 +13,13 @@ RUN apt-get update \
       grub-efi-amd64-signed \
       sbsigntool \
       grub-common \
+      python3 \
+      python3-gi \
+      python3-gi-cairo \
+      python3-cairo \
+      python3-pil \
+      gir1.2-rsvg-2.0 \
+      libcairo2 \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src

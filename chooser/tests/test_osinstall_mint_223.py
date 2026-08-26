@@ -26,6 +26,12 @@ class Mint223Tests(unittest.TestCase):
         self.assertIn("mint", DRIVER.aliases)
         self.assertEqual(DRIVER.default_hostname, "mint")
 
+    def test_shared_by_all_mint_catalog_rows(self) -> None:
+        from firstboot.osinstall import get_driver
+
+        self.assertIs(get_driver("mint-223"), DRIVER)
+        self.assertIs(get_driver("mint"), DRIVER)
+
     def test_seed_files(self) -> None:
         ident = OsIdentity("shop-pc", "leon", "Leon", UBUNTU_HASH)
         files = DRIVER.seed_files(ident, "/dev/sda", "")

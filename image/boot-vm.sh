@@ -190,6 +190,7 @@ smoke_ok() {
   grep -Eq 'getty@tty1|firstboot-kiosk.service' <<<"$text" || return 1
   grep -Eq 'firstboot-session: (cage|labwc) exited' <<<"$text" && return 1
   grep -Eq 'firstboot-chooser: window presented' <<<"$text" || return 1
+  grep -Fq 'XCURSOR_THEME=First Boot Cursor' <<<"$text" || return 1
   if [[ $SECURE_BOOT -eq 1 ]]; then
     grep -Eq 'firstboot-sb: SecureBoot=1' <<<"$text" || return 1
     grep -Eq 'firstboot-sb: SecureBoot=0' <<<"$text" && return 1

@@ -69,9 +69,18 @@
     </section>
 
     <section id="page-2" class="page hidden">
-      <h1>Recommended options</h1>
-      <p class="lead">Pick up to 5 options to recommend which will also be included on disk. Other options will have to be downloaded by the customer.</p>
-      <div id="ready" class="cards"></div>
+      <div class="page-2-head">
+        <h1>Recommended options</h1>
+        <p class="lead">Tick up to 5 desktops to recommend and keep on the USB. Customers can download the rest.</p>
+        <div id="picked" class="picked-grid" aria-label="Selected desktops"></div>
+        <label class="search-label">Search
+          <input id="distro-search" type="search" placeholder="Search" autocomplete="off" spellcheck="false">
+        </label>
+      </div>
+      <div class="page-2-list">
+        <p id="distro-empty" class="note" hidden>No matching systems</p>
+        <div id="ready" class="cards"></div>
+      </div>
     </section>
 
     <section id="page-3" class="page hidden">

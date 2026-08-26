@@ -34,6 +34,7 @@ Older sticks may still say `ubuntu-autoinstall`, `mint`, or
 
 The desktop environment is an **edition** in the catalog (which ISO),
 not a Python file, unless that desktop needs a different installer.
+The creator lists every edition under its distro, each with a tickbox.
 
 ## New version of the same distro (26.04 → 26.10)
 

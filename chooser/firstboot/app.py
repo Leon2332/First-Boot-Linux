@@ -43,7 +43,13 @@ from firstboot.catalog_search import (
     tokens,
 )
 from firstboot.isodownload import DownloadError, edition_dest
-from firstboot.payload import Distro, Edition, Payload, load_payload
+from firstboot.payload import (
+    Distro,
+    Edition,
+    Payload,
+    load_payload,
+    recommended_offerings,
+)
 from firstboot.shell import Shell
 from firstboot.floatlayer import FloatLayer
 from firstboot.browser import BrowserWindow
@@ -70,10 +76,10 @@ def dump_payload(payload: Payload) -> None:
         print("retailer: (missing)")
     print(f"wallpaper_dark: {payload.wallpaper_dark or '-'}")
     print(f"wallpaper_light: {payload.wallpaper_light or '-'}")
-    print(f"recommended: {len(payload.recommended)}")
-    for distro in payload.recommended:
-        ed = distro.default_edition
-        print(f"  {distro.id}  default={ed.id}  {ed.action}  {ed.file or ed.url}")
+    offerings = recommended_offerings(payload.recommended)
+    print(f"recommended: {len(offerings)}")
+    for distro, ed in offerings:
+        print(f"  {distro.id}:{ed.id}  {ed.action}  {ed.file or ed.url}")
     print(f"others: {len(payload.others)}")
     for distro in payload.others:
         print(f"  {distro.id}")
@@ -133,6 +139,7 @@ def run_window(
             self._running_apps: dict[str, list] = {}
             self.shop_plan = live_plan(root)
             self.detail_distro: Distro | None = None
+            self.detail_edition: Edition | None = None
             self.detail_from_catalog = False
             self.overlay_mode: str | None = None
             self.other_logo = None
@@ -574,7 +581,9 @@ def run_window(
                 self.main_box.append(note)
                 return
 
-            cards: list[Gtk.Widget] = [self._card(d) for d in p.recommended]
+            cards: list[Gtk.Widget] = [
+                self._card(d, ed) for d, ed in recommended_offerings(p.recommended)
+            ]
             if p.others:
                 cards.append(self._other_card())
             if cards:
@@ -617,7 +626,7 @@ def run_window(
                 col.append(row)
             return col
 
-        def _card(self, distro: Distro) -> Gtk.Widget:
+        def _card(self, distro: Distro, ed: Edition) -> Gtk.Widget:
             btn = Gtk.Button()
             btn.add_css_class("distro-card")
             btn.set_has_frame(False)
@@ -630,7 +639,7 @@ def run_window(
             inner.append(logo)
             name = Gtk.Label(label=distro.name)
             name.add_css_class("card-name")
-            desk = Gtk.Label(label=distro.default_desktop)
+            desk = Gtk.Label(label=ed.name)
             desk.add_css_class("card-desktop")
             ver = Gtk.Label(label=distro.version)
             ver.add_css_class("card-version")
@@ -638,7 +647,12 @@ def run_window(
             inner.append(desk)
             inner.append(ver)
             btn.set_child(inner)
-            btn.connect("clicked", lambda *_: self.open_detail(distro, from_catalog=False))
+            btn.connect(
+                "clicked",
+                lambda _btn, d=distro, e=ed: self.open_detail(
+                    d, from_catalog=False, edition=e
+                ),
+            )
             return btn
 
         def _other_card(self) -> Gtk.Widget:
@@ -738,6 +752,7 @@ def run_window(
         def _hide_overlay(self) -> None:
             self.overlay_mode = None
             self.detail_distro = None
+            self.detail_edition = None
             self.detail_from_catalog = False
             self._reset_catalog_search()
             self._set_dimmed(False)
@@ -752,6 +767,7 @@ def run_window(
         def open_catalog(self) -> None:
             self.shell.close_menus()
             self.detail_distro = None
+            self.detail_edition = None
             self.detail_from_catalog = False
             if self.catalog_page.get_first_child() is None:
                 self._fill_catalog()
@@ -967,13 +983,20 @@ def run_window(
                     row_px = 66
                     self._catalog_scroll.set_size_request(-1, min(400, n * row_px))
 
-        def open_detail(self, distro: Distro, *, from_catalog: bool) -> None:
+        def open_detail(
+            self,
+            distro: Distro,
+            *,
+            from_catalog: bool,
+            edition: Edition | None = None,
+        ) -> None:
             self.shell.close_menus()
             self.detail_distro = distro
+            self.detail_edition = edition
             self.detail_from_catalog = from_catalog
             if from_catalog and self.catalog_page.get_first_child() is None:
                 self._fill_catalog()
-            self._fill_detail(distro, from_catalog=from_catalog)
+            self._fill_detail(distro, from_catalog=from_catalog, edition=edition)
             slide = (
                 from_catalog
                 and self.overlay_mode == "catalog"
@@ -981,7 +1004,13 @@ def run_window(
             )
             self._show_overlay("detail", slide=slide)
 
-        def _fill_detail(self, distro: Distro, *, from_catalog: bool) -> None:
+        def _fill_detail(
+            self,
+            distro: Distro,
+            *,
+            from_catalog: bool,
+            edition: Edition | None = None,
+        ) -> None:
             self._clear(self.detail_page)
             card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
             card.add_css_class("detail-card")
@@ -993,8 +1022,9 @@ def run_window(
             t = Gtk.Label(label=distro.name, xalign=0)
             t.add_css_class("detail-title")
             titles.append(t)
-            if not from_catalog:
-                dsk = Gtk.Label(label=distro.default_desktop, xalign=0)
+            show = edition or (None if from_catalog else distro.default_edition)
+            if show is not None:
+                dsk = Gtk.Label(label=show.name, xalign=0)
                 dsk.add_css_class("detail-desktop")
                 titles.append(dsk)
             ver = Gtk.Label(label=distro.version, xalign=0)
@@ -1022,10 +1052,12 @@ def run_window(
                 actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
                 actions.set_halign(Gtk.Align.END)
                 actions.set_margin_top(12)
-                ed = distro.default_edition
+                ed = show or distro.default_edition
                 btn = Gtk.Button(label="Install" if ed.on_disk else "Download")
                 btn.add_css_class("btn-primary")
-                btn.connect("clicked", lambda *_: self._act(distro, ed))
+                btn.connect(
+                    "clicked", lambda _b, d=distro, e=ed: self._act(d, e)
+                )
                 actions.append(btn)
                 card.append(actions)
 

@@ -97,7 +97,7 @@
         },
         "suggested_default": {
           "type": "boolean",
-          "description": "Pre-tick in the creator. Requires install. May be true when redistributable is false (download-only recommended)."
+          "description": "Reserved. Creator does not pre-tick. Requires install. May be true when redistributable is false."
         },
         "editions": {
           "type": "array",

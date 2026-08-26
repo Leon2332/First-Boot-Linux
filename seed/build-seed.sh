@@ -157,6 +157,12 @@ copy_apt_early() {
 
 copy_overlay() {
   # Do not preserve host uid: overlay files live in the user's tree.
+  # xcursor-themes points default/index.theme at /etc/alternatives (often dangling).
+  if [[ -L $ROOTFS/usr/share/icons/default ]]; then
+    rm -f "$ROOTFS/usr/share/icons/default"
+  elif [[ -L $ROOTFS/usr/share/icons/default/index.theme ]]; then
+    rm -f "$ROOTFS/usr/share/icons/default/index.theme"
+  fi
   cp -a --no-preserve=ownership "$SEED_DIR/overlay/." "$ROOTFS/"
   mkdir -p "$ROOTFS/etc/firstboot"
   printf '%s\n' "$VERSION" > "$ROOTFS/etc/firstboot/version"
@@ -255,6 +261,24 @@ install_chooser() {
   chown -R root:root "$ROOTFS/usr/share/firstboot"
   find "$ROOTFS/usr/share/firstboot" -type d -exec chmod 755 {} +
   find "$ROOTFS/usr/share/firstboot" -type f -exec chmod 644 {} +
+}
+
+install_cursors() {
+  local builder="$SEED_DIR/cursors/build_theme.py"
+  local svg="$SEED_DIR/cursors/src/svg/left_ptr.svg"
+  local dest="$ROOTFS/usr/share/icons/First Boot Cursor"
+  [[ -f $builder ]] || die "cursor theme builder missing ($builder)"
+  [[ -f $svg ]] || die "cursor SVGs missing ($svg)"
+  command -v python3 >/dev/null || die "python3 required to build the cursor theme"
+  log "cursor theme"
+  mkdir -p "$WORK/cursor-theme"
+  FIRSTBOOT_CURSOR_BUILD="$WORK/cursor-theme/First Boot Cursor" \
+    FIRSTBOOT_CURSOR_BITMAPS="$WORK/cursor-theme/bitmaps" \
+    python3 "$builder" --prefix "$ROOTFS/usr"
+  if [[ -f $SEED_DIR/cursors/LICENSE ]]; then
+    install -m 0644 "$SEED_DIR/cursors/LICENSE" "$dest/LICENSE"
+  fi
+  [[ -f $dest/cursors/left_ptr ]] || die "cursor theme build produced no left_ptr"
 }
 
 apt_get() {
@@ -498,6 +522,7 @@ apt_get -y install --no-install-recommends "${pkgs[@]}"
 log "overlay"
 copy_overlay
 install_chooser
+install_cursors
 run_hooks
 
 # drop chroot-only guards before the image is frozen

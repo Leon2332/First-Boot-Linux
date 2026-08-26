@@ -42,7 +42,7 @@ Each distro:
 | `redistributable` | We may copy an official ISO onto `payload/images/`. False when the license forbids redistribution (MS Windows). Independent of `install`. |
 | `install` | Install driver id, or `null` if we cannot install it yet. `windows` and `freebsd` are reserved; no driver yet. |
 | `can_stage` | Creator may copy an edition ISO onto `payload/images/` |
-| `suggested_default` | Pre-tick in the creator GUI |
+| `suggested_default` | Reserved. Creator does not pre-tick anything. |
 | `editions[]` | One ISO per desktop (or flavor) |
 
 Each edition:
@@ -51,7 +51,7 @@ Each edition:
 | --- | --- |
 | `id` | `gnome`, `cinnamon`, `plasma`, … |
 | `name` | Display name |
-| `default` | Featured on the recommended card (exactly one `true` per distro) |
+| `default` | Exactly one `true` per distro. Chooser recommended cards are each local edition; default is the fallback card when none are local |
 | `filename` | Basename written to `payload/images/` |
 | `url` | Direct ISO URL, or `null` until pinned |
 | `sha256` | 64 lowercase hex, or `null` until pinned |
@@ -61,8 +61,8 @@ Rules:
 
 - `can_stage` is true only when `install` is set **and** `redistributable` is true. Do not stage an ISO we cannot install or may not copy.
 - `redistributable: false` forces `can_stage: false`. The shop may still put that distro in `recommended` as download-only once `install` is set. The creator must never write its ISO to `images/`.
-- `suggested_default` requires `install`. It may be true when `redistributable` is false (pre-tick as download-only recommended).
-- Official catalog is only distros with a working install driver: Ubuntu (`ubuntu-2604`), Linux Mint (`mint-223`), Fedora Plasma (`fedora-44-plasma`). Older sticks may still say `ubuntu-autoinstall` / `mint` / `fedora-kickstart` (aliases). `windows` and `freebsd` stay reserved in the schema. The mockup in `docs/` is the longer future list. Driver Python lives in `chooser/firstboot/osinstall/`.
+- `suggested_default` requires `install`. The creator GUI does not pre-tick; shops tick desktops under each distro.
+- Official catalog is only distros with a working install driver: Ubuntu (`ubuntu-2604`), Linux Mint (`mint-223`, Cinnamon / MATE / Xfce editions), Fedora Plasma (`fedora-44-plasma`). Older sticks may still say `ubuntu-autoinstall` / `mint` / `fedora-kickstart` (aliases). `windows` and `freebsd` stay reserved in the schema. The mockup in `docs/` is the longer future list. Driver Python lives in `chooser/firstboot/osinstall/`.
 - Pin `url`, `sha256`, and `size_bytes` before the creator downloads that edition.
 
 ## `catalog.json` (on the USB)
@@ -77,7 +77,7 @@ Self-contained shop catalog. Schema: [`catalog.schema.json`](catalog.schema.json
 }
 ```
 
-The chooser grid is `recommended`. **Other options** (the last card) opens `recommended` followed by `catalog`, sorted by name (do not duplicate ids in the JSON). `ms-windows` stays **MS Windows** on the card and **Microsoft Windows** in that list.
+The chooser grid is `recommended`, one card per **local** edition (ticked desktop). The same distro id can appear on more than one card (Mint MATE and Mint Xfce). A recommended distro with no local edition (download-only, e.g. MS Windows) is still one card. **Other options** (the last card) opens `recommended` followed by `catalog`, sorted by name, one row per distro (do not duplicate ids in the JSON). `ms-windows` stays **MS Windows** on the card and **Microsoft Windows** in that list.
 
 Each distro copies display fields from the official catalog (`id`, `name`, `version`, `tagline`, `description`, `family`, `install`) plus `editions`. Do not copy official edition objects through: they have `filename` and nullable hashes, which this schema rejects (`additionalProperties: false`).
 

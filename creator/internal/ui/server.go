@@ -92,33 +92,48 @@ func Run() error {
 }
 
 func (s *session) state(w http.ResponseWriter, r *http.Request) {
+	type edition struct {
+		ID        string `json:"id"`
+		Name      string `json:"name"`
+		Size      string `json:"size"`
+		Stageable bool   `json:"stageable"`
+	}
 	type distro struct {
-		ID               string `json:"id"`
-		Name             string `json:"name"`
-		Version          string `json:"version"`
-		Tagline          string `json:"tagline"`
-		Description      string `json:"description"`
-		Stageable        bool   `json:"stageable"`
-		Redistributable  bool   `json:"redistributable"`
-		SuggestedDefault bool   `json:"suggested_default"`
-		Edition          string `json:"edition"`
-		Size             string `json:"size"`
-		Logo             bool   `json:"logo"`
+		ID          string    `json:"id"`
+		Name        string    `json:"name"`
+		Version     string    `json:"version"`
+		Tagline     string    `json:"tagline"`
+		Description string    `json:"description"`
+		Stageable   bool      `json:"stageable"`
+		Logo        bool      `json:"logo"`
+		Editions    []edition `json:"editions"`
 	}
 	var list []distro
 	for _, d := range s.off.Distros {
+		if !d.Offerable() {
+			continue
+		}
 		item := distro{
 			ID: d.ID, Name: d.Name, Version: d.Version,
 			Tagline: d.Tagline, Description: d.Description,
-			Stageable: d.Stageable(), Redistributable: d.Redistributable,
-			SuggestedDefault: d.SuggestedDefault,
-			Logo:             assets.DistroLogo(d.ID) != "",
+			Stageable: d.Stageable(),
+			Logo:      assets.DistroLogo(d.ID) != "",
 		}
-		if ed := d.DefaultEdition(); ed != nil {
-			item.Edition = ed.Name
-			if ed.SizeBytes != nil {
-				item.Size = catalog.FormatBytes(*ed.SizeBytes)
+		for _, ed := range d.Editions {
+			if !ed.Pinned() {
+				continue
 			}
+			row := edition{
+				ID: ed.ID, Name: ed.Name,
+				Stageable: d.CanStageEdition(ed),
+			}
+			if ed.SizeBytes != nil {
+				row.Size = catalog.FormatBytes(*ed.SizeBytes)
+			}
+			item.Editions = append(item.Editions, row)
+		}
+		if len(item.Editions) == 0 {
+			continue
 		}
 		list = append(list, item)
 	}
@@ -155,7 +170,11 @@ func (s *session) estimate(w http.ResponseWriter, r *http.Request) {
 	est := compose.Plan(s.seed, shop)
 	var names []string
 	for _, d := range shop.Recommended {
-		names = append(names, d.Name+" "+d.Version)
+		for _, e := range d.Editions {
+			if e.Local {
+				names = append(names, strings.TrimSpace(d.Name+" "+e.Name))
+			}
+		}
 	}
 	writeJSON(w, map[string]any{
 		"summary":  est.Summary,

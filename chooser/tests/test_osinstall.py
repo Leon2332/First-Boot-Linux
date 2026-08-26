@@ -136,8 +136,17 @@ def ubuntu_distro(root: str, *, present: bool = True) -> Distro:
     )
 
 
-def mint_distro(root: str, *, present: bool = True) -> Distro:
-    iso_rel = "images/linuxmint-22.3-cinnamon-64bit.iso"
+def mint_distro(
+    root: str,
+    *,
+    present: bool = True,
+    distro_id: str = "linux-mint",
+    name: str = "Linux Mint",
+    edition_id: str = "cinnamon",
+    edition_name: str = "Cinnamon",
+    iso_name: str = "linuxmint-22.3-cinnamon-64bit.iso",
+) -> Distro:
+    iso_rel = f"images/{iso_name}"
     path = os.path.join(root, iso_rel)
     if present:
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -145,8 +154,8 @@ def mint_distro(root: str, *, present: bool = True) -> Distro:
             fh.write(b"iso-bytes")
     sha = hashlib.sha256(b"iso-bytes").hexdigest() if present else ZERO
     ed = Edition(
-        id="cinnamon",
-        name="Cinnamon",
+        id=edition_id,
+        name=edition_name,
         default=True,
         claimed_local=True,
         file=iso_rel,
@@ -156,8 +165,8 @@ def mint_distro(root: str, *, present: bool = True) -> Distro:
         available=present and os.path.isfile(path),
     )
     return Distro(
-        id="linux-mint",
-        name="Linux Mint",
+        id=distro_id,
+        name=name,
         version="22.3",
         tagline="t",
         description="d",
@@ -439,6 +448,8 @@ class YamlTests(unittest.TestCase):
         self.assertEqual(iso_relpath("images/ubuntu-26.04-desktop-amd64.iso"), "/images/ubuntu-26.04-desktop-amd64.iso")
         self.assertTrue(ISO_REL_RE.fullmatch("/images/ubuntu-26.04-desktop-amd64.iso"))
         self.assertTrue(ISO_REL_RE.fullmatch("/images/linuxmint-22.3-cinnamon-64bit.iso"))
+        self.assertTrue(ISO_REL_RE.fullmatch("/images/linuxmint-22.3-mate-64bit.iso"))
+        self.assertTrue(ISO_REL_RE.fullmatch("/images/linuxmint-22.3-xfce-64bit.iso"))
         self.assertTrue(ISO_REL_RE.fullmatch("/images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso"))
         self.assertFalse(ISO_REL_RE.fullmatch("/etc/passwd"))
         self.assertFalse(ISO_REL_RE.fullmatch("/images/../ubuntu.iso"))
@@ -502,6 +513,44 @@ class PlanTests(unittest.TestCase):
             self.assertTrue(plan.same_disk)
             self.assertEqual(plan.driver, DRIVER_MINT)
             self.assertEqual(plan.iso_rel, "/images/linuxmint-22.3-cinnamon-64bit.iso")
+
+    def test_mint_mate_and_xfce_share_driver(self) -> None:
+        rows = (
+            (
+                "linux-mint",
+                "Linux Mint",
+                "mate",
+                "MATE",
+                "linuxmint-22.3-mate-64bit.iso",
+            ),
+            (
+                "linux-mint",
+                "Linux Mint",
+                "xfce",
+                "Xfce",
+                "linuxmint-22.3-xfce-64bit.iso",
+            ),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            sda = disk("/dev/sda", 512 * 1024**3, parts=fbl_parts("/dev/sda"))
+            mounts = {"/cdrom": "/dev/sda2", "/run/payload": "/dev/sda3"}
+            for distro_id, name, eid, ename, iso in rows:
+                distro = mint_distro(
+                    tmp,
+                    distro_id=distro_id,
+                    name=name,
+                    edition_id=eid,
+                    edition_name=ename,
+                    iso_name=iso,
+                )
+                plan = plan_os_install(
+                    [sda], mounts, tmp, distro, distro.default_edition
+                )
+                self.assertTrue(plan.available, plan.reason)
+                self.assertEqual(plan.driver, DRIVER_MINT)
+                self.assertEqual(plan.iso_rel, f"/images/{iso}")
+                self.assertEqual(plan.distro_name, name)
+                self.assertEqual(plan.edition_name, ename)
 
     def test_fedora_same_disk_is_ready(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

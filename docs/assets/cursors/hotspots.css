@@ -1,9 +1,9 @@
 :root {
-  --cursor-default: url("assets/cursors/default.png") 4 2, default;
-  --cursor-pointer: url("assets/cursors/pointer.png") 10 2, pointer;
+  --cursor-default: url("assets/cursors/default.png") 5 2, default;
+  --cursor-pointer: url("assets/cursors/pointer.png") 11 2, pointer;
   --cursor-text: url("assets/cursors/text.png") 12 12, text;
   --cursor-wait: url("assets/cursors/wait.png") 12 12, wait;
-  --cursor-progress: url("assets/cursors/progress.png") 4 2, progress;
+  --cursor-progress: url("assets/cursors/progress.png") 5 2, progress;
   --cursor-move: url("assets/cursors/move.png") 12 12, move;
   --cursor-grab: url("assets/cursors/grab.png") 14 7, grab;
   --cursor-grabbing: url("assets/cursors/grabbing.png") 12 6, grabbing;
@@ -20,10 +20,10 @@
   --cursor-not-allowed: url("assets/cursors/not-allowed.png") 12 12, not-allowed;
   --cursor-help: url("assets/cursors/help.png") 4 8, help;
   --cursor-crosshair: url("assets/cursors/crosshair.png") 12 12, crosshair;
-  --cursor-copy: url("assets/cursors/copy.png") 4 2, copy;
+  --cursor-copy: url("assets/cursors/copy.png") 5 2, copy;
   --cursor-alias: url("assets/cursors/alias.png") 9 6, alias;
   --cursor-context-menu: url("assets/cursors/context-menu.png") 5 2, context-menu;
-  --cursor-zoom-in: url("assets/cursors/zoom-in.png") 10 10, zoom-in;
-  --cursor-zoom-out: url("assets/cursors/zoom-out.png") 10 10, zoom-out;
+  --cursor-zoom-in: url("assets/cursors/zoom-in.png") 11 11, zoom-in;
+  --cursor-zoom-out: url("assets/cursors/zoom-out.png") 11 11, zoom-out;
   --cursor-no-drop: url("assets/cursors/no-drop.png") 9 6, no-drop;
 }

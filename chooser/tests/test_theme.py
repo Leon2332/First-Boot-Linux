@@ -16,6 +16,8 @@ if CHOOSER_DIR not in sys.path:
 
 from firstboot.theme import (  # noqa: E402
     CONSOLE_SCHEMA,
+    CURSOR_SIZE,
+    CURSOR_THEME,
     EPIPHANY_DESKTOP,
     apply_session_theme,
     config_home,
@@ -43,13 +45,17 @@ class WriteTests(unittest.TestCase):
             gtk = Path(tmp, "gtk-4.0", "settings.ini").read_text(encoding="utf-8")
             self.assertIn("gtk-application-prefer-dark-theme=true", gtk)
             self.assertIn("gtk-interface-color-scheme=dark", gtk)
+            self.assertIn(f"gtk-cursor-theme-name={CURSOR_THEME}", gtk)
+            self.assertIn(f"gtk-cursor-theme-size={CURSOR_SIZE}", gtk)
             apply_session_theme(False, env)
             gtk = Path(tmp, "gtk-4.0", "settings.ini").read_text(encoding="utf-8")
             self.assertIn("gtk-application-prefer-dark-theme=false", gtk)
             self.assertIn("gtk-interface-color-scheme=light", gtk)
+            self.assertIn(f"gtk-cursor-theme-name={CURSOR_THEME}", gtk)
             gtk3 = Path(tmp, "gtk-3.0", "settings.ini").read_text(encoding="utf-8")
             self.assertIn("gtk-application-prefer-dark-theme=false", gtk3)
             self.assertIn("gtk-interface-color-scheme=light", gtk3)
+            self.assertIn(f"gtk-cursor-theme-name={CURSOR_THEME}", gtk3)
             mime = Path(tmp, "mimeapps.list").read_text(encoding="utf-8")
             self.assertIn("[Default Applications]", mime)
             self.assertIn(f"x-scheme-handler/https={EPIPHANY_DESKTOP}", mime)
@@ -81,7 +87,12 @@ class ChooserEnvTests(unittest.TestCase):
             "environment",
         ).resolve()
         self.assertTrue(labwc.is_file(), labwc)
-        self.assertIn("ADW_DISABLE_PORTAL=1", labwc.read_text(encoding="utf-8"))
+        text = labwc.read_text(encoding="utf-8")
+        self.assertIn("ADW_DISABLE_PORTAL=1", text)
+        self.assertIn("XCURSOR_THEME=First Boot Cursor", text)
+        self.assertIn("XCURSOR_SIZE=24", text)
+        self.assertIn("XCURSOR_THEME=", session)
+        self.assertIn("First Boot Cursor", session)
 
 
 class ConsoleDefaultTests(unittest.TestCase):
@@ -108,6 +119,56 @@ class ConsoleDefaultTests(unittest.TestCase):
         self.assertIn("ensure_console_follows_system", app)
         self.assertIn(CONSOLE_SCHEMA, theme)
         self.assertIn('"theme", "auto"', theme)
+
+
+class CursorThemeTests(unittest.TestCase):
+    def test_overlay_default_index(self) -> None:
+        path = Path(
+            CHOOSER_DIR,
+            "..",
+            "seed",
+            "overlay",
+            "usr",
+            "share",
+            "icons",
+            "default",
+            "index.theme",
+        ).resolve()
+        self.assertTrue(path.is_file(), path)
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("Inherits=First Boot Cursor", text)
+
+    def test_interface_gschema_override(self) -> None:
+        path = Path(
+            CHOOSER_DIR,
+            "..",
+            "seed",
+            "overlay",
+            "usr",
+            "share",
+            "glib-2.0",
+            "schemas",
+            "20-firstboot-interface.gschema.override",
+        ).resolve()
+        self.assertTrue(path.is_file(), path)
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("[org.gnome.desktop.interface]", text)
+        self.assertIn("cursor-theme='First Boot Cursor'", text)
+        self.assertIn("cursor-size=24", text)
+
+    def test_svg_sources(self) -> None:
+        svg = Path(
+            CHOOSER_DIR, "..", "seed", "cursors", "src", "svg", "left_ptr.svg"
+        ).resolve()
+        self.assertTrue(svg.is_file(), svg)
+        builder = Path(
+            CHOOSER_DIR, "..", "seed", "cursors", "build_theme.py"
+        ).resolve()
+        self.assertTrue(builder.is_file(), builder)
+        toml = Path(
+            CHOOSER_DIR, "..", "seed", "cursors", "configs", "x.build.toml"
+        ).resolve()
+        self.assertTrue(toml.is_file(), toml)
 
 
 if __name__ == "__main__":

@@ -34,22 +34,83 @@ function renderSteps() {
   });
 }
 
-function card(d, ready) {
-  const el = document.createElement("label");
-  el.className = "card" + (ready ? "" : " disabled");
+const PICKED_SLOTS = 5;
+const ticked = [];
+
+function tokens(query) {
+  return String(query || "").toLowerCase().trim().split(/\s+/).filter(Boolean);
+}
+
+function nameMatches(name, query) {
+  const toks = tokens(query);
+  if (!toks.length) return true;
+  const field = String(name || "").toLowerCase();
+  return toks.every((tok) => field.includes(tok));
+}
+
+function stagedKey(distroId, editionId) {
+  return `${distroId}:${editionId}`;
+}
+
+function lookupStaged(key) {
+  const cut = String(key || "").indexOf(":");
+  if (cut < 1) return null;
+  const did = key.slice(0, cut);
+  const eid = key.slice(cut + 1);
+  const distro = (state?.distros || []).find((d) => d.id === did);
+  if (!distro) return null;
+  const edition = (distro.editions || []).find((ed) => ed.id === eid);
+  if (!edition) return null;
+  return { distro, edition };
+}
+
+function setTicked(key, on) {
+  const i = ticked.indexOf(key);
+  if (on) {
+    if (i >= 0) return true;
+    if (ticked.length >= PICKED_SLOTS) return false;
+    ticked.push(key);
+    return true;
+  }
+  if (i >= 0) ticked.splice(i, 1);
+  return true;
+}
+
+function card(d) {
+  const el = document.createElement("article");
+  el.className = "card";
+  el.dataset.id = d.id;
   const src = d.logo ? `/api/logo/${encodeURIComponent(d.id)}` : "";
+  const full = ticked.length >= PICKED_SLOTS;
+  const editions = (d.editions || []).map((ed) => {
+    const key = stagedKey(d.id, ed.id);
+    const ready = !!ed.stageable;
+    const checked = ticked.includes(key);
+    const locked = !ready || (full && !checked);
+    const meta = ready
+      ? `${escapeHtml(ed.size)} · on the USB`
+      : "Install support is not ready";
+    return `<label class="edition">
+      <input type="checkbox" data-key="${escapeHtml(key)}" data-ready="${ready ? "1" : "0"}" ${checked ? "checked" : ""} ${locked ? "disabled" : ""}>
+      <span class="ed-name">${escapeHtml(ed.name)}</span>
+      <span class="ed-meta">${meta}</span>
+    </label>`;
+  }).join("");
   el.innerHTML = `
-    <input type="checkbox" ${ready && d.suggested_default ? "checked" : ""} ${ready ? "" : "disabled"}>
     ${src ? `<img class="logo" src="${src}" alt="">` : "<span></span>"}
     <div>
       <h3>${escapeHtml(d.name)}</h3>
       <p class="meta">${escapeHtml(d.version)} · ${escapeHtml(d.tagline)}</p>
       <p>${escapeHtml(d.description)}</p>
-      <p class="tag">${ready
-        ? `${escapeHtml(d.edition)} · ${escapeHtml(d.size)} · on the USB`
-        : "Install support is not ready"}</p>
+      <div class="editions">${editions}</div>
     </div>`;
-  el.querySelector("input").dataset.id = d.id;
+  el.querySelectorAll("input[type=checkbox]").forEach((box) => {
+    box.addEventListener("change", () => {
+      if (!setTicked(box.dataset.key, box.checked)) box.checked = false;
+      renderPicked();
+      syncEditionLocks();
+    });
+  });
   return el;
 }
 
@@ -60,7 +121,60 @@ function escapeHtml(s) {
 }
 
 function selected() {
-  return [...document.querySelectorAll("#ready input:checked")].map((el) => el.dataset.id);
+  return ticked.slice();
+}
+
+function renderPicked() {
+  const grid = $("picked");
+  if (!grid) return;
+  grid.innerHTML = "";
+  for (let i = 0; i < PICKED_SLOTS; i++) {
+    const slot = document.createElement("div");
+    slot.className = "picked-slot";
+    const item = lookupStaged(ticked[i]);
+    if (!item) {
+      grid.appendChild(slot);
+      continue;
+    }
+    slot.classList.add("filled");
+    if (item.distro.logo) {
+      const img = document.createElement("img");
+      img.src = `/api/logo/${encodeURIComponent(item.distro.id)}`;
+      img.alt = "";
+      slot.appendChild(img);
+    }
+    const de = document.createElement("span");
+    de.className = "de";
+    de.textContent = item.edition.name;
+    slot.appendChild(de);
+    grid.appendChild(slot);
+  }
+}
+
+function syncEditionLocks() {
+  const full = ticked.length >= PICKED_SLOTS;
+  document.querySelectorAll("#ready input[type=checkbox]").forEach((box) => {
+    const ready = box.dataset.ready === "1";
+    box.disabled = !ready || (full && !box.checked);
+  });
+}
+
+function renderDistros() {
+  const ready = $("ready");
+  const empty = $("distro-empty");
+  const query = $("distro-search")?.value || "";
+  ready.innerHTML = "";
+  const distros = (state?.distros || [])
+    .filter((d) => nameMatches(d.name, query))
+    .slice()
+    .sort((a, b) => {
+      const byName = a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      if (byName) return byName;
+      return a.id.localeCompare(b.id);
+    });
+  distros.forEach((d) => ready.appendChild(card(d)));
+  empty.hidden = distros.length > 0;
+  renderPicked();
 }
 
 function validate() {
@@ -73,7 +187,7 @@ function validate() {
       if ($("pass").value.length < 6) return "Use at least 6 characters.";
     }
   }
-  if (step === 2 && selected().length === 0) return "Tick at least one distro to keep on the USB.";
+  if (step === 2 && selected().length === 0) return "Tick at least one desktop to keep on the USB.";
   if (step === 3) {
     if (!state.seed_ok) return state.seed_error || "No First Boot seed on this computer.";
     const target = document.querySelector("input[name=target]:checked").value;
@@ -245,10 +359,9 @@ async function init() {
   $("img-path").value = state.default_image;
   $("dark-preview").src = "/api/wallpaper/dark";
   $("light-preview").src = "/api/wallpaper/light";
-  const ready = $("ready");
-  state.distros.forEach((d) => {
-    if (d.stageable) ready.appendChild(card(d, true));
-  });
+  renderDistros();
+  $("distro-search").addEventListener("input", renderDistros);
+  $("distro-search").addEventListener("search", renderDistros);
   await refreshDisks();
   render();
 

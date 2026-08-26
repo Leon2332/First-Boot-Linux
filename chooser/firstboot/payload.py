@@ -102,6 +102,9 @@ class Distro:
             return "Microsoft Windows"
         return self.name
 
+    def local_editions(self) -> tuple[Edition, ...]:
+        return tuple(ed for ed in self.editions if ed.claimed_local)
+
 
 @dataclass
 class Payload:
@@ -395,6 +398,23 @@ def _parse_edition(root: str, raw: object, where: str) -> Edition:
         size_bytes=raw["size_bytes"],
         available=available,
     )
+
+
+def recommended_offerings(distros: list[Distro]) -> list[tuple[Distro, Edition]]:
+    """Chooser grid: one card per ticked desktop.
+
+    Shop ``local`` editions are the ticked desktops. A recommended distro
+    with no local edition (download-only, e.g. MS Windows) still gets one
+    card for its default edition.
+    """
+    out: list[tuple[Distro, Edition]] = []
+    for distro in distros:
+        local = distro.local_editions()
+        if local:
+            out.extend((distro, ed) for ed in local)
+        else:
+            out.append((distro, distro.default_edition))
+    return out
 
 
 def _merge_others(recommended: list[Distro], catalog: list[Distro]) -> list[Distro]:

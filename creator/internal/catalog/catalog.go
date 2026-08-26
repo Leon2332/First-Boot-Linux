@@ -121,12 +121,29 @@ func (d *Distro) DefaultEdition() *Edition {
 	return nil
 }
 
-func (d *Distro) Stageable() bool {
+func (d *Distro) Edition(id string) *Edition {
+	for i := range d.Editions {
+		if d.Editions[i].ID == id {
+			return &d.Editions[i]
+		}
+	}
+	return nil
+}
+
+func (d *Distro) CanStageEdition(ed Edition) bool {
 	if !d.Redistributable || !d.CanStage || d.Install == nil || *d.Install == "" {
 		return false
 	}
-	ed := d.DefaultEdition()
-	return ed != nil && ed.Pinned()
+	return ed.Pinned()
+}
+
+func (d *Distro) Stageable() bool {
+	for _, ed := range d.Editions {
+		if d.CanStageEdition(ed) {
+			return true
+		}
+	}
+	return false
 }
 
 // Offerable is true when the shop catalog may list this distro.
@@ -144,6 +161,43 @@ func (d *Distro) Offerable() bool {
 		return true
 	}
 	return !d.Redistributable
+}
+
+func (d *Distro) NameMatches(query string) bool {
+	return nameMatches(d.Name, query)
+}
+
+func nameMatches(name, query string) bool {
+	toks := strings.Fields(strings.ToLower(strings.TrimSpace(query)))
+	if len(toks) == 0 {
+		return true
+	}
+	field := strings.ToLower(name)
+	for _, tok := range toks {
+		if !strings.Contains(field, tok) {
+			return false
+		}
+	}
+	return true
+}
+
+func StagedKey(distroID, editionID string) string {
+	return distroID + ":" + editionID
+}
+
+func ParseStaged(spec string) (distroID, editionID string, err error) {
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return "", "", fmt.Errorf("empty selection")
+	}
+	distroID, editionID, ok := strings.Cut(spec, ":")
+	if !ok {
+		return spec, "", nil
+	}
+	if distroID == "" || editionID == "" {
+		return "", "", fmt.Errorf("invalid selection %s", spec)
+	}
+	return distroID, editionID, nil
 }
 
 func (e *Edition) Pinned() bool {
@@ -213,32 +267,59 @@ func sanitizeValue(s string) string {
 	return s
 }
 
-// BuildShop turns the ticked official ids into a shop catalog.json.
-// Each ticked distro is recommended. Stageable defaults become local; a
-// non-redistributable row is recommended with every edition as a download.
-// Other pinned editions of a staged distro stay as downloads.
-// Unticked but offerable distros (install driver + pinned default) go in
-// catalog as download-only — Other options on the chooser. Rows with
-// install: null stay out.
-func BuildShop(off *Official, selectedIDs []string) (*Shop, error) {
-	if len(selectedIDs) == 0 {
-		return nil, fmt.Errorf("pick at least one distro to keep on the USB")
+// BuildShop turns ticked desktops into a shop catalog.json.
+// Each spec is distro:edition (linux-mint:cinnamon). A bare distro id
+// means that distro's default edition.
+// A distro with any ticked desktop is recommended: ticked stageable
+// editions are local (chooser recommended cards, one per desktop);
+// other pinned editions stay as downloads. Ticked editions are listed
+// first, in selection order. The featured edition is the official
+// default if ticked, otherwise the first ticked desktop. Unticked
+// offerable distros go in catalog as download-only — Other options on
+// the chooser. Rows with install: null stay out.
+func BuildShop(off *Official, selected []string) (*Shop, error) {
+	if len(selected) == 0 {
+		return nil, fmt.Errorf("tick at least one desktop to keep on the USB")
 	}
+	picked := map[string][]string{}
+	order := []string{}
 	seen := map[string]bool{}
-	shop := &Shop{SchemaVersion: 1, Recommended: []ShopDistro{}, Catalog: []ShopDistro{}}
-	for _, id := range selectedIDs {
-		if seen[id] {
-			return nil, fmt.Errorf("duplicate distro %s", id)
+	for _, spec := range selected {
+		did, eid, err := ParseStaged(spec)
+		if err != nil {
+			return nil, err
 		}
-		seen[id] = true
-		d := off.Distro(id)
+		d := off.Distro(did)
 		if d == nil {
-			return nil, fmt.Errorf("unknown distro %s", id)
+			return nil, fmt.Errorf("unknown distro %s", did)
 		}
 		if !d.Offerable() {
 			return nil, fmt.Errorf("%s cannot be offered yet", d.Name)
 		}
-		sd, err := shopDistro(d, true)
+		if eid == "" {
+			ed := d.DefaultEdition()
+			if ed == nil {
+				return nil, fmt.Errorf("%s has no default desktop", d.Name)
+			}
+			eid = ed.ID
+		}
+		if d.Edition(eid) == nil {
+			return nil, fmt.Errorf("unknown desktop %s for %s", eid, d.Name)
+		}
+		key := StagedKey(did, eid)
+		if seen[key] {
+			return nil, fmt.Errorf("duplicate desktop %s", key)
+		}
+		seen[key] = true
+		if _, ok := picked[did]; !ok {
+			order = append(order, did)
+		}
+		picked[did] = append(picked[did], eid)
+	}
+	shop := &Shop{SchemaVersion: 1, Recommended: []ShopDistro{}, Catalog: []ShopDistro{}}
+	for _, did := range order {
+		d := off.Distro(did)
+		sd, err := shopDistro(d, picked[did])
 		if err != nil {
 			return nil, err
 		}
@@ -246,13 +327,13 @@ func BuildShop(off *Official, selectedIDs []string) (*Shop, error) {
 	}
 	for i := range off.Distros {
 		d := &off.Distros[i]
-		if seen[d.ID] {
+		if _, ok := picked[d.ID]; ok {
 			continue
 		}
 		if !d.Offerable() {
 			continue
 		}
-		sd, err := shopDistro(d, false)
+		sd, err := shopDistro(d, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -261,7 +342,7 @@ func BuildShop(off *Official, selectedIDs []string) (*Shop, error) {
 	return shop, nil
 }
 
-func shopDistro(d *Distro, stageDefault bool) (ShopDistro, error) {
+func shopDistro(d *Distro, selected []string) (ShopDistro, error) {
 	sd := ShopDistro{
 		ID:          d.ID,
 		Name:        d.Name,
@@ -271,8 +352,13 @@ func shopDistro(d *Distro, stageDefault bool) (ShopDistro, error) {
 		Family:      d.Family,
 		Install:     *d.Install,
 	}
-	var haveDefault bool
-	for _, ed := range d.Editions {
+	picked := map[string]bool{}
+	for _, id := range selected {
+		picked[id] = true
+	}
+	featured := featuredEdition(d, selected)
+	var haveFeatured bool
+	for _, ed := range orderedEditions(d, selected) {
 		if !ed.Pinned() {
 			if ed.Default {
 				return sd, fmt.Errorf("%s %s is not pinned (url / sha256 / size)", d.Name, ed.Name)
@@ -282,27 +368,63 @@ func shopDistro(d *Distro, stageDefault bool) (ShopDistro, error) {
 		se := ShopEdition{
 			ID:        ed.ID,
 			Name:      ed.Name,
-			Default:   ed.Default,
+			Default:   featured != "" && ed.ID == featured,
 			SHA256:    *ed.SHA256,
 			SizeBytes: *ed.SizeBytes,
 		}
-		if stageDefault && d.Stageable() && ed.Default {
+		if picked[ed.ID] && d.CanStageEdition(ed) {
 			se.Local = true
 			se.File = "images/" + ed.Filename
-			haveDefault = true
 		} else {
 			se.Local = false
 			se.URL = *ed.URL
-			if ed.Default {
-				haveDefault = true
-			}
+		}
+		if se.Default {
+			haveFeatured = true
 		}
 		sd.Editions = append(sd.Editions, se)
 	}
-	if !haveDefault {
+	if !haveFeatured {
 		return sd, fmt.Errorf("%s has no pinned default edition", d.Name)
 	}
 	return sd, nil
+}
+
+func orderedEditions(d *Distro, selected []string) []Edition {
+	seen := map[string]bool{}
+	out := make([]Edition, 0, len(d.Editions))
+	for _, eid := range selected {
+		ed := d.Edition(eid)
+		if ed == nil || seen[eid] {
+			continue
+		}
+		seen[eid] = true
+		out = append(out, *ed)
+	}
+	for _, ed := range d.Editions {
+		if seen[ed.ID] {
+			continue
+		}
+		out = append(out, ed)
+	}
+	return out
+}
+
+func featuredEdition(d *Distro, selected []string) string {
+	if len(selected) > 0 {
+		picked := map[string]bool{}
+		for _, id := range selected {
+			picked[id] = true
+		}
+		if def := d.DefaultEdition(); def != nil && picked[def.ID] {
+			return def.ID
+		}
+		return selected[0]
+	}
+	if def := d.DefaultEdition(); def != nil {
+		return def.ID
+	}
+	return ""
 }
 
 func (s *Shop) LocalEditions() []ShopEdition {

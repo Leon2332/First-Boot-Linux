@@ -20,6 +20,7 @@ from firstboot.payload import (  # noqa: E402
     parse_retailer_conf,
     PayloadError,
     edition_is_present,
+    recommended_offerings,
 )
 
 ZERO = "0" * 64
@@ -293,6 +294,96 @@ class LoadPayloadTests(unittest.TestCase):
         self.assertFalse(win.default_edition.claimed_local)
         self.assertFalse(win.default_edition.available)
         self.assertEqual(win.default_edition.action, "download")
+
+    def test_recommended_offerings_are_local_desktops(self) -> None:
+        mint = {
+            "id": "linux-mint",
+            "name": "Linux Mint",
+            "version": "22.3",
+            "tagline": "Familiar and easy",
+            "description": "A stable desktop.",
+            "family": "mint",
+            "install": "mint-223",
+            "editions": [
+                {
+                    "id": "cinnamon",
+                    "name": "Cinnamon",
+                    "default": False,
+                    "local": False,
+                    "url": "https://example.invalid/cinnamon.iso",
+                    "sha256": ZERO,
+                    "size_bytes": 2800000000,
+                },
+                {
+                    "id": "mate",
+                    "name": "MATE",
+                    "default": True,
+                    "local": True,
+                    "file": "images/linuxmint-22.3-mate-64bit.iso",
+                    "sha256": ZERO,
+                    "size_bytes": 2600000000,
+                },
+                {
+                    "id": "xfce",
+                    "name": "Xfce",
+                    "default": False,
+                    "local": True,
+                    "file": "images/linuxmint-22.3-xfce-64bit.iso",
+                    "sha256": ZERO,
+                    "size_bytes": 2500000000,
+                },
+            ],
+        }
+        fedora = {
+            "id": "fedora",
+            "name": "Fedora",
+            "version": "44",
+            "tagline": "Modern Plasma desktop",
+            "description": "Plasma.",
+            "family": "fedora",
+            "install": "fedora-44-plasma",
+            "editions": [
+                {
+                    "id": "plasma",
+                    "name": "KDE Plasma",
+                    "default": True,
+                    "local": True,
+                    "file": "images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso",
+                    "sha256": ZERO,
+                    "size_bytes": 2800000000,
+                }
+            ],
+        }
+        _write(
+            self.tmp,
+            "catalog.json",
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "recommended": [mint, fedora],
+                    "catalog": [UBUNTU],
+                }
+            ),
+        )
+        p = load_payload(self.tmp)
+        cards = recommended_offerings(p.recommended)
+        self.assertEqual(
+            [(d.id, e.id) for d, e in cards],
+            [("linux-mint", "mate"), ("linux-mint", "xfce"), ("fedora", "plasma")],
+        )
+        mint_d = next(d for d in p.others if d.id == "linux-mint")
+        by_id = {e.id: e for e in mint_d.editions}
+        self.assertFalse(by_id["cinnamon"].claimed_local)
+        self.assertTrue(by_id["mate"].claimed_local)
+        self.assertTrue(by_id["xfce"].claimed_local)
+        self.assertEqual(by_id["cinnamon"].action, "download")
+        _write(self.tmp, "images/linuxmint-22.3-mate-64bit.iso", b"iso")
+        _write(self.tmp, "images/linuxmint-22.3-xfce-64bit.iso", b"iso")
+        p = load_payload(self.tmp)
+        by_id = {e.id: e for e in p.recommended[0].editions}
+        self.assertEqual(by_id["cinnamon"].action, "download")
+        self.assertEqual(by_id["mate"].action, "install")
+        self.assertEqual(by_id["xfce"].action, "install")
 
     def test_edition_is_present_rejects_unsafe(self) -> None:
         self.assertFalse(edition_is_present(self.tmp, "../catalog.json"))

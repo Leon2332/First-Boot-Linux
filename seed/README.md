@@ -12,7 +12,7 @@ It is not a desktop and not a shop remaster. The squashfs is the live root on `F
 | systemd, udev, casper, initramfs | snapd (apt-pinned out) |
 | NetworkManager, `wpasupplicant`, systemd-resolved | unattended-upgrades, update-notifier |
 | Mesa libraries | Ubuntu Pro / `cloud-init` / apport |
-| labwc + GTK4 chooser (tty1 autologin; GNOME-like panel / QS, not a desktop) + GNOME Console + GNOME Web + System details helper | App Center, ubiquity |
+| labwc + GTK4 chooser (tty1 autologin; GNOME-like panel / QS, not a desktop) + GNOME Console + GNOME Web + System details helper + First Boot Cursor | App Center, ubiquity |
 | Disk tools: parted, gdisk, ntfs-3g, lvm2, cryptsetup, rsync | |
 | `apt` / `dpkg` (hidden from the future UI) | |
 | OpenSSH server (field debug; key + live-user password) | |
@@ -83,6 +83,7 @@ Check the package set without root:
 | `packages/keep.list` | Installed with `--no-install-recommends` |
 | `packages/forbid.list` | Apt pin −1, then audited out of the manifest |
 | `overlay/` | Copied into the rootfs as-is |
+| `cursors/` | First Boot Cursor SVG sources. `build-seed.sh` rasterizes them into `/usr/share/icons/First Boot Cursor`. |
 | `hooks/` | Run in the chroot after packages. `45-kiosk.sh` creates the live user. `50-initramfs.sh` rebuilds the initrd so `casper.conf` and `casper-bottom/27payload` are what live boot sees. |
 | `build-seed.sh` | Real builder (root). Also installs `../chooser/` into `/usr/bin`. |
 | `build-in-docker.sh` | Same builder inside `ubuntu:26.04` |

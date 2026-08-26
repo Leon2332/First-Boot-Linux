@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="256"
+   height="256"
+   viewBox="0 0 256 256"
+   fill="none"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="right_tee.svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#b4b4b4"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="true"
+     inkscape:deskcolor="#1c1c1c"
+     inkscape:zoom="1.1089976"
+     inkscape:cx="128"
+     inkscape:cy="128"
+     inkscape:window-width="1920"
+     inkscape:window-height="1011"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1" />
+  <g>
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M40 224.32C36.4654 224.32 33.6 221.455 33.6 217.92V30.4C33.6 26.8654 36.4654 24 40 24C43.5346 24 46.4 26.8654 46.4 30.4V117.76H212.8C216.335 117.76 219.2 120.625 219.2 124.16C219.2 127.695 216.335 130.56 212.8 130.56H46.4V217.92C46.4 221.455 43.5346 224.32 40 224.32Z" fill="#FFFFFF"/>
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M40 224.32C36.4654 224.32 33.6 221.455 33.6 217.92V30.4C33.6 26.8654 36.4654 24 40 24C43.5346 24 46.4 26.8654 46.4 30.4V117.76H212.8C216.335 117.76 219.2 120.625 219.2 124.16C219.2 127.695 216.335 130.56 212.8 130.56H46.4V217.92C46.4 221.455 43.5346 224.32 40 224.32Z" stroke="#FFFFFF" stroke-width="19.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M40 224.32C36.4654 224.32 33.6 221.455 33.6 217.92V30.4C33.6 26.8654 36.4654 24 40 24C43.5346 24 46.4 26.8654 46.4 30.4V117.76H212.8C216.335 117.76 219.2 120.625 219.2 124.16C219.2 127.695 216.335 130.56 212.8 130.56H46.4V217.92C46.4 221.455 43.5346 224.32 40 224.32Z" fill="#000000"/>
+  </svg>

@@ -214,15 +214,17 @@ exit 0
 
 LINK_SERVICE = """[Unit]
 Description=First Boot Linux Fedora live image
-After=local-fs.target
-Before=display-manager.service
+After=local-fs.target livesys.service
+# Policy + rules must be labeled before polkitd reads them.
+# try-restart later: HUP does not reload action XML (0.6.48).
+Before=polkit.service polkitd.service display-manager.service
 
 [Service]
 Type=oneshot
 # Labeled Fedora binaries first: unlabeled copies AVC if we exec them
 # while still enforcing. Official liveinst also setenforce 0.
 ExecStart=-/usr/sbin/setenforce 0
-ExecStart=-/usr/sbin/restorecon -F /ks.cfg /usr/bin/liveinst /usr/bin/liveinst.real /usr/sbin/liveinst /usr/sbin/liveinst.real /usr/libexec/fbl-link-squashfs /usr/libexec/fbl-selinux /etc/systemd/system/fbl-link-squashfs.service /etc/xdg/autostart/fbl-liveinst.desktop /var/log/firstboot-fedora.log
+ExecStart=-/usr/sbin/restorecon -F /ks.cfg /usr/bin/liveinst /usr/bin/liveinst.real /usr/sbin/liveinst /usr/sbin/liveinst.real /usr/libexec/fbl-link-squashfs /usr/libexec/fbl-selinux /etc/systemd/system/fbl-link-squashfs.service /etc/xdg/autostart/fbl-liveinst.desktop /etc/xdg/autostart/kxkb2locale1.desktop /etc/xdg/autostart/org.kde.plasma-welcome.desktop /etc/polkit-1/rules.d/00-fbl-liveinst.rules /usr/share/polkit-1/rules.d/00-fbl-liveinst.rules /usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy /var/log/firstboot-fedora.log
 ExecStart=/usr/libexec/fbl-link-squashfs
 ExecStart=/usr/libexec/fbl-selinux
 RemainAfterExit=yes
@@ -260,6 +262,11 @@ if command -v restorecon >/dev/null; then
     /usr/libexec/fbl-link-squashfs /usr/libexec/fbl-selinux \\
     /etc/systemd/system/fbl-link-squashfs.service \\
     /etc/xdg/autostart/fbl-liveinst.desktop \\
+    /etc/xdg/autostart/kxkb2locale1.desktop \\
+    /etc/xdg/autostart/org.kde.plasma-welcome.desktop \\
+    /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
+    /usr/share/polkit-1/rules.d/00-fbl-liveinst.rules \\
+    /usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy \\
     /var/log/firstboot-fedora.log >> "$log" 2>&1 || true
 fi
 
@@ -281,7 +288,9 @@ if [ -e /run/fbl-squashfs.img ]; then
 fi
 
 for name in sealertauto setroubleshoot seapplet setroubleshoot-applet \\
-            org.fedorahosted.setroubleshoot org.fedoraproject.setroubleshoot; do
+            org.fedorahosted.setroubleshoot org.fedoraproject.setroubleshoot \\
+            kxkb2locale1 org.kde.plasma-welcome plasma-welcome \\
+            org.fedoraproject.welcome-screen; do
   printf '%s\\n' '[Desktop Entry]' 'Hidden=true' > "/etc/xdg/autostart/${name}.desktop"
 done
 ln -sfn /dev/null /etc/systemd/system/setroubleshootd.service
@@ -289,28 +298,66 @@ if command -v systemctl >/dev/null; then
   systemctl mask setroubleshootd.service >> "$log" 2>&1 || true
 fi
 pkill -x seapplet >/dev/null 2>&1 || true
+pkill -x kxkb2locale1 >/dev/null 2>&1 || true
+pkill -f plasma-welcome >/dev/null 2>&1 || true
 
-# liveuser has a blank password; auth_admin cannot complete unattended.
-mkdir -p /etc/polkit-1/rules.d /usr/share/polkit-1/rules.d
+# livesys-kde writes LiveInstaller=liveinst into plasma-welcomerc
+# (0.6.48: Welcome Center then pkexec'd liveinst). Neutralize after livesys.
+if [ -d /home/liveuser ]; then
+  mkdir -p /home/liveuser/.config /home/liveuser/.config/autostart
+  printf '%s\\n' '[General]' 'LiveEnvironment=false' \\
+    > /home/liveuser/.config/plasma-welcomerc
+  printf '%s\\n' '[Desktop Entry]' 'Hidden=true' \\
+    > /home/liveuser/.config/autostart/org.kde.plasma-welcome.desktop
+  chown -R liveuser:liveuser /home/liveuser/.config >> "$log" 2>&1 || true
+fi
+
+# Replace the official action with a labeled allow-yes file. Do not sed
+# the squashfs copy (0.6.47 unlabeled it). HUP does not reload action XML
+# (0.6.48 still prompted org.fedoraproject.pkexec.liveinst).
+mkdir -p /etc/polkit-1/rules.d /usr/share/polkit-1/rules.d \\
+  /usr/share/polkit-1/actions
 if [ -f /etc/polkit-1/rules.d/00-fbl-liveinst.rules ]; then
   cp -f /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
     /usr/share/polkit-1/rules.d/00-fbl-liveinst.rules 2>/dev/null || true
 fi
 pol=/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy
-if [ -f "$pol" ]; then
-  sed -i \\
-    -e 's|<allow_any>auth_admin</allow_any>|<allow_any>yes</allow_any>|' \\
-    -e 's|<allow_inactive>auth_admin</allow_inactive>|<allow_inactive>yes</allow_inactive>|' \\
-    -e 's|<allow_active>auth_admin</allow_active>|<allow_active>yes</allow_active>|' \\
-    "$pol" >> "$log" 2>&1 || true
+if [ -f /usr/libexec/fbl-liveinst.policy ]; then
+  cp -f /usr/libexec/fbl-liveinst.policy "$pol"
+  chmod 644 "$pol"
+fi
+pref=
+for p in /usr/share/polkit-1/rules.d/50-default.rules \\
+         /usr/share/polkit-1/rules.d/11-fedora-kde-policy.rules; do
+  if [ -f "$p" ]; then
+    pref=$p
+    break
+  fi
+done
+if [ -n "$pref" ]; then
+  chcon --reference="$pref" \\
+    /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
+    /usr/share/polkit-1/rules.d/00-fbl-liveinst.rules >> "$log" 2>&1 || true
+fi
+polref=
+for p in /usr/share/polkit-1/actions/org.freedesktop.locale1.policy \\
+         /usr/share/polkit-1/actions/org.freedesktop.NetworkManager.policy; do
+  if [ -f "$p" ]; then
+    polref=$p
+    break
+  fi
+done
+if [ -n "$polref" ] && [ -f "$pol" ]; then
+  chcon --reference="$polref" "$pol" >> "$log" 2>&1 || true
 fi
 if command -v restorecon >/dev/null; then
   restorecon -F /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
     /usr/share/polkit-1/rules.d/00-fbl-liveinst.rules "$pol" >> "$log" 2>&1 || true
 fi
 if command -v systemctl >/dev/null; then
-  systemctl reload polkit.service >> "$log" 2>&1 \\
-    || systemctl reload polkitd.service >> "$log" 2>&1 || true
+  systemctl try-restart polkit.service >> "$log" 2>&1 \\
+    || systemctl restart polkit.service >> "$log" 2>&1 \\
+    || systemctl try-restart polkitd.service >> "$log" 2>&1 || true
 fi
 
 {
@@ -331,15 +378,43 @@ X-GNOME-Autostart-enabled=true
 OnlyShowIn=KDE;
 """
 
-POLKIT_RULE = """// First Boot Linux — unattended liveinst. Overlay only.
-// Official policy is auth_admin; liveuser has a blank password, so
-// pkexec shows "Authentication is required to run the installer"
-// (0.6.46). Allow this action without a prompt.
+POLKIT_RULE = """// First Boot Linux — unattended live session. Overlay only.
+// liveuser has a blank password; auth_admin cannot complete unattended.
+// 0.6.48 still prompted org.fedoraproject.pkexec.liveinst (Welcome
+// Center). Do not gate on subject.user — pkexec subject is not always
+// the unix name "liveuser". Do not call action.lookup (duktape).
 polkit.addRule(function(action, subject) {
     if (action.id == "org.fedoraproject.pkexec.liveinst") {
         return polkit.Result.YES;
     }
+    if (action.id == "org.freedesktop.policykit.exec") {
+        return polkit.Result.YES;
+    }
+    if (action.id == "org.freedesktop.locale1.set-keyboard" ||
+        action.id == "org.freedesktop.locale1.set-locale") {
+        return polkit.Result.YES;
+    }
 });
+"""
+
+LIVEINST_POLICY = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <action id="org.fedoraproject.pkexec.liveinst">
+    <description>Run the live installer</description>
+    <message>Authentication is required to run the installer</message>
+    <icon_name>org.fedoraproject.AnacondaInstaller</icon_name>
+    <defaults>
+      <allow_any>yes</allow_any>
+      <allow_inactive>yes</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/liveinst</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>
 """
 
 DRACUT_HOOK = """#!/bin/sh
@@ -423,14 +498,42 @@ if [ -f /etc/polkit-1/rules.d/00-fbl-liveinst.rules ]; then
     "$root/usr/share/polkit-1/rules.d/00-fbl-liveinst.rules"
   chmod 644 "$root/etc/polkit-1/rules.d/00-fbl-liveinst.rules" \\
     "$root/usr/share/polkit-1/rules.d/00-fbl-liveinst.rules"
+  pref=
+  for p in "$root/usr/share/polkit-1/rules.d/50-default.rules" \\
+           "$root/usr/share/polkit-1/rules.d/11-fedora-kde-policy.rules"; do
+    if [ -f "$p" ]; then
+      pref=$p
+      break
+    fi
+  done
+  if [ -n "$pref" ]; then
+    chcon --reference="$pref" \\
+      "$root/etc/polkit-1/rules.d/00-fbl-liveinst.rules" \\
+      "$root/usr/share/polkit-1/rules.d/00-fbl-liveinst.rules" >> "$log" 2>&1 || true
+  fi
 fi
-pol="$root/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy"
-if [ -f "$pol" ]; then
-  sed -i \\
-    -e 's|<allow_any>auth_admin</allow_any>|<allow_any>yes</allow_any>|' \\
-    -e 's|<allow_inactive>auth_admin</allow_inactive>|<allow_inactive>yes</allow_inactive>|' \\
-    -e 's|<allow_active>auth_admin</allow_active>|<allow_active>yes</allow_active>|' \\
-    "$pol" >> "$log" 2>&1 || true
+# Replace the official action with our allow-yes file, then copy the
+# xattr from a sibling policy. Do not sed the squashfs copy (0.6.47).
+mkdir -p "$root/usr/share/polkit-1/actions" "$root/usr/libexec"
+if [ -f /fbl-pkexec.policy ]; then
+  cp /fbl-pkexec.policy "$root/usr/libexec/fbl-liveinst.policy"
+  cp /fbl-pkexec.policy \\
+    "$root/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy"
+  chmod 644 "$root/usr/libexec/fbl-liveinst.policy" \\
+    "$root/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy"
+  polref=
+  for p in "$root/usr/share/polkit-1/actions/org.freedesktop.locale1.policy" \\
+           "$root/usr/share/polkit-1/actions/org.freedesktop.NetworkManager.policy"; do
+    if [ -f "$p" ]; then
+      polref=$p
+      break
+    fi
+  done
+  if [ -n "$polref" ]; then
+    chcon --reference="$polref" \\
+      "$root/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy" \\
+      "$root/usr/libexec/fbl-liveinst.policy" >> "$log" 2>&1 || true
+  fi
 fi
 # restorecon on /sysroot/usr/bin/liveinst matches no file_contexts rule
 # (0.6.45 unlabeled_t → setroubleshoot). setfiles -r NEWROOT uses the
@@ -454,11 +557,14 @@ if [ -n "$sf" ] && [ -f "$fc" ]; then
     "$root/etc/polkit-1/rules.d/00-fbl-liveinst.rules" \\
     "$root/usr/share/polkit-1/rules.d/00-fbl-liveinst.rules" \\
     "$root/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy" \\
+    "$root/usr/libexec/fbl-liveinst.policy" \\
     "$root/var/log/firstboot-fedora.log" >> "$log" 2>&1 || true
 fi
 mkdir -p "$root/etc/xdg/autostart" "$root/etc/systemd/system"
 for name in sealertauto setroubleshoot seapplet setroubleshoot-applet \\
-            org.fedorahosted.setroubleshoot org.fedoraproject.setroubleshoot; do
+            org.fedorahosted.setroubleshoot org.fedoraproject.setroubleshoot \\
+            kxkb2locale1 org.kde.plasma-welcome plasma-welcome \\
+            org.fedoraproject.welcome-screen; do
   printf '%s\\n' '[Desktop Entry]' 'Hidden=true' > "$root/etc/xdg/autostart/${name}.desktop"
 done
 ln -sfn /dev/null "$root/etc/systemd/system/setroubleshootd.service"
@@ -694,8 +800,10 @@ class Fedora44Plasma:
         return {
             "ks.cfg": fedora_kickstart(identity, target_path),
             "fbl-liveinst": LIVEINST_WRAPPER,
+            "fbl-pkexec.policy": LIVEINST_POLICY,
             "usr/libexec/fbl-link-squashfs": LINK_SQUASH,
             "usr/libexec/fbl-selinux": FBL_SELINUX,
+            "usr/libexec/fbl-liveinst.policy": LIVEINST_POLICY,
             "etc/systemd/system/fbl-link-squashfs.service": LINK_SERVICE,
             "etc/xdg/autostart/fbl-liveinst.desktop": AUTOSTART_DESKTOP,
             "etc/polkit-1/rules.d/00-fbl-liveinst.rules": POLKIT_RULE,

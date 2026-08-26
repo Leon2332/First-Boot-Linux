@@ -10,6 +10,8 @@ export GTK_A11Y=none
 export NO_AT_BRIDGE=1
 export GTK_USE_PORTAL="${GTK_USE_PORTAL:-0}"
 export ADW_DISABLE_PORTAL=1
+export XCURSOR_THEME="${XCURSOR_THEME:-First Boot Cursor}"
+export XCURSOR_SIZE="${XCURSOR_SIZE:-24}"
 
 LABWC_DIR=/usr/share/firstboot/labwc
 PYDIR=/usr/share/firstboot/python
@@ -41,7 +43,7 @@ if [ -f "$PYDIR/firstboot/render.py" ] && command -v python3 >/dev/null 2>&1; th
 fi
 export GSK_RENDERER="${GSK_RENDERER:-cairo}"
 export WLR_RENDERER="${WLR_RENDERER:-pixman}"
-note "GSK_RENDERER=$GSK_RENDERER WLR_RENDERER=$WLR_RENDERER"
+note "GSK_RENDERER=$GSK_RENDERER WLR_RENDERER=$WLR_RENDERER XCURSOR_THEME=$XCURSOR_THEME"
 
 if ! command -v labwc >/dev/null 2>&1; then
   drop_to_shell "labwc not found"

@@ -10,6 +10,8 @@ INTERFACE_SCHEMA = "org.gnome.desktop.interface"
 CONSOLE_SCHEMA = "org.gnome.Console"
 EPIPHANY_SCHEMA = "org.gnome.Epiphany"
 EPIPHANY_DESKTOP = "org.gnome.Epiphany.desktop"
+CURSOR_THEME = "First Boot Cursor"
+CURSOR_SIZE = 24
 
 MIME_DEFAULTS = (
     ("text/html", EPIPHANY_DESKTOP),
@@ -34,6 +36,8 @@ def apply_session_theme(dark: bool, env: dict[str, str] | None = None) -> None:
     _set_gsettings(INTERFACE_SCHEMA, "color-scheme", scheme, env)
     _write_gtk_settings(dark, env)
     apply_gtk_interface_scheme(dark)
+    if os.environ.get("FIRSTBOOT_KIOSK"):
+        apply_gtk_cursor()
 
 
 def ensure_default_browser(env: dict[str, str] | None = None) -> None:
@@ -48,19 +52,14 @@ def ensure_console_follows_system(env: dict[str, str] | None = None) -> None:
 
 def apply_gtk_interface_scheme(dark: bool) -> None:
     """Push light/dark into Gtk.Settings so Adwaita CSD restyles with QS."""
-    try:
-        import gi
-
-        gi.require_version("Gtk", "4.0")
-        from gi.repository import Gtk
-    except Exception:
-        return
-    settings = Gtk.Settings.get_default()
+    settings = _gtk_settings()
     if settings is None:
         return
     if settings.find_property("gtk-interface-color-scheme") is None:
         return
     try:
+        from gi.repository import Gtk
+
         value = (
             Gtk.InterfaceColorScheme.DARK if dark else Gtk.InterfaceColorScheme.LIGHT
         )
@@ -68,6 +67,32 @@ def apply_gtk_interface_scheme(dark: bool) -> None:
             settings.set_property("gtk-interface-color-scheme", value)
     except Exception:
         return
+
+
+def apply_gtk_cursor() -> None:
+    settings = _gtk_settings()
+    if settings is None:
+        return
+    try:
+        if settings.find_property("gtk-cursor-theme-name") is not None:
+            if settings.get_property("gtk-cursor-theme-name") != CURSOR_THEME:
+                settings.set_property("gtk-cursor-theme-name", CURSOR_THEME)
+        if settings.find_property("gtk-cursor-theme-size") is not None:
+            if int(settings.get_property("gtk-cursor-theme-size") or 0) != CURSOR_SIZE:
+                settings.set_property("gtk-cursor-theme-size", CURSOR_SIZE)
+    except Exception:
+        return
+
+
+def _gtk_settings():
+    try:
+        import gi
+
+        gi.require_version("Gtk", "4.0")
+        from gi.repository import Gtk
+    except Exception:
+        return None
+    return Gtk.Settings.get_default()
 
 
 def _gsettings_env(env: dict[str, str] | None) -> dict[str, str]:
@@ -127,6 +152,8 @@ def _write_gtk_settings(dark: bool, env: dict[str, str] | None = None) -> None:
         "[Settings]\n"
         "gtk-application-prefer-dark-theme=" + flag + "\n"
         "gtk-interface-color-scheme=" + scheme + "\n"
+        "gtk-cursor-theme-name=" + CURSOR_THEME + "\n"
+        "gtk-cursor-theme-size=" + str(CURSOR_SIZE) + "\n"
     )
     home = config_home(env)
     for sub in ("gtk-4.0", "gtk-3.0"):

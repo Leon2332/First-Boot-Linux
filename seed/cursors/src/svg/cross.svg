@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="256"
+   height="256"
+   viewBox="0 0 256 256"
+   fill="none"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="cross.svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#b4b4b4"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="true"
+     inkscape:deskcolor="#1c1c1c"
+     inkscape:zoom="1.1089976"
+     inkscape:cx="128"
+     inkscape:cy="128"
+     inkscape:window-width="1920"
+     inkscape:window-height="1011"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1" />
+  <path d="M148.5 34.5C148.5 22.902 139.098 13.5 127.5 13.5C115.902 13.5 106.5 22.902 106.5 34.5V106.5H34.5C22.902 106.5 13.5 115.902 13.5 127.5C13.5 139.098 22.902 148.5 34.5 148.5H106.5V221.5C106.5 233.098 115.902 242.5 127.5 242.5C139.098 242.5 148.5 233.098 148.5 221.5V148.5H221.5C233.098 148.5 242.5 139.098 242.5 127.5C242.5 115.902 233.098 106.5 221.5 106.5H148.5V34.5Z" fill="#000000" stroke="#FFFFFF" stroke-width="17" stroke-linecap="round"/>
+</svg>

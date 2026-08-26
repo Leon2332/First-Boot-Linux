@@ -38,9 +38,48 @@
           "file": "images/linuxmint-22.3-cinnamon-64bit.iso",
           "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "size_bytes": 2800000000
+        },
+        {
+          "id": "mate",
+          "name": "MATE",
+          "default": false,
+          "local": false,
+          "url": "https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-mate-64bit.iso",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "size_bytes": 2600000000
+        },
+        {
+          "id": "xfce",
+          "name": "Xfce",
+          "default": false,
+          "local": false,
+          "url": "https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-xfce-64bit.iso",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "size_bytes": 2500000000
         }
       ]
     }
   ],
-  "catalog": []
+  "catalog": [
+    {
+      "id": "fedora",
+      "name": "Fedora",
+      "version": "44",
+      "tagline": "Modern Plasma desktop",
+      "description": "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults.",
+      "family": "fedora",
+      "install": "fedora-44-plasma",
+      "editions": [
+        {
+          "id": "plasma",
+          "name": "KDE Plasma",
+          "default": true,
+          "local": false,
+          "url": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/KDE/x86_64/iso/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "size_bytes": 2800000000
+        }
+      ]
+    }
+  ]
 }

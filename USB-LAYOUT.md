@@ -4,7 +4,7 @@ How a First Boot Linux **shop USB** is laid out after the creator writes it.
 
 This is a partitioned disk, not a single ISO9660 image. The UI may still say “write ISO.” On the stick it is GPT + three partitions. The same layout is copied onto the PC’s internal disk when the shop installs First Boot.
 
-The normative v1 example below is a shop that staged Ubuntu and Linux Mint. Official catalog is Ubuntu, Mint, and Fedora Plasma. The `docs/` mockup still shows a larger set; that is vision, not the creator menu.
+The normative v1 example below is a shop that staged Ubuntu GNOME and Linux Mint Cinnamon. Official catalog is Ubuntu (GNOME), Linux Mint (Cinnamon / MATE / Xfce), and Fedora Plasma. The `docs/` mockup still shows a larger set; that is vision, not the creator menu.
 
 ## Partitions
 
@@ -73,7 +73,7 @@ USB
         └── linuxmint-22.3-cinnamon-64bit.iso
 ```
 
-`images/` only contains redistributable ISOs this retailer staged. Recommended can include a download-only row (official `redistributable: false`) with nothing under `images/`. Distros the shop did not tick, but that already have an install driver, go in `catalog.json` `catalog` (Other options, Download). v1 may stage only distros with official `can_stage`, `redistributable`, and `install` (Ubuntu, Mint, Fedora Plasma). Basenames come from `schemas/official-catalog.json` `filename` fields.
+`images/` only contains redistributable ISOs this retailer staged. Recommended can include a download-only row (official `redistributable: false`) with nothing under `images/`. Distros the shop did not tick, but that already have an install driver, go in `catalog.json` `catalog` (Other options, Download). v1 may stage only distros with official `can_stage`, `redistributable`, and `install` (Ubuntu, Linux Mint, Fedora Plasma). Basenames come from `schemas/official-catalog.json` `filename` fields.
 
 ## What each payload file is
 
@@ -135,11 +135,50 @@ Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either lo
           "file": "images/linuxmint-22.3-cinnamon-64bit.iso",
           "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "size_bytes": 2800000000
+        },
+        {
+          "id": "mate",
+          "name": "MATE",
+          "default": false,
+          "local": false,
+          "url": "https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-mate-64bit.iso",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "size_bytes": 2600000000
+        },
+        {
+          "id": "xfce",
+          "name": "Xfce",
+          "default": false,
+          "local": false,
+          "url": "https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-xfce-64bit.iso",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "size_bytes": 2500000000
         }
       ]
     }
   ],
-  "catalog": []
+  "catalog": [
+    {
+      "id": "fedora",
+      "name": "Fedora",
+      "version": "44",
+      "tagline": "Modern Plasma desktop",
+      "description": "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults.",
+      "family": "fedora",
+      "install": "fedora-44-plasma",
+      "editions": [
+        {
+          "id": "plasma",
+          "name": "KDE Plasma",
+          "default": true,
+          "local": false,
+          "url": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/KDE/x86_64/iso/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "size_bytes": 2800000000
+        }
+      ]
+    }
+  ]
 }
 ```
 

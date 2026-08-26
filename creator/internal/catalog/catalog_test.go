@@ -26,8 +26,23 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	if m == nil || !m.Stageable() {
 		t.Fatalf("mint should be stageable")
 	}
-	if !m.SuggestedDefault || !u.SuggestedDefault {
-		t.Fatalf("ubuntu and mint should be suggested defaults")
+	if u.SuggestedDefault || m.SuggestedDefault {
+		t.Fatalf("nothing should be a suggested default")
+	}
+	if cat.Distro("linux-mint-mate") != nil || cat.Distro("linux-mint-xfce") != nil {
+		t.Fatal("mint DEs are editions, not separate distros")
+	}
+	if len(m.Editions) != 3 {
+		t.Fatalf("mint editions %d", len(m.Editions))
+	}
+	if m.Edition("mate") == nil || m.Edition("mate").Filename != "linuxmint-22.3-mate-64bit.iso" {
+		t.Fatalf("mint mate %+v", m.Edition("mate"))
+	}
+	if m.Edition("xfce") == nil || m.Edition("xfce").Filename != "linuxmint-22.3-xfce-64bit.iso" {
+		t.Fatalf("mint xfce %+v", m.Edition("xfce"))
+	}
+	if !m.CanStageEdition(*m.Edition("cinnamon")) || !m.CanStageEdition(*m.Edition("mate")) {
+		t.Fatal("mint editions should be stageable")
 	}
 	f := cat.Distro("fedora")
 	if f == nil || !f.Stageable() {
@@ -60,8 +75,8 @@ func TestBuildShop(t *testing.T) {
 	if len(shop.Recommended) != 2 {
 		t.Fatalf("got rec=%d", len(shop.Recommended))
 	}
-	if len(shop.Catalog) != 1 || shop.Catalog[0].ID != "fedora" {
-		t.Fatalf("unticked fedora should be catalog, got %+v", shop.Catalog)
+	if got := shopIDs(shop.Catalog); len(got) != 1 || got[0] != "fedora" {
+		t.Fatalf("unticked fedora should be catalog, got %+v", got)
 	}
 	if shop.Catalog[0].Editions[0].Local || shop.Catalog[0].Editions[0].URL == "" {
 		t.Fatalf("catalog fedora must be download-only: %+v", shop.Catalog[0].Editions)
@@ -121,8 +136,8 @@ func TestBuildShopUntickedGoesToCatalog(t *testing.T) {
 	if !shop.Recommended[0].Editions[0].Local || !shop.Recommended[1].Editions[0].Local {
 		t.Fatal("ticked mint and fedora should be staged")
 	}
-	if len(shop.Catalog) != 1 || shop.Catalog[0].ID != "ubuntu" {
-		t.Fatalf("ubuntu should be the download catalog, got %+v", shop.Catalog)
+	if got := shopIDs(shop.Catalog); len(got) != 1 || got[0] != "ubuntu" {
+		t.Fatalf("ubuntu should be the download catalog, got %+v", got)
 	}
 	ub := shop.Catalog[0].Editions[0]
 	if ub.Local || ub.File != "" || ub.URL == "" {
@@ -131,6 +146,115 @@ func TestBuildShopUntickedGoesToCatalog(t *testing.T) {
 	if ub.URL != "https://releases.ubuntu.com/26.04/ubuntu-26.04-desktop-amd64.iso" {
 		t.Fatalf("ubuntu url %s", ub.URL)
 	}
+}
+
+func TestBuildShopMintEditions(t *testing.T) {
+	cat, err := LoadOfficial("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	shop, err := BuildShop(cat, []string{"linux-mint:mate", "linux-mint:xfce"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := shopIDs(shop.Recommended); len(got) != 1 || got[0] != "linux-mint" {
+		t.Fatalf("recommended %+v", got)
+	}
+	mint := shop.Recommended[0]
+	if mint.Install != "mint-223" {
+		t.Fatalf("install %s", mint.Install)
+	}
+	byID := map[string]ShopEdition{}
+	for _, e := range mint.Editions {
+		byID[e.ID] = e
+	}
+	if byID["cinnamon"].Local || byID["cinnamon"].Default {
+		t.Fatalf("unticked cinnamon %+v", byID["cinnamon"])
+	}
+	if !byID["mate"].Local || byID["mate"].File != "images/linuxmint-22.3-mate-64bit.iso" {
+		t.Fatalf("mate %+v", byID["mate"])
+	}
+	if !byID["xfce"].Local || byID["xfce"].File != "images/linuxmint-22.3-xfce-64bit.iso" {
+		t.Fatalf("xfce %+v", byID["xfce"])
+	}
+	if !byID["mate"].Default || byID["xfce"].Default {
+		t.Fatalf("featured should be first ticked (mate): %+v", mint.Editions)
+	}
+	if mint.Editions[0].ID != "mate" || mint.Editions[1].ID != "xfce" || mint.Editions[2].ID != "cinnamon" {
+		t.Fatalf("ticked editions should come first: %+v", mint.Editions)
+	}
+	if got := shopIDs(shop.Catalog); len(got) != 2 || got[0] != "ubuntu" || got[1] != "fedora" {
+		t.Fatalf("catalog %+v", got)
+	}
+}
+
+func TestBuildShopMateXfceFedora(t *testing.T) {
+	cat, err := LoadOfficial("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	shop, err := BuildShop(cat, []string{"linux-mint:mate", "linux-mint:xfce", "fedora:plasma"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := shopIDs(shop.Recommended); len(got) != 2 || got[0] != "linux-mint" || got[1] != "fedora" {
+		t.Fatalf("recommended %+v", got)
+	}
+	mint := shop.Recommended[0]
+	byID := map[string]ShopEdition{}
+	for _, e := range mint.Editions {
+		byID[e.ID] = e
+	}
+	if byID["cinnamon"].Local || byID["cinnamon"].File != "" {
+		t.Fatalf("unticked cinnamon must not be staged: %+v", byID["cinnamon"])
+	}
+	if byID["cinnamon"].URL == "" {
+		t.Fatalf("cinnamon should stay a download: %+v", byID["cinnamon"])
+	}
+	if !byID["mate"].Local || byID["mate"].File != "images/linuxmint-22.3-mate-64bit.iso" {
+		t.Fatalf("mate %+v", byID["mate"])
+	}
+	if !byID["xfce"].Local || byID["xfce"].File != "images/linuxmint-22.3-xfce-64bit.iso" {
+		t.Fatalf("xfce %+v", byID["xfce"])
+	}
+	if !shop.Recommended[1].Editions[0].Local {
+		t.Fatal("fedora plasma should be staged")
+	}
+	locals := shop.LocalEditions()
+	if len(locals) != 3 {
+		t.Fatalf("local editions %d %+v", len(locals), locals)
+	}
+	if got := shopIDs(shop.Catalog); len(got) != 1 || got[0] != "ubuntu" {
+		t.Fatalf("catalog %+v", got)
+	}
+}
+
+func TestParseStagedAndNameMatches(t *testing.T) {
+	did, eid, err := ParseStaged("linux-mint:cinnamon")
+	if err != nil || did != "linux-mint" || eid != "cinnamon" {
+		t.Fatalf("got %s %s %v", did, eid, err)
+	}
+	did, eid, err = ParseStaged("ubuntu")
+	if err != nil || did != "ubuntu" || eid != "" {
+		t.Fatalf("bare %s %s %v", did, eid, err)
+	}
+	if !nameMatches("Linux Mint", "mint") || !nameMatches("Linux Mint", "Linux  mint") {
+		t.Fatal("mint should match")
+	}
+	if nameMatches("Linux Mint", "mate") || nameMatches("Ubuntu", "gnome") {
+		t.Fatal("edition names must not match")
+	}
+	if nameMatches("Fedora", "windows") {
+		t.Fatal("unrelated")
+	}
+}
+
+func shopIDs(ds []ShopDistro) []string {
+	out := make([]string, len(ds))
+	for i, d := range ds {
+		out[i] = d.ID
+	}
+	return out
 }
 
 func TestBuildShopDownloadOnlyRecommended(t *testing.T) {
