@@ -345,12 +345,21 @@
     catalogQueryJoined: "",
     catalogHits: [],
     catalogPaneMin: 0,
+    tzMinutes: Math.max(
+      -720,
+      Math.min(840, Math.round(-new Date().getTimezoneOffset() / 30) * 30)
+    ),
   };
 
   const $ = (id) => document.getElementById(id);
 
   const els = {
     clockText: $("clock-text"),
+    clockBtn: $("clock-btn"),
+    clockMenu: $("clock-menu"),
+    tzValue: $("tz-value"),
+    tzUp: $("tz-up"),
+    tzDown: $("tz-down"),
     systemMenuBtn: $("system-menu-btn"),
     quickSettings: $("quick-settings"),
     networkMenu: $("network-menu"),
@@ -484,8 +493,10 @@
     els.networkMenu.hidden = true;
     els.powerMenu.hidden = true;
     els.appMenu.hidden = true;
+    if (els.clockMenu) els.clockMenu.hidden = true;
     els.systemMenuBtn.setAttribute("aria-expanded", "false");
     els.appMenuBtn.setAttribute("aria-expanded", "false");
+    if (els.clockBtn) els.clockBtn.setAttribute("aria-expanded", "false");
     els.backdrop.hidden = true;
     if (state.wifiExpanded) {
       setWifiExpanded(null);
@@ -1008,6 +1019,37 @@
     els.backdrop.hidden = false;
   }
 
+  function openClockMenu() {
+    const wasOpen = els.clockMenu && !els.clockMenu.hidden;
+    closeMenus();
+    if (wasOpen || !els.clockMenu) return;
+    els.clockMenu.hidden = false;
+    if (els.clockBtn) els.clockBtn.setAttribute("aria-expanded", "true");
+    els.backdrop.hidden = false;
+  }
+
+  function formatTzOffset(minutes) {
+    const sign = minutes < 0 ? "-" : "+";
+    const abs = Math.abs(minutes);
+    const hh = String(Math.floor(abs / 60)).padStart(2, "0");
+    const mm = String(abs % 60).padStart(2, "0");
+    return `UTC${sign}${hh}${mm}`;
+  }
+
+  function shiftTz(deltaMinutes) {
+    const next = Math.max(-720, Math.min(840, state.tzMinutes + deltaMinutes));
+    if (next === state.tzMinutes) return;
+    state.tzMinutes = next;
+    updateTzUI();
+  }
+
+  function updateTzUI() {
+    if (els.tzValue) els.tzValue.textContent = formatTzOffset(state.tzMinutes);
+    if (els.tzUp) els.tzUp.disabled = state.tzMinutes >= 840;
+    if (els.tzDown) els.tzDown.disabled = state.tzMinutes <= -720;
+    updateClock();
+  }
+
   function openNetworkMenu() {
     closeMenus();
     els.networkMenu.hidden = false;
@@ -1107,16 +1149,16 @@
   }
 
   function updateClock() {
-    const now = new Date();
     const months = [
       "Jan", "Feb", "Mar", "Apr", "May", "Jun",
       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
-    const day = now.getDate();
-    const mon = months[now.getMonth()];
-    const h = String(now.getHours()).padStart(2, "0");
-    const m = String(now.getMinutes()).padStart(2, "0");
-    els.clockText.textContent = `${day} ${mon} ${h}:${m}`;
+    const shifted = new Date(Date.now() + state.tzMinutes * 60000);
+    const day = shifted.getUTCDate();
+    const mon = months[shifted.getUTCMonth()];
+    const h = String(shifted.getUTCHours()).padStart(2, "0");
+    const m = String(shifted.getUTCMinutes()).padStart(2, "0");
+    if (els.clockText) els.clockText.textContent = `${day} ${mon} ${h}:${m}`;
   }
 
   function applyTheme() {
@@ -2198,7 +2240,8 @@
         if (
           !els.quickSettings.hidden ||
           !els.powerMenu.hidden ||
-          !els.appMenu.hidden
+          !els.appMenu.hidden ||
+          (els.clockMenu && !els.clockMenu.hidden)
         ) {
           closeMenus();
           return;
@@ -2233,6 +2276,18 @@
         }
         return;
       }
+      if (els.clockMenu && !els.clockMenu.hidden) {
+        if (e.key === "ArrowUp") {
+          shiftTz(30);
+          e.preventDefault();
+          return;
+        }
+        if (e.key === "ArrowDown") {
+          shiftTz(-30);
+          e.preventDefault();
+          return;
+        }
+      }
       onTermKeydown(e);
     });
 
@@ -2240,6 +2295,21 @@
     els.networkMenu.addEventListener("click", (e) => e.stopPropagation());
     els.powerMenu.addEventListener("click", (e) => e.stopPropagation());
     els.appMenu.addEventListener("click", (e) => e.stopPropagation());
+    if (els.clockMenu) {
+      els.clockMenu.addEventListener("click", (e) => e.stopPropagation());
+    }
+    if (els.clockBtn) {
+      els.clockBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openClockMenu();
+      });
+    }
+    if (els.tzUp) {
+      els.tzUp.addEventListener("click", () => shiftTz(30));
+    }
+    if (els.tzDown) {
+      els.tzDown.addEventListener("click", () => shiftTz(-30));
+    }
 
     els.appMenuBtn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -2285,7 +2355,7 @@
   }
 
   function init() {
-    updateClock();
+    updateTzUI();
     setInterval(updateClock, 15000);
     applyTheme();
     renderRecommended();
@@ -2311,6 +2381,7 @@
     if (q.get("catalog") === "open") openCatalog();
     if (menu === "apps") openAppMenu();
     if (menu === "qs") openQuickSettings();
+    if (menu === "clock") openClockMenu();
     if (menu === "network") {
       openNetworkMenu();
       const wifi = q.get("wifi");

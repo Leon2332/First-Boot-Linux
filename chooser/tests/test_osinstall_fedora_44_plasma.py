@@ -16,26 +16,18 @@ if CHOOSER_DIR not in sys.path:
 
 from firstboot.osinstall import OsIdentity  # noqa: E402
 from firstboot.osinstall.fedora_44_plasma import (  # noqa: E402
-    AUTOSTART_DESKTOP,
+    ANACONDA_SCRIPT,
+    ANACONDA_SERVICE,
     DRACUT_HOOK,
     DRIVER,
-    FBL_SELINUX,
+    GENERATOR,
     ID,
-    LINK_SERVICE,
     LINK_SQUASH,
-    LIVEINST_POLICY,
-    LIVEINST_WRAPPER,
-    POLKIT_RULE,
     SQUASH_LINK,
+    STRIP_INSTALLER_CMDLINE_PY,
     fedora_kernel_args,
     fedora_kickstart,
 )
-
-OFFICIAL_LIVEINST = """#!/bin/bash
-ANACONDA="/sbin/anaconda --liveinst --graphical ${LIVECMD}"
-[ -z "$LIVECMD" ] && ANACONDA="/sbin/anaconda --liveinst --graphical"
-exec $ANACONDA "$@"
-"""
 
 UBUNTU_HASH = (
     "$6$exDY1mhS4KUYCE/2$Zx9Rit70sU0wKFAKESECRET_k4l5m6n7o8p9q0r1s2t3"
@@ -52,206 +44,210 @@ class Fedora44PlasmaTests(unittest.TestCase):
         ident = OsIdentity("shop-pc", "leon", "Leon", UBUNTU_HASH)
         files = DRIVER.seed_files(ident, "/dev/sda", "")
         self.assertIn("ks.cfg", files)
-        self.assertIn("fbl-liveinst", files)
         self.assertIn("usr/libexec/fbl-link-squashfs", files)
-        self.assertIn("usr/libexec/fbl-selinux", files)
-        self.assertIn("etc/xdg/autostart/fbl-liveinst.desktop", files)
-        self.assertIn("etc/polkit-1/rules.d/00-fbl-liveinst.rules", files)
-        self.assertIn("fbl-pkexec.policy", files)
-        self.assertIn("usr/libexec/fbl-liveinst.policy", files)
+        self.assertIn("usr/libexec/fbl-anaconda", files)
+        self.assertIn("etc/systemd/system/getty@tty1.service", files)
+        self.assertIn("etc/systemd/system-generators/fbl-anaconda-gen", files)
+        self.assertNotIn("etc/systemd/system/fbl-anaconda.service", files)
+        self.assertIn("var/lib/dracut/hooks/pre-pivot/90-fbl-ks.sh", files)
+        self.assertNotIn("fbl-liveinst", files)
+        self.assertNotIn("fbl-pkexec.policy", files)
+        self.assertNotIn("etc/xdg/autostart/fbl-liveinst.desktop", files)
+        self.assertNotIn("etc/polkit-1/rules.d/00-fbl-liveinst.rules", files)
 
     def test_kickstart_is_liveimg_not_dnf(self) -> None:
         ident = OsIdentity("shop-pc", "leon", "Leon", UBUNTU_HASH)
         text = fedora_kickstart(ident, "/dev/sda")
         self.assertIn(f"liveimg --url=file://{SQUASH_LINK}", text)
+        self.assertIn("cmdline\n", text)
+        self.assertNotIn("graphical\n", text)
+        self.assertIn('--append="rhgb quiet"', text)
+        self.assertIn("selinux --enforcing", text)
+        self.assertIn("services --enabled=sddm,NetworkManager", text)
+        self.assertIn("graphical.target", text)
+        self.assertIn("systemd.unit=", text)
+        self.assertIn("systemd.mask=", text)
+        self.assertIn("rm -f /etc/systemd/system/getty@tty1.service", text)
+        self.assertIn("fbl-anaconda-gen", text)
         self.assertNotIn("%packages", text)
         self.assertNotIn("boot=casper", text)
-        self.assertIn("liveinst.real", LIVEINST_WRAPPER)
         args = fedora_kernel_args(
             "/images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso",
             "Fedora-KDE-Live-44",
             toram=True,
         )
         self.assertNotIn("liveinst", args.split())
-        self.assertNotIn("inst.ks", args)
-        self.assertIn("Exec=/usr/bin/liveinst", AUTOSTART_DESKTOP)
-        self.assertIn("/usr/bin/liveinst.real", LIVEINST_WRAPPER)
-        self.assertIn("pkexec /usr/bin/liveinst", LIVEINST_WRAPPER)
+        self.assertNotIn("inst.ks", args.split())
+        self.assertIn("systemd.unit=multi-user.target", args)
+        self.assertIn("inst.cmdline", args.split())
+        self.assertIn("rd.live.ram=1", args)
+        self.assertIn("--kickstart=/ks.cfg --cmdline", ANACONDA_SCRIPT)
+        self.assertNotIn("pkexec /", ANACONDA_SCRIPT)
+        self.assertNotIn("--liveinst", ANACONDA_SCRIPT)
+        self.assertIn("squashfs link missing", ANACONDA_SCRIPT)
         self.assertIn("squashed.img", LINK_SQUASH)
         self.assertIn("FBL_LIVE_ROOT", LINK_SQUASH)
         self.assertIn("hardlinked", LINK_SQUASH)
-        self.assertIn("ensure_link", LIVEINST_WRAPPER)
-        self.assertIn("WantedBy=graphical.target", LINK_SERVICE)
-        self.assertIn("ExecStart=-/usr/sbin/setenforce 0", LINK_SERVICE)
-        self.assertIn("ExecStart=-/usr/sbin/restorecon", LINK_SERVICE)
-        self.assertIn("ExecStart=/usr/libexec/fbl-selinux", LINK_SERVICE)
+        self.assertNotIn("symlinked", LINK_SQUASH)
+        self.assertIn("WantedBy=getty.target", ANACONDA_SERVICE)
+        self.assertIn("ExecStart=/usr/libexec/fbl-anaconda", ANACONDA_SERVICE)
+        self.assertIn("ExecStartPre=-/usr/sbin/setenforce 0", ANACONDA_SERVICE)
+        self.assertNotIn("ExecStartPre=/usr/libexec/fbl-link-squashfs", ANACONDA_SERVICE)
+        self.assertIn("ConditionKernelCommandLine=fbl.install", ANACONDA_SERVICE)
+        self.assertNotIn("Conflicts=getty@tty1.service", ANACONDA_SERVICE)
+        self.assertIn("exec /bin/bash", ANACONDA_SCRIPT)
+        self.assertIn("enforcing=0", args.split())
+        self.assertIn("systemd.mask=display-manager.service", args)
+        self.assertIn("rd.live.overlay.overlayfs", args)
+        self.assertIn("getty@tty1.service", GENERATOR)
         self.assertLess(
-            LINK_SERVICE.find("ExecStart=-/usr/sbin/setenforce 0"),
-            LINK_SERVICE.find("ExecStart=/usr/libexec/fbl-link-squashfs"),
+            ANACONDA_SERVICE.find("ExecStartPre=-/usr/sbin/setenforce 0"),
+            ANACONDA_SERVICE.find("ExecStart=/usr/libexec/fbl-anaconda"),
         )
-        self.assertIn("/usr/sbin/setenforce 0", FBL_SELINUX)
-        self.assertIn("Hidden=true", FBL_SELINUX)
-        self.assertIn("setroubleshootd.service", FBL_SELINUX)
-        self.assertIn("chcon --reference", FBL_SELINUX)
-        self.assertIn("setfiles", DRACUT_HOOK)
-        self.assertIn("Hidden=true", DRACUT_HOOK)
-        self.assertIn("/usr/libexec/fbl-selinux", LIVEINST_WRAPPER)
-        self.assertIn("/usr/libexec/fbl-link-squashfs >>", DRACUT_HOOK)
-        self.assertIn("org.fedoraproject.pkexec.liveinst", POLKIT_RULE)
-        self.assertIn("org.freedesktop.policykit.exec", POLKIT_RULE)
-        self.assertIn("org.freedesktop.locale1.set-keyboard", POLKIT_RULE)
-        self.assertNotIn("if (subject", POLKIT_RULE)
-        self.assertNotIn("action.lookup(", POLKIT_RULE)
-        self.assertIn("polkit.Result.YES", POLKIT_RULE)
-        self.assertIn("<allow_any>yes</allow_any>", LIVEINST_POLICY)
-        self.assertIn("/usr/bin/liveinst", LIVEINST_POLICY)
-        self.assertIn("00-fbl-liveinst.rules", DRACUT_HOOK)
-        self.assertIn("/fbl-pkexec.policy", DRACUT_HOOK)
-        self.assertIn("chcon --reference", DRACUT_HOOK)
-        self.assertIn("chcon --reference", FBL_SELINUX)
-        self.assertIn("try-restart polkit.service", FBL_SELINUX)
-        self.assertIn("kxkb2locale1", DRACUT_HOOK)
-        self.assertIn("kxkb2locale1", FBL_SELINUX)
-        self.assertIn("org.kde.plasma-welcome", DRACUT_HOOK)
-        self.assertIn("org.kde.plasma-welcome", FBL_SELINUX)
-        self.assertIn("plasma-welcomerc", FBL_SELINUX)
-        self.assertIn("Before=polkit.service", LINK_SERVICE)
-        self.assertIn("After=local-fs.target livesys.service", LINK_SERVICE)
+        self.assertIn("getty@tty1.service", DRACUT_HOOK)
+        self.assertNotIn("\nexit ", DRACUT_HOOK)
+        self.assertIn("FBL_LIVE_LOG=", DRACUT_HOOK)
+        self.assertLess(
+            DRACUT_HOOK.find("getty@tty1.service"),
+            DRACUT_HOOK.find("FBL_LIVE_LOG="),
+        )
+        self.assertIn("rm -f", DRACUT_HOOK)
+        self.assertNotIn("liveinst.real", DRACUT_HOOK)
+        self.assertNotIn("pkexec", DRACUT_HOOK)
+        self.assertNotIn("polkit-1", DRACUT_HOOK)
         self.assertNotIn("allow_any>yes", DRACUT_HOOK)
-        self.assertNotIn("allow_any>yes", FBL_SELINUX)
         self.assertNotIn('ln -sfn ../sbin/liveinst "', DRACUT_HOOK)
-        self.assertLess(
-            LIVEINST_WRAPPER.find("pkexec /usr/bin/liveinst"),
-            LIVEINST_WRAPPER.find("could not find the Fedora live image"),
-        )
 
-    def _run_pre_pivot(self, newroot: str, wrapper: str) -> None:
-        policy = os.path.join(newroot, "injected.policy")
-        hook = DRACUT_HOOK.replace("/fbl-pkexec.policy", policy)
+    def _bind_hook_to_initrd(self, initrd: str) -> str:
+        """Point initramfs source paths at a fake tree. Leave $root dests alone."""
+        hook = DRACUT_HOOK
         hook = hook.replace(
-            "if [ -f /fbl-liveinst ]; then", f"if [ -f {wrapper} ]; then"
+            "if [ -f /ks.cfg ]; then\n  cp /ks.cfg ",
+            f"if [ -f {initrd}/ks.cfg ]; then\n  cp {initrd}/ks.cfg ",
         )
-        hook = hook.replace("cp /fbl-liveinst ", f"cp {wrapper} ")
         hook = hook.replace(
-            "/ks.cfg /fbl-liveinst /usr/libexec",
-            f"/ks.cfg {wrapper} /usr/libexec",
+            "if [ -f /usr/libexec/fbl-link-squashfs ]; then\n"
+            "  cp /usr/libexec/fbl-link-squashfs ",
+            f"if [ -f {initrd}/usr/libexec/fbl-link-squashfs ]; then\n"
+            f"  cp {initrd}/usr/libexec/fbl-link-squashfs ",
         )
-        script = os.path.join(newroot, "run-hook.sh")
-        with open(script, "w", encoding="utf-8") as fh:
-            fh.write(hook)
-        os.chmod(script, 0o755)
-        proc = subprocess.run(
-            ["sh", script],
-            check=False,
-            capture_output=True,
-            text=True,
-            env={**os.environ, "NEWROOT": newroot},
+        hook = hook.replace(
+            'FBL_LIVE_LOG="$log" /usr/libexec/fbl-link-squashfs >>',
+            f'FBL_LIVE_LOG="$log" {initrd}/usr/libexec/fbl-link-squashfs >>',
         )
-        self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+        hook = hook.replace(
+            "if [ -f /usr/libexec/fbl-anaconda ]; then\n"
+            "  cp /usr/libexec/fbl-anaconda ",
+            f"if [ -f {initrd}/usr/libexec/fbl-anaconda ]; then\n"
+            f"  cp {initrd}/usr/libexec/fbl-anaconda ",
+        )
+        hook = hook.replace(
+            "if [ -f /etc/systemd/system/getty@tty1.service ]; then\n",
+            f"if [ -f {initrd}/etc/systemd/system/getty@tty1.service ]; then\n",
+        )
+        hook = hook.replace(
+            "  cp /etc/systemd/system/getty@tty1.service ",
+            f"  cp {initrd}/etc/systemd/system/getty@tty1.service ",
+        )
+        hook = hook.replace(
+            "if [ -f /etc/systemd/system-generators/fbl-anaconda-gen ]; then\n"
+            "  cp /etc/systemd/system-generators/fbl-anaconda-gen ",
+            f"if [ -f {initrd}/etc/systemd/system-generators/fbl-anaconda-gen ]; then\n"
+            f"  cp {initrd}/etc/systemd/system-generators/fbl-anaconda-gen ",
+        )
+        hook = hook.replace(
+            "ls -l /ks.cfg /usr/libexec/fbl-link-squashfs /usr/libexec/fbl-anaconda",
+            f"ls -l {initrd}/ks.cfg {initrd}/usr/libexec/fbl-link-squashfs "
+            f"{initrd}/usr/libexec/fbl-anaconda",
+        )
+        return hook
 
-    def test_usr_merge_keeps_liveinst_executable(self) -> None:
+    def _write_initrd_seed(self, initrd: str) -> None:
+        os.makedirs(os.path.join(initrd, "usr/libexec"))
+        os.makedirs(os.path.join(initrd, "etc/systemd/system"))
+        os.makedirs(os.path.join(initrd, "etc/systemd/system-generators"))
+        os.makedirs(os.path.join(initrd, "var/lib/dracut/hooks/pre-pivot"))
+        with open(os.path.join(initrd, "ks.cfg"), "w", encoding="utf-8") as fh:
+            fh.write("cmdline\nliveimg --url=file:///run/fbl-squashfs.img\n")
+        linker = os.path.join(initrd, "usr/libexec/fbl-link-squashfs")
+        with open(linker, "w", encoding="utf-8") as fh:
+            fh.write("#!/bin/bash\nexit 0\n")
+        os.chmod(linker, 0o755)
+        ana = os.path.join(initrd, "usr/libexec/fbl-anaconda")
+        with open(ana, "w", encoding="utf-8") as fh:
+            fh.write(ANACONDA_SCRIPT)
+        os.chmod(ana, 0o755)
+        unit = os.path.join(initrd, "etc/systemd/system/getty@tty1.service")
+        with open(unit, "w", encoding="utf-8") as fh:
+            fh.write(ANACONDA_SERVICE)
+        gen = os.path.join(initrd, "etc/systemd/system-generators/fbl-anaconda-gen")
+        with open(gen, "w", encoding="utf-8") as fh:
+            fh.write(GENERATOR)
+        os.chmod(gen, 0o755)
+
+    def test_pre_pivot_leaves_official_liveinst_alone(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            usr_bin = os.path.join(tmp, "usr", "bin")
+            newroot = os.path.join(tmp, "sysroot")
+            initrd = os.path.join(tmp, "initrd")
+            usr_bin = os.path.join(newroot, "usr", "bin")
             os.makedirs(usr_bin)
-            os.symlink("bin", os.path.join(tmp, "usr", "sbin"))
+            os.symlink("bin", os.path.join(newroot, "usr", "sbin"))
             liveinst = os.path.join(usr_bin, "liveinst")
+            official = "#!/bin/bash\nANACONDA=\"anaconda --liveinst --graphical\"\n"
             with open(liveinst, "w", encoding="utf-8") as fh:
-                fh.write(OFFICIAL_LIVEINST)
+                fh.write(official)
             os.chmod(liveinst, 0o755)
-            wrapper = os.path.join(tmp, "wrapper")
-            with open(wrapper, "w", encoding="utf-8") as fh:
-                fh.write(LIVEINST_WRAPPER)
-            os.chmod(wrapper, 0o755)
-            self._run_pre_pivot(tmp, wrapper)
-            self.assertTrue(os.path.isfile(liveinst), liveinst)
-            self.assertFalse(os.path.islink(liveinst))
-            self.assertTrue(os.access(liveinst, os.X_OK))
-            self.assertFalse(os.path.islink(os.path.realpath(liveinst)))
-            real = os.path.join(usr_bin, "liveinst.real")
-            self.assertTrue(os.path.isfile(real))
+            self._write_initrd_seed(initrd)
+            script = os.path.join(tmp, "run-hook.sh")
+            with open(script, "w", encoding="utf-8") as fh:
+                fh.write(self._bind_hook_to_initrd(initrd))
+            os.chmod(script, 0o755)
+            proc = subprocess.run(
+                ["sh", script],
+                check=False,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "NEWROOT": newroot},
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
             with open(liveinst, encoding="utf-8") as fh:
                 body = fh.read()
-            self.assertIn("liveinst.real", body)
-            with open(real, encoding="utf-8") as fh:
-                official = fh.read()
-            self.assertIn("--kickstart=/ks.cfg", official)
-
-    def test_split_sbin_gets_symlink_to_bin(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            usr_bin = os.path.join(tmp, "usr", "bin")
-            usr_sbin = os.path.join(tmp, "usr", "sbin")
-            os.makedirs(usr_bin)
-            os.makedirs(usr_sbin)
-            liveinst = os.path.join(usr_sbin, "liveinst")
-            with open(liveinst, "w", encoding="utf-8") as fh:
-                fh.write(OFFICIAL_LIVEINST)
-            os.chmod(liveinst, 0o755)
-            wrapper = os.path.join(tmp, "wrapper")
-            with open(wrapper, "w", encoding="utf-8") as fh:
-                fh.write("#!/bin/bash\nexec /usr/sbin/liveinst.real \"$@\"\n")
-            os.chmod(wrapper, 0o755)
-            self._run_pre_pivot(tmp, wrapper)
-            bin_live = os.path.join(usr_bin, "liveinst")
-            self.assertTrue(os.path.isfile(bin_live))
-            self.assertTrue(os.path.islink(liveinst) or os.path.isfile(liveinst))
-            self.assertEqual(os.path.realpath(liveinst), os.path.realpath(bin_live))
-            self.assertTrue(os.path.isfile(os.path.join(usr_sbin, "liveinst.real")))
-
-    def test_pre_pivot_installs_allow_yes_policy(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            injected = os.path.join(tmp, "injected.policy")
-            with open(injected, "w", encoding="utf-8") as fh:
-                fh.write(LIVEINST_POLICY)
-            usr_bin = os.path.join(tmp, "usr", "bin")
-            os.makedirs(usr_bin)
-            os.symlink("bin", os.path.join(tmp, "usr", "sbin"))
-            liveinst = os.path.join(usr_bin, "liveinst")
-            with open(liveinst, "w", encoding="utf-8") as fh:
-                fh.write(OFFICIAL_LIVEINST)
-            os.chmod(liveinst, 0o755)
-            actions = os.path.join(tmp, "usr", "share", "polkit-1", "actions")
-            os.makedirs(actions)
-            sibling = os.path.join(actions, "org.freedesktop.locale1.policy")
-            with open(sibling, "w", encoding="utf-8") as fh:
-                fh.write("<policyconfig/>\n")
-            wrapper = os.path.join(tmp, "wrapper")
-            with open(wrapper, "w", encoding="utf-8") as fh:
-                fh.write(LIVEINST_WRAPPER)
-            os.chmod(wrapper, 0o755)
-            self._run_pre_pivot(tmp, wrapper)
-            dest = os.path.join(
-                actions, "org.fedoraproject.pkexec.liveinst.policy"
+            self.assertEqual(body, official)
+            self.assertFalse(
+                os.path.exists(os.path.join(usr_bin, "liveinst.real"))
             )
-            self.assertTrue(os.path.isfile(dest), dest)
-            with open(dest, encoding="utf-8") as fh:
-                body = fh.read()
-            self.assertIn("<allow_any>yes</allow_any>", body)
-            libexec = os.path.join(tmp, "usr", "libexec", "fbl-liveinst.policy")
-            self.assertTrue(os.path.isfile(libexec), libexec)
 
-    def test_pre_pivot_hides_kxkb2locale1(self) -> None:
+    def test_pre_pivot_copies_ks_and_enables_unit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            autostart = os.path.join(tmp, "etc", "xdg", "autostart")
-            os.makedirs(autostart)
-            desktop = os.path.join(autostart, "kxkb2locale1.desktop")
-            with open(desktop, "w", encoding="utf-8") as fh:
-                fh.write("[Desktop Entry]\nExec=kxkb2locale1\n")
-            usr_bin = os.path.join(tmp, "usr", "bin")
-            os.makedirs(usr_bin)
-            os.symlink("bin", os.path.join(tmp, "usr", "sbin"))
-            liveinst = os.path.join(usr_bin, "liveinst")
-            with open(liveinst, "w", encoding="utf-8") as fh:
-                fh.write(OFFICIAL_LIVEINST)
-            os.chmod(liveinst, 0o755)
-            wrapper = os.path.join(tmp, "wrapper")
-            with open(wrapper, "w", encoding="utf-8") as fh:
-                fh.write(LIVEINST_WRAPPER)
-            os.chmod(wrapper, 0o755)
-            self._run_pre_pivot(tmp, wrapper)
-            with open(desktop, encoding="utf-8") as fh:
-                body = fh.read()
-            self.assertIn("Hidden=true", body)
-            self.assertNotIn("Exec=kxkb2locale1", body)
+            newroot = os.path.join(tmp, "sysroot")
+            initrd = os.path.join(tmp, "initrd")
+            os.makedirs(newroot)
+            self._write_initrd_seed(initrd)
+            script = os.path.join(tmp, "run-hook.sh")
+            with open(script, "w", encoding="utf-8") as fh:
+                fh.write(self._bind_hook_to_initrd(initrd))
+            os.chmod(script, 0o755)
+            proc = subprocess.run(
+                ["sh", script],
+                check=False,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "NEWROOT": newroot},
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            self.assertTrue(os.path.isfile(os.path.join(newroot, "ks.cfg")))
+            with open(os.path.join(newroot, "ks.cfg"), encoding="utf-8") as fh:
+                self.assertIn("liveimg", fh.read())
+            self.assertTrue(
+                os.path.isfile(os.path.join(newroot, "usr/libexec/fbl-anaconda"))
+            )
+            getty = os.path.join(newroot, "etc/systemd/system/getty@tty1.service")
+            self.assertTrue(os.path.isfile(getty), getty)
+            gen = os.path.join(
+                newroot, "etc/systemd/system-generators/fbl-anaconda-gen"
+            )
+            self.assertTrue(os.path.isfile(gen), gen)
+            self.assertTrue(os.access(gen, os.X_OK))
 
     def test_linker_hardlinks_squashed_img(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -282,10 +278,90 @@ class Fedora44PlasmaTests(unittest.TestCase):
                 body = fh.read()
             self.assertIn("hardlinked", body)
 
-    def test_wrapper_pkexecs_itself_before_zenity(self) -> None:
-        pkexec_at = LIVEINST_WRAPPER.find("pkexec /usr/bin/liveinst")
-        zenity_at = LIVEINST_WRAPPER.find("could not find the Fedora live image")
-        self.assertGreater(pkexec_at, -1)
-        self.assertGreater(zenity_at, pkexec_at)
-        self.assertIn('echo "pkexec $0 (not root)"', LIVEINST_WRAPPER)
-        self.assertIn("exit $rc", LIVEINST_WRAPPER)
+    def test_linker_does_not_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            other = os.path.join(tmp, "otherfs")
+            os.makedirs(other)
+            src = os.path.join(other, "squashfs.img")
+            with open(src, "wb") as fh:
+                fh.write(b"live-image" * 64)
+            # Point find() fallback at other/ by putting it under run/live.
+            live = os.path.join(tmp, "run", "live")
+            os.makedirs(live)
+            src2 = os.path.join(live, "squashfs.img")
+            # Different file (copy) so hardlink from dest's filesystem fails
+            # if we later used a bind; here dest is tmp/run which is same FS.
+            # Simulate cross-device by making dest's parent a file? Skip —
+            # assert the script text never falls back to ln -s.
+            self.assertNotIn("ln -sfn", LINK_SQUASH)
+            self.assertIn("no symlink", LINK_SQUASH)
+            _ = src2
+
+    def test_anaconda_script_refuses_without_image(self) -> None:
+        self.assertIn("refusing to start (would DNF)", ANACONDA_SCRIPT)
+        self.assertLess(
+            ANACONDA_SCRIPT.find("squashfs link missing"),
+            ANACONDA_SCRIPT.find("exec \"$ana\""),
+        )
+        self.assertIn("not root; refusing", ANACONDA_SCRIPT)
+        self.assertIn("exec /bin/bash", ANACONDA_SCRIPT)
+        self.assertIn("Installer did not finish", ANACONDA_SCRIPT)
+
+    def test_strip_installer_cmdline_leaves_desktop(self) -> None:
+        ns: dict = {}
+        exec(STRIP_INSTALLER_CMDLINE_PY, ns)
+        clean = ns["clean"]
+        patch_text = ns["patch_text"]
+        src = (
+            "root=UUID=abc rd.luks.uuid=x rd.live.image rd.live.ram=1 "
+            "rd.live.overlay.overlayfs iso-scan/filename=/images/Fedora.iso "
+            "root=live:CDLABEL=Fedora-KDE-Live-44 systemd.unit=multi-user.target "
+            "systemd.mask=display-manager.service systemd.mask=sddm.service "
+            "inst.cmdline fbl.install enforcing=0"
+        )
+        out = clean(src)
+        toks = out.split()
+        self.assertIn("root=UUID=abc", toks)
+        self.assertIn("rd.luks.uuid=x", toks)
+        self.assertIn("rhgb", toks)
+        self.assertIn("quiet", toks)
+        self.assertNotIn("inst.cmdline", toks)
+        self.assertNotIn("fbl.install", toks)
+        self.assertNotIn("enforcing=0", toks)
+        self.assertFalse(any(t.startswith("systemd.unit=") for t in toks))
+        self.assertFalse(any(t.startswith("systemd.mask=") for t in toks))
+        self.assertFalse(any(t.startswith("rd.live.") for t in toks))
+        self.assertFalse(any(t.startswith("iso-scan/") for t in toks))
+        self.assertFalse(any(t.startswith("root=live:") for t in toks))
+        bls = (
+            "title Fedora\n"
+            "linux /vmlinuz\n"
+            f"options {src}\n"
+        )
+        patched = patch_text(bls)
+        self.assertIn("options root=UUID=abc", patched)
+        self.assertNotIn("systemd.unit=", patched)
+        grub = 'GRUB_CMDLINE_LINUX="rhgb quiet systemd.unit=multi-user.target"\n'
+        self.assertNotIn("systemd.unit=", patch_text(grub))
+
+    def test_pre_pivot_hook_can_be_sourced(self) -> None:
+        """dracut source_hook sources scripts; exit would abort pre-pivot."""
+        with tempfile.TemporaryDirectory() as tmp:
+            newroot = os.path.join(tmp, "sysroot")
+            initrd = os.path.join(tmp, "initrd")
+            os.makedirs(newroot)
+            self._write_initrd_seed(initrd)
+            script = os.path.join(tmp, "run-hook.sh")
+            with open(script, "w", encoding="utf-8") as fh:
+                fh.write(self._bind_hook_to_initrd(initrd))
+            os.chmod(script, 0o755)
+            proc = subprocess.run(
+                ["sh", "-c", ". ./run-hook.sh; echo STILL_ALIVE"],
+                check=False,
+                capture_output=True,
+                text=True,
+                cwd=tmp,
+                env={**os.environ, "NEWROOT": newroot},
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            self.assertIn("STILL_ALIVE", proc.stdout)

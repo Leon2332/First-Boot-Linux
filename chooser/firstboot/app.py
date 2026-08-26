@@ -1746,7 +1746,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--menu",
-        choices=("qs", "network", "apps", "power", "terminal", "sysinfo", "browser"),
+        choices=(
+            "qs",
+            "network",
+            "apps",
+            "power",
+            "clock",
+            "terminal",
+            "sysinfo",
+            "browser",
+        ),
         help="open a shell menu or an in-kiosk window (host/CI screenshots)",
     )
     parser.add_argument(

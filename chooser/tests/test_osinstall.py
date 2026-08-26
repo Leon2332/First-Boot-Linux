@@ -23,11 +23,10 @@ from firstboot.osinstall import (  # noqa: E402
     DRIVER_UBUNTU,
     canonical_driver_id,
     get_driver,
-    FEDORA_AUTOSTART_DESKTOP,
+    FEDORA_ANACONDA_SCRIPT,
+    FEDORA_ANACONDA_SERVICE,
     FEDORA_DRACUT_HOOK,
-    FEDORA_LINK_SERVICE,
     FEDORA_LINK_SQUASH,
-    FEDORA_LIVEINST_WRAPPER,
     FEDORA_LINUX_FLAG,
     FEDORA_LIVE_LABEL,
     FEDORA_SQUASH_LINK,
@@ -308,8 +307,8 @@ class YamlTests(unittest.TestCase):
         self.assertNotIn("subiquity", text)
         self.assertNotIn("d-i ", text)
         self.assertNotIn("boot=casper", text)
-        self.assertIn("graphical\n", text)
-        self.assertNotIn("cmdline\n", text)
+        self.assertIn("cmdline\n", text)
+        self.assertNotIn("graphical\n", text)
         self.assertIn(f"liveimg --url=file://{FEDORA_SQUASH_LINK}", text)
         self.assertNotIn("%packages", text)
         self.assertIn("ignoredisk --only-use=sda", text)
@@ -319,31 +318,30 @@ class YamlTests(unittest.TestCase):
         self.assertIn(UBUNTU_HASH, text)
         self.assertIn("network --hostname=shop-pc", text)
         self.assertIn("rootpw --lock", text)
-        self.assertIn("liveinst.real", FEDORA_LIVEINST_WRAPPER)
-        self.assertIn("root without display", FEDORA_LIVEINST_WRAPPER)
-        self.assertNotIn("exec \"$ana\"", FEDORA_LIVEINST_WRAPPER)
-        self.assertNotIn("--kickstart=/ks.cfg --graphical", FEDORA_LIVEINST_WRAPPER)
-        self.assertIn("--kickstart=/ks.cfg", FEDORA_DRACUT_HOOK)
-        self.assertIn("liveinst.real", FEDORA_DRACUT_HOOK)
+        self.assertIn("--kickstart=/ks.cfg --cmdline", FEDORA_ANACONDA_SCRIPT)
+        self.assertNotIn("pkexec /", FEDORA_ANACONDA_SCRIPT)
+        self.assertNotIn("--liveinst", FEDORA_ANACONDA_SCRIPT)
+        self.assertIn("ExecStart=/usr/libexec/fbl-anaconda", FEDORA_ANACONDA_SERVICE)
+        self.assertIn("WantedBy=getty.target", FEDORA_ANACONDA_SERVICE)
+        self.assertNotIn("Conflicts=getty@tty1.service", FEDORA_ANACONDA_SERVICE)
+        self.assertIn("exec /bin/bash", FEDORA_ANACONDA_SCRIPT)
         self.assertIn("squashfs.img", FEDORA_LINK_SQUASH)
         self.assertIn("squashed.img", FEDORA_LINK_SQUASH)
         self.assertIn(FEDORA_SQUASH_LINK, FEDORA_LINK_SQUASH)
-        self.assertIn("ExecStart=/usr/libexec/fbl-link-squashfs", FEDORA_LINK_SERVICE)
-        self.assertIn("ExecStart=-/usr/sbin/setenforce 0", FEDORA_LINK_SERVICE)
-        self.assertIn("ExecStart=/usr/libexec/fbl-selinux", FEDORA_LINK_SERVICE)
-        self.assertIn("WantedBy=graphical.target", FEDORA_LINK_SERVICE)
-        self.assertNotIn("DefaultDependencies=no", FEDORA_LINK_SERVICE)
-        self.assertIn("fbl-link-squashfs", FEDORA_LIVEINST_WRAPPER)
-        self.assertIn("ensure_link", FEDORA_LIVEINST_WRAPPER)
-        self.assertIn("pkexec /usr/bin/liveinst", FEDORA_LIVEINST_WRAPPER)
-        self.assertIn("/usr/libexec/fbl-link-squashfs >>", FEDORA_DRACUT_HOOK)
-        self.assertIn("Exec=/usr/bin/liveinst", FEDORA_AUTOSTART_DESKTOP)
+        self.assertNotIn("symlinked", FEDORA_LINK_SQUASH)
+        self.assertIn("FBL_LIVE_LOG=", FEDORA_DRACUT_HOOK)
+        self.assertIn("getty@tty1.service", FEDORA_DRACUT_HOOK)
+        self.assertNotIn("\nexit ", FEDORA_DRACUT_HOOK)
+        self.assertNotIn("liveinst.real", FEDORA_DRACUT_HOOK)
         self.assertNotIn('ln -sfn ../sbin/liveinst "', FEDORA_DRACUT_HOOK)
         self.assertIn("%pre", text)
         self.assertIn("%post", text)
         self.assertIn("First Boot Linux", text)
         self.assertIn("Install Fedora", text)
         self.assertIn("plasma-setup", text)
+        self.assertIn("graphical.target", text)
+        self.assertIn('--append="rhgb quiet"', text)
+        self.assertIn("sddm", text)
         self.assertNotIn("inst.ks", text)
         args = fedora_kernel_args(
             "/images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso",
@@ -357,9 +355,11 @@ class YamlTests(unittest.TestCase):
         self.assertIn(FEDORA_LINUX_FLAG, args)
         self.assertNotIn("liveinst", args.split())
         self.assertNotIn("inst.ks", args.split())
-        self.assertNotIn("systemd.unit=multi-user.target", args)
+        self.assertIn("systemd.unit=multi-user.target", args)
+        self.assertIn("enforcing=0", args.split())
+        self.assertIn("systemd.mask=display-manager.service", args)
+        self.assertIn("inst.cmdline", args.split())
         self.assertNotIn("boot=casper", args)
-        self.assertNotIn("inst.ks", args)
         self.assertNotIn("autoinstall", args)
 
     def test_autoinstall_prefers_serial_match(self) -> None:
@@ -435,7 +435,8 @@ class YamlTests(unittest.TestCase):
         self.assertNotIn("subiquity", install_line)
         self.assertNotIn("inst.ks", install_line)
         self.assertNotIn("liveinst", install_line.split())
-        self.assertNotIn("systemd.unit=multi-user.target", install_line)
+        self.assertIn("systemd.unit=multi-user.target", install_line)
+        self.assertIn("inst.cmdline", install_line)
         self.assertIn("/boot/osinstall/vmlinuz", cfg)
         self.assertIn("initrd /boot/osinstall/initrd", cfg)
         self.assertIn("First Boot Linux", cfg)
@@ -792,11 +793,12 @@ class CpioTests(unittest.TestCase):
             inject_into_initrd(
                 initrd,
                 {
-                    "ks.cfg": "graphical\n",
-                    "fbl-liveinst": "#!/bin/bash\nexit 0\n",
+                    "ks.cfg": "cmdline\n",
                     "usr/libexec/fbl-link-squashfs": "#!/bin/bash\nexit 0\n",
-                    "etc/xdg/autostart/fbl-liveinst.desktop": "[Desktop Entry]\n",
-                    "var/lib/dracut/hooks/pre-pivot/90-fbl-ks.sh": "#!/bin/sh\nexit 0\n",
+                    "usr/libexec/fbl-anaconda": "#!/bin/bash\nexit 0\n",
+                    "etc/systemd/system/getty@tty1.service": "[Unit]\n",
+                    "etc/systemd/system-generators/fbl-anaconda-gen": "#!/bin/sh\nexit 0\n",
+                    "var/lib/dracut/hooks/pre-pivot/90-fbl-ks.sh": "#!/bin/sh\n",
                 },
             )
             with open(initrd, "rb") as fh:
@@ -817,17 +819,22 @@ class CpioTests(unittest.TestCase):
             )
             self.assertTrue(os.path.isfile(hook))
             self.assertTrue(os.access(hook, os.X_OK))
-            wrapper = os.path.join(unpacked, "fbl-liveinst")
-            self.assertTrue(os.path.isfile(wrapper))
-            self.assertTrue(os.access(wrapper, os.X_OK))
             link = os.path.join(unpacked, "usr/libexec/fbl-link-squashfs")
             self.assertTrue(os.path.isfile(link))
             self.assertTrue(os.access(link, os.X_OK))
-            desktop = os.path.join(
-                unpacked, "etc/xdg/autostart/fbl-liveinst.desktop"
+            ana = os.path.join(unpacked, "usr/libexec/fbl-anaconda")
+            self.assertTrue(os.path.isfile(ana))
+            self.assertTrue(os.access(ana, os.X_OK))
+            unit = os.path.join(
+                unpacked, "etc/systemd/system/getty@tty1.service"
             )
-            self.assertTrue(os.path.isfile(desktop))
-            self.assertEqual(os.stat(desktop).st_mode & 0o111, 0)
+            self.assertTrue(os.path.isfile(unit))
+            self.assertEqual(os.stat(unit).st_mode & 0o111, 0)
+            gen = os.path.join(
+                unpacked, "etc/systemd/system-generators/fbl-anaconda-gen"
+            )
+            self.assertTrue(os.path.isfile(gen))
+            self.assertTrue(os.access(gen, os.X_OK))
 
 
 class CasperBootTests(unittest.TestCase):

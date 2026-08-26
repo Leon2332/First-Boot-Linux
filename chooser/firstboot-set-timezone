@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""Set the live-session timezone from a UTC offset in minutes."""
+
+from __future__ import annotations
+
+import os
+import sys
+
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+CANDIDATES = (
+    HERE,
+    "/usr/share/firstboot/python",
+)
+for path in CANDIDATES:
+    if os.path.isdir(os.path.join(path, "firstboot")):
+        if path not in sys.path:
+            sys.path.insert(0, path)
+        break
+
+from firstboot.timezone import (  # noqa: E402
+    TZ_MINUTES_MAX,
+    TZ_MINUTES_MIN,
+    TZ_MINUTES_STEP,
+    apply_as_root,
+    snap_tz_minutes,
+)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = sys.argv[1:] if argv is None else argv
+    if len(args) != 1:
+        print(
+            "usage: set-timezone MINUTES",
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        minutes = int(args[0])
+    except ValueError:
+        print("set-timezone: minutes must be an integer", file=sys.stderr)
+        return 2
+    if minutes != snap_tz_minutes(minutes):
+        print(
+            f"set-timezone: minutes must be a multiple of {TZ_MINUTES_STEP} "
+            f"between {TZ_MINUTES_MIN} and {TZ_MINUTES_MAX}",
+            file=sys.stderr,
+        )
+        return 2
+    if os.geteuid() != 0:
+        print("set-timezone: must run as root", file=sys.stderr)
+        return 1
+    apply_as_root(minutes)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,8 +1,12 @@
 """Fedora 44 KDE Plasma — Anaconda kickstart from the live ISO.
 
 Catalog ``install``: ``fedora-44-plasma``. Alias ``fedora-kickstart`` (older sticks).
-Do not feed Fedora autoinstall YAML or a casper cmdline. Official liveinst
-rejects inst.ks. Keep official liveinst; liveimg so Anaconda cannot DNF.
+Do not feed Fedora autoinstall YAML or a casper cmdline.
+
+Official liveinst rejects kickstart on its argv and pkexecs as liveuser
+(auth_admin, blank password). That is a desktop app, not an unattended
+installer. Run Anaconda as root from systemd on multi-user.target with
+kickstart liveimg. Do not wrap liveinst, do not pkexec, do not start Plasma.
 """
 
 from __future__ import annotations
@@ -31,104 +35,13 @@ LINUX_FLAG = "fbl.install"
 BOOTNEXT_LABEL = "Install Fedora"
 SQUASH_LINK = "/run/fbl-squashfs.img"
 
-LIVEINST_WRAPPER = """#!/bin/bash
-# Session front door. Official liveinst pkexecs $0 (this path — the
-# polkit rule is /usr/bin/liveinst). Do not exec anaconda here (0.6.41:
-# no display, then DNF). LIVECMD does not survive pkexec — pre-pivot
-# patches liveinst.real's ANACONDA default.
-#
-# 0.6.44 ran the linker as liveuser via sudo -n / pkexec of the helper.
-# Polkit allows liveinst, not fbl-link-squashfs, so that failed and
-# zenity fired before we ever became root. Become root first, then link.
-log=/var/log/firstboot-fedora.log
-link=/usr/libexec/fbl-link-squashfs
-wayland_socket=/tmp/anaconda-wldisplay
-mkdir -p /var/log /run
-{
-  echo "=== fbl liveinst wrapper ==="
-  date
-  echo "uid=$(id -u) WAYLAND_DISPLAY=${WAYLAND_DISPLAY-} DISPLAY=${DISPLAY-} PKEXEC_UID=${PKEXEC_UID-}"
-  cat /proc/cmdline 2>/dev/null
-  ls -l /ks.cfg /usr/bin/liveinst /usr/bin/liveinst.real /usr/sbin/liveinst.real /run/fbl-squashfs.img "$link" 2>/dev/null
-} >> "$log" 2>&1
-
-ensure_link() {
-  if [ -e /run/fbl-squashfs.img ] && [ -s /run/fbl-squashfs.img ]; then
-    return 0
-  fi
-  if [ ! -x "$link" ]; then
-    echo "fbl-link-squashfs missing" >> "$log"
-    return 1
-  fi
-  if [ "$(id -u)" -ne 0 ]; then
-    echo "ensure_link skipped; not root" >> "$log"
-    return 1
-  fi
-  "$link" >> "$log" 2>&1 || true
-  [ -e /run/fbl-squashfs.img ] && [ -s /run/fbl-squashfs.img ]
-}
-
-# liveinst.real restores WAYLAND_DISPLAY from this file after pkexec.
-if [ -n "${WAYLAND_DISPLAY:-}" ]; then
-  rm -f "$wayland_socket"
-  echo "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/${WAYLAND_DISPLAY}" > "$wayland_socket"
-fi
-
-# Polkit exec.path is /usr/bin/liveinst. pkexec that path, not the linker.
-if [ "$(id -u)" -ne 0 ]; then
-  echo "pkexec $0 (not root)" >> "$log"
-  pkexec /usr/bin/liveinst "$@"
-  rc=$?
-  echo "pkexec returned $rc" >> "$log"
-  exit $rc
-fi
-
-# livesys-late may still call us as root before SDDM. Make the liveimg
-# alias now; do not start Anaconda without a compositor.
-if [ -z "${PKEXEC_UID:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ] && [ -z "${DISPLAY:-}" ]; then
-  ensure_link || true
-  echo "root without display; session autostart will start liveinst" >> "$log"
-  exit 0
-fi
-
-if ! ensure_link; then
-  echo "squashfs link missing; refusing to start (would DNF)" >> "$log"
-  ls -la /run/initramfs /run/initramfs/live /run/initramfs/live/LiveOS /run/initramfs/isoscan 2>> "$log" || true
-  if command -v zenity >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
-    zenity --error --no-markup --text="First Boot Linux could not find the Fedora live image." || true
-  fi
-  exit 1
-fi
-
-if [ -x /usr/libexec/fbl-selinux ]; then
-  /usr/libexec/fbl-selinux >> "$log" 2>&1 || true
-fi
-
-real=
-for p in /usr/bin/liveinst.real /usr/sbin/liveinst.real; do
-  if [ -x "$p" ]; then
-    real=$p
-    break
-  fi
-done
-if [ -z "$real" ]; then
-  echo "liveinst.real missing" >> "$log"
-  exit 1
-fi
-
-exec "$real" "$@"
-"""
-
 LINK_SQUASH = """#!/bin/bash
 # Alias the live image so kickstart liveimg cannot DNF.
 # Same-disk boots use rd.live.ram=1; F44 dmsquash then copies to
-# /run/initramfs/squashed.img. 0.6.43 only looked for squashfs.img and
-# waited for a systemd oneshot. 0.6.44 still zenity-failed: the wrapper
-# ran the linker as liveuser (polkit denies it) and never created the
-# alias in pre-pivot, while /run still had the image. Run this from
-# pre-pivot (initramfs /run survives switch_root) and again as root.
+# /run/initramfs/squashed.img. Never symlink: the source may sit on
+# FBL-DATA, which %pre unmounts and clearpart wipes.
 root=${FBL_LIVE_ROOT:-}
-log="$root/var/log/firstboot-fedora.log"
+log="${FBL_LIVE_LOG:-$root/var/log/firstboot-fedora.log}"
 dest="$root/run/fbl-squashfs.img"
 mkdir -p "$root/var/log" "$root/run"
 sq=
@@ -198,378 +111,213 @@ fi
   findmnt /run/initramfs/live /run/initramfs/isoscan /run/rootfsbase 2>/dev/null
   losetup -a 2>/dev/null
 } >> "$log" 2>&1
-if [ -n "$sq" ]; then
-  rm -f "$dest"
-  if ln "$sq" "$dest" 2>/dev/null; then
-    echo "hardlinked $sq -> $dest" >> "$log"
-  elif cp -f --reflink=auto "$sq" "$dest" 2>/dev/null; then
-    echo "copied $sq -> $dest" >> "$log"
-  else
-    ln -sfn "$sq" "$dest"
-    echo "symlinked $sq -> $dest" >> "$log"
-  fi
+if [ -z "$sq" ]; then
+  echo "no live image found" >> "$log"
+  exit 1
 fi
-exit 0
+if [ -e "$dest" ] && [ -s "$dest" ]; then
+  echo "already present $dest" >> "$log"
+  exit 0
+fi
+rm -f "$dest"
+if ln "$sq" "$dest" 2>/dev/null; then
+  echo "hardlinked $sq -> $dest" >> "$log"
+  exit 0
+fi
+if cp -f --reflink=auto "$sq" "$dest" 2>/dev/null; then
+  echo "copied $sq -> $dest" >> "$log"
+  exit 0
+fi
+echo "failed to place live image at $dest (no symlink: source may be on the target disk)" >> "$log"
+exit 1
 """
 
-LINK_SERVICE = """[Unit]
-Description=First Boot Linux Fedora live image
-After=local-fs.target livesys.service
-# Policy + rules must be labeled before polkitd reads them.
-# try-restart later: HUP does not reload action XML (0.6.48).
-Before=polkit.service polkitd.service display-manager.service
-
-[Service]
-Type=oneshot
-# Labeled Fedora binaries first: unlabeled copies AVC if we exec them
-# while still enforcing. Official liveinst also setenforce 0.
-ExecStart=-/usr/sbin/setenforce 0
-ExecStart=-/usr/sbin/restorecon -F /ks.cfg /usr/bin/liveinst /usr/bin/liveinst.real /usr/sbin/liveinst /usr/sbin/liveinst.real /usr/libexec/fbl-link-squashfs /usr/libexec/fbl-selinux /etc/systemd/system/fbl-link-squashfs.service /etc/xdg/autostart/fbl-liveinst.desktop /etc/xdg/autostart/kxkb2locale1.desktop /etc/xdg/autostart/org.kde.plasma-welcome.desktop /etc/polkit-1/rules.d/00-fbl-liveinst.rules /usr/share/polkit-1/rules.d/00-fbl-liveinst.rules /usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy /var/log/firstboot-fedora.log
-ExecStart=/usr/libexec/fbl-link-squashfs
-ExecStart=/usr/libexec/fbl-selinux
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-WantedBy=graphical.target
-"""
-
-FBL_SELINUX = """#!/bin/bash
-# Live overlay only — liveimg copies squashfs.img, not this layer.
-# Pre-pivot cp leaves unlabeled_t. restorecon in the initramfs used
-# /sysroot/usr/bin/liveinst, which matches no file_contexts rule, so
-# pkexec liveinst and Anaconda liveimg AVC'd. 0.6.45: setroubleshoot
-# balloon on Plasma. Relabel after pivot; setenforce 0 like official
-# liveinst; hide the applet so leftover AVCs stay off the desktop.
+ANACONDA_SCRIPT = """#!/bin/bash
+# Root installer, run in place of getty@tty1. Official liveinst
+# pkexecs as liveuser (auth_admin, blank password). That cannot run
+# unattended. Live-OS payload mode would rsync this overlay onto the
+# disk. Payload is kickstart liveimg. Cmdline mode needs no compositor.
+# Never exit: a failed oneshot lets getty paint a login prompt that
+# looks like the install finished. Stay on this tty with the log.
 log=/var/log/firstboot-fedora.log
-mkdir -p /var/log /etc/xdg/autostart /etc/systemd/system
+mkdir -p /var/log /run
 {
-  echo "=== fbl selinux ==="
+  echo "=== fbl anaconda ==="
   date
-  echo "uid=$(id -u) getenforce=$(getenforce 2>/dev/null || echo missing)"
-  ls -Z /ks.cfg /usr/bin/liveinst /usr/bin/liveinst.real \\
-    /usr/libexec/fbl-link-squashfs /run/fbl-squashfs.img 2>/dev/null || true
+  echo "uid=$(id -u) tty=$(tty 2>/dev/null || true) WAYLAND_DISPLAY=${WAYLAND_DISPLAY-} DISPLAY=${DISPLAY-}"
+  cat /proc/cmdline 2>/dev/null
+  ls -l /ks.cfg /run/fbl-squashfs.img /usr/bin/anaconda /usr/sbin/anaconda \\
+    /usr/bin/liveinst /usr/libexec/fbl-link-squashfs 2>/dev/null
 } >> "$log" 2>&1
+
+fail() {
+  echo "FAILED: $*" | tee -a "$log"
+  echo
+  echo "==== /var/log/firstboot-fedora.log ===="
+  cat "$log" 2>/dev/null || true
+  echo
+  echo "Installer did not finish. This shell is root; tty2 is also a getty."
+  exec /bin/bash
+}
+
+if [ "$(id -u)" -ne 0 ]; then
+  fail "not root; refusing (do not escalate)"
+fi
 
 if [ -x /usr/sbin/setenforce ]; then
   /usr/sbin/setenforce 0 >> "$log" 2>&1 || true
 fi
-
-if command -v restorecon >/dev/null; then
-  restorecon -F /ks.cfg \\
-    /usr/bin/liveinst /usr/bin/liveinst.real \\
-    /usr/sbin/liveinst /usr/sbin/liveinst.real \\
-    /usr/libexec/fbl-link-squashfs /usr/libexec/fbl-selinux \\
-    /etc/systemd/system/fbl-link-squashfs.service \\
-    /etc/xdg/autostart/fbl-liveinst.desktop \\
-    /etc/xdg/autostart/kxkb2locale1.desktop \\
-    /etc/xdg/autostart/org.kde.plasma-welcome.desktop \\
-    /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
-    /usr/share/polkit-1/rules.d/00-fbl-liveinst.rules \\
-    /usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy \\
-    /var/log/firstboot-fedora.log >> "$log" 2>&1 || true
+if command -v plymouth >/dev/null; then
+  plymouth quit >> "$log" 2>&1 || true
 fi
 
-if [ -e /run/fbl-squashfs.img ]; then
-  ref=
-  for p in /run/initramfs/squashed.img \\
-           /run/initramfs/live/LiveOS/squashfs.img \\
-           /run/initramfs/live/LiveOS/rootfs.img; do
-    if [ -e "$p" ]; then
-      ref=$p
-      break
-    fi
-  done
-  if [ -n "$ref" ]; then
-    chcon --reference="$ref" /run/fbl-squashfs.img >> "$log" 2>&1 || true
-  else
-    chcon -t iso9660_t /run/fbl-squashfs.img >> "$log" 2>&1 || true
-  fi
-fi
-
-for name in sealertauto setroubleshoot seapplet setroubleshoot-applet \\
-            org.fedorahosted.setroubleshoot org.fedoraproject.setroubleshoot \\
-            kxkb2locale1 org.kde.plasma-welcome plasma-welcome \\
-            org.fedoraproject.welcome-screen; do
-  printf '%s\\n' '[Desktop Entry]' 'Hidden=true' > "/etc/xdg/autostart/${name}.desktop"
+for i in raid0 raid1 raid5 raid6 raid456 raid10 dm-mod dm-zero dm-mirror \\
+         dm-snapshot dm-multipath dm-round-robin vfat dm-crypt cbc sha256 \\
+         lrw xts iscsi_tcp iscsi_ibft; do
+  /sbin/modprobe "$i" 2>/dev/null || true
 done
-ln -sfn /dev/null /etc/systemd/system/setroubleshootd.service
-if command -v systemctl >/dev/null; then
-  systemctl mask setroubleshootd.service >> "$log" 2>&1 || true
-fi
-pkill -x seapplet >/dev/null 2>&1 || true
-pkill -x kxkb2locale1 >/dev/null 2>&1 || true
-pkill -f plasma-welcome >/dev/null 2>&1 || true
 
-# livesys-kde writes LiveInstaller=liveinst into plasma-welcomerc
-# (0.6.48: Welcome Center then pkexec'd liveinst). Neutralize after livesys.
-if [ -d /home/liveuser ]; then
-  mkdir -p /home/liveuser/.config /home/liveuser/.config/autostart
-  printf '%s\\n' '[General]' 'LiveEnvironment=false' \\
-    > /home/liveuser/.config/plasma-welcomerc
-  printf '%s\\n' '[Desktop Entry]' 'Hidden=true' \\
-    > /home/liveuser/.config/autostart/org.kde.plasma-welcome.desktop
-  chown -R liveuser:liveuser /home/liveuser/.config >> "$log" 2>&1 || true
+link=/usr/libexec/fbl-link-squashfs
+if [ -x "$link" ]; then
+  "$link" >> "$log" 2>&1 || true
+fi
+if [ ! -e /run/fbl-squashfs.img ] || [ ! -s /run/fbl-squashfs.img ]; then
+  echo "squashfs link missing; refusing to start (would DNF)" >> "$log"
+  ls -la /run/initramfs /run/initramfs/live /run/initramfs/live/LiveOS \\
+    /run/initramfs/isoscan 2>> "$log" || true
+  fail "squashfs link missing; refusing to start (would DNF)"
+fi
+if [ ! -f /ks.cfg ]; then
+  fail "ks.cfg missing"
 fi
 
-# Replace the official action with a labeled allow-yes file. Do not sed
-# the squashfs copy (0.6.47 unlabeled it). HUP does not reload action XML
-# (0.6.48 still prompted org.fedoraproject.pkexec.liveinst).
-mkdir -p /etc/polkit-1/rules.d /usr/share/polkit-1/rules.d \\
-  /usr/share/polkit-1/actions
-if [ -f /etc/polkit-1/rules.d/00-fbl-liveinst.rules ]; then
-  cp -f /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
-    /usr/share/polkit-1/rules.d/00-fbl-liveinst.rules 2>/dev/null || true
+if command -v anaconda-cleanup >/dev/null; then
+  anaconda-cleanup >> "$log" 2>&1 || true
 fi
-pol=/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy
-if [ -f /usr/libexec/fbl-liveinst.policy ]; then
-  cp -f /usr/libexec/fbl-liveinst.policy "$pol"
-  chmod 644 "$pol"
-fi
-pref=
-for p in /usr/share/polkit-1/rules.d/50-default.rules \\
-         /usr/share/polkit-1/rules.d/11-fedora-kde-policy.rules; do
-  if [ -f "$p" ]; then
-    pref=$p
+
+ana=
+for p in /usr/bin/anaconda /usr/sbin/anaconda; do
+  if [ -x "$p" ]; then
+    ana=$p
     break
   fi
 done
-if [ -n "$pref" ]; then
-  chcon --reference="$pref" \\
-    /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
-    /usr/share/polkit-1/rules.d/00-fbl-liveinst.rules >> "$log" 2>&1 || true
-fi
-polref=
-for p in /usr/share/polkit-1/actions/org.freedesktop.locale1.policy \\
-         /usr/share/polkit-1/actions/org.freedesktop.NetworkManager.policy; do
-  if [ -f "$p" ]; then
-    polref=$p
-    break
-  fi
-done
-if [ -n "$polref" ] && [ -f "$pol" ]; then
-  chcon --reference="$polref" "$pol" >> "$log" 2>&1 || true
-fi
-if command -v restorecon >/dev/null; then
-  restorecon -F /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
-    /usr/share/polkit-1/rules.d/00-fbl-liveinst.rules "$pol" >> "$log" 2>&1 || true
-fi
-if command -v systemctl >/dev/null; then
-  systemctl try-restart polkit.service >> "$log" 2>&1 \\
-    || systemctl restart polkit.service >> "$log" 2>&1 \\
-    || systemctl try-restart polkitd.service >> "$log" 2>&1 || true
+if [ -z "$ana" ]; then
+  fail "anaconda missing"
 fi
 
-{
-  echo "getenforce=$(getenforce 2>/dev/null || echo missing)"
-  ls -Z /ks.cfg /usr/bin/liveinst /usr/libexec/fbl-link-squashfs \\
-    /run/fbl-squashfs.img 2>/dev/null || true
-} >> "$log" 2>&1
+echo "exec $ana --kickstart=/ks.cfg --cmdline" >> "$log"
+exec "$ana" --kickstart=/ks.cfg --cmdline
+fail "anaconda exited"
+"""
+
+# Replaces getty@tty1. A separate oneshot that Conflicts with getty lost
+# the console (0.6.40 and 0.6.53 hardware: localhost-live login).
+ANACONDA_SERVICE = """[Unit]
+Description=First Boot Linux Fedora installer
+ConditionKernelCommandLine=fbl.install
+After=systemd-user-sessions.service plymouth-quit-wait.service local-fs.target
+After=getty-pre.target
+Conflicts=rescue.service display-manager.service
+Before=rescue.service getty.target
+
+[Service]
+Type=idle
+TimeoutSec=infinity
+Environment=HOME=/root LANG=en_US.UTF-8
+WorkingDirectory=/root
+ExecStartPre=-/usr/sbin/setenforce 0
+ExecStartPre=-/usr/bin/plymouth quit
+ExecStart=/usr/libexec/fbl-anaconda
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=no
+Restart=no
+
+[Install]
+WantedBy=getty.target
+"""
+
+GENERATOR = """#!/bin/sh
+# systemd generator: write getty@tty1 as the installer into /run.
+# Overlay copies under /etc can be unlabeled; generators still run
+# when the kernel has enforcing=0.
+normal="${1:-/run/systemd/generator}"
+grep -qw fbl.install /proc/cmdline 2>/dev/null || exit 0
+[ -x /usr/libexec/fbl-anaconda ] || exit 0
+mkdir -p "$normal"
+ln -sfn /dev/null "$normal/display-manager.service"
+ln -sfn /dev/null "$normal/sddm.service"
+unit="$normal/getty@tty1.service"
+cat > "$unit" <<'EOF'
+""" + ANACONDA_SERVICE + """EOF
+chmod 644 "$unit"
 exit 0
 """
 
-AUTOSTART_DESKTOP = """[Desktop Entry]
-Type=Application
-Name=Install Fedora
-Comment=First Boot Linux unattended installer
-Exec=/usr/bin/liveinst
-X-KDE-autostart-phase=2
-X-GNOME-Autostart-enabled=true
-OnlyShowIn=KDE;
-"""
-
-POLKIT_RULE = """// First Boot Linux — unattended live session. Overlay only.
-// liveuser has a blank password; auth_admin cannot complete unattended.
-// 0.6.48 still prompted org.fedoraproject.pkexec.liveinst (Welcome
-// Center). Do not gate on subject.user — pkexec subject is not always
-// the unix name "liveuser". Do not call action.lookup (duktape).
-polkit.addRule(function(action, subject) {
-    if (action.id == "org.fedoraproject.pkexec.liveinst") {
-        return polkit.Result.YES;
-    }
-    if (action.id == "org.freedesktop.policykit.exec") {
-        return polkit.Result.YES;
-    }
-    if (action.id == "org.freedesktop.locale1.set-keyboard" ||
-        action.id == "org.freedesktop.locale1.set-locale") {
-        return polkit.Result.YES;
-    }
-});
-"""
-
-LIVEINST_POLICY = """<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE policyconfig PUBLIC
- "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
- "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
-<policyconfig>
-  <action id="org.fedoraproject.pkexec.liveinst">
-    <description>Run the live installer</description>
-    <message>Authentication is required to run the installer</message>
-    <icon_name>org.fedoraproject.AnacondaInstaller</icon_name>
-    <defaults>
-      <allow_any>yes</allow_any>
-      <allow_inactive>yes</allow_inactive>
-      <allow_active>yes</allow_active>
-    </defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/liveinst</annotate>
-    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
-  </action>
-</policyconfig>
-"""
-
 DRACUT_HOOK = """#!/bin/sh
-# Overlay kickstart + official liveinst (patched) onto the live root.
-# Fedora dracut keeps hooks in var/lib/dracut/hooks (lib/dracut/hooks is a symlink).
+# Overlay kickstart + getty@tty1 installer onto the live root.
+# Do not wrap liveinst. Fedora dracut *sources* pre-pivot hooks
+# (lib/dracut-lib.sh source_hook) — do not exit, that aborts cleanup.
+# Fedora dracut keeps hooks in var/lib/dracut/hooks
+# (lib/dracut/hooks is a symlink).
 root="${NEWROOT:-/sysroot}"
 log="$root/var/log/firstboot-fedora.log"
-mkdir -p "$root/var/log" "$root/usr/sbin" "$root/usr/libexec" \\
-  "$root/etc/xdg/autostart" \\
-  "$root/etc/polkit-1/rules.d" \\
-  "$root/usr/share/polkit-1/rules.d" \\
-  "$root/etc/systemd/system/multi-user.target.wants" \\
-  "$root/etc/systemd/system/graphical.target.wants"
+mkdir -p "$root/var/log" "$root/usr/libexec" \\
+  "$root/etc/systemd/system" \\
+  "$root/etc/systemd/system-generators"
 {
   echo "=== fbl fedora pre-pivot ==="
   cat /proc/cmdline 2>/dev/null
-  ls -l /ks.cfg /fbl-liveinst /usr/libexec/fbl-link-squashfs \\
+  ls -l /ks.cfg /usr/libexec/fbl-link-squashfs /usr/libexec/fbl-anaconda \\
+    /etc/systemd/system/getty@tty1.service \\
+    /etc/systemd/system-generators/fbl-anaconda-gen \\
     /var/lib/dracut/hooks/pre-pivot 2>/dev/null
 } > "$log" 2>&1
 if [ -f /ks.cfg ]; then
   cp /ks.cfg "$root/ks.cfg"
   chmod 644 "$root/ks.cfg"
 fi
-if [ -f /fbl-liveinst ]; then
-  # F44 anaconda-live ships /usr/bin/liveinst. Fedora 42+ usr-merge makes
-  # /usr/sbin a symlink to bin, so those two paths are one file. 0.6.42
-  # replaced bin/liveinst with a symlink to ../sbin/liveinst — circular.
-  # KDE: "Could not find the program 'liveinst'".
-  bin="$root/usr/bin/liveinst"
-  sbin="$root/usr/sbin/liveinst"
-  mkdir -p "$root/usr/bin"
-  if [ -f "$bin" ] && [ ! -L "$bin" ] && [ ! -e "$bin.real" ]; then
-    mv "$bin" "$bin.real" || true
-  fi
-  if [ -f "$sbin" ] && [ ! -L "$sbin" ] && [ ! -e "$sbin.real" ]; then
-    mv "$sbin" "$sbin.real" || true
-  fi
-  for real in "$bin.real" "$sbin.real"; do
-    if [ -f "$real" ] && ! grep -q -- '--kickstart=/ks.cfg' "$real"; then
-      sed -i 's|anaconda --liveinst --graphical|anaconda --liveinst --graphical --kickstart=/ks.cfg|' \\
-        "$real" || true
-    fi
-  done
-  cp /fbl-liveinst "$bin"
-  chmod 755 "$bin"
-  if [ -d "$root/usr/sbin" ] && [ ! "$root/usr/sbin" -ef "$root/usr/bin" ]; then
-    if [ ! -e "$sbin" ] || [ -L "$sbin" ]; then
-      ln -sfn ../bin/liveinst "$sbin"
-    fi
-  fi
+if [ -f /usr/libexec/fbl-anaconda ]; then
+  cp /usr/libexec/fbl-anaconda "$root/usr/libexec/fbl-anaconda"
+  chmod 755 "$root/usr/libexec/fbl-anaconda"
+fi
+if [ -f /etc/systemd/system/getty@tty1.service ]; then
+  # Regular file replaces a live-image mask (symlink to /dev/null).
+  rm -f "$root/etc/systemd/system/getty@tty1.service"
+  cp /etc/systemd/system/getty@tty1.service \\
+    "$root/etc/systemd/system/getty@tty1.service"
+  chmod 644 "$root/etc/systemd/system/getty@tty1.service"
+fi
+if [ -f /etc/systemd/system-generators/fbl-anaconda-gen ]; then
+  cp /etc/systemd/system-generators/fbl-anaconda-gen \\
+    "$root/etc/systemd/system-generators/fbl-anaconda-gen"
+  chmod 755 "$root/etc/systemd/system-generators/fbl-anaconda-gen"
 fi
 if [ -f /usr/libexec/fbl-link-squashfs ]; then
   cp /usr/libexec/fbl-link-squashfs "$root/usr/libexec/fbl-link-squashfs"
   chmod 755 "$root/usr/libexec/fbl-link-squashfs"
   # Initramfs /run survives switch_root. Create the liveimg alias now,
-  # while squashed.img / LiveOS / isoscan are still visible. 0.6.44 waited
-  # for a systemd oneshot + liveuser sudo and still zenity-failed.
-  /usr/libexec/fbl-link-squashfs >> "$log" 2>&1 || true
+  # while squashed.img / LiveOS / isoscan are still visible. Do this
+  # after the small copies: a full-image copy onto tmpfs must not
+  # ENOSPC the unit files.
+  FBL_LIVE_LOG="$log" /usr/libexec/fbl-link-squashfs >> "$log" 2>&1 || true
   ls -l /run/fbl-squashfs.img >> "$log" 2>&1 || true
 fi
-if [ -f /usr/libexec/fbl-selinux ]; then
-  cp /usr/libexec/fbl-selinux "$root/usr/libexec/fbl-selinux"
-  chmod 755 "$root/usr/libexec/fbl-selinux"
+if command -v chcon >/dev/null; then
+  chcon -t systemd_unit_file_t \\
+    "$root/etc/systemd/system/getty@tty1.service" 2>/dev/null || true
+  chcon -t bin_t \\
+    "$root/usr/libexec/fbl-anaconda" \\
+    "$root/usr/libexec/fbl-link-squashfs" \\
+    "$root/etc/systemd/system-generators/fbl-anaconda-gen" 2>/dev/null || true
 fi
-if [ -f /etc/systemd/system/fbl-link-squashfs.service ]; then
-  cp /etc/systemd/system/fbl-link-squashfs.service \\
-    "$root/etc/systemd/system/fbl-link-squashfs.service"
-  ln -sfn /etc/systemd/system/fbl-link-squashfs.service \\
-    "$root/etc/systemd/system/multi-user.target.wants/fbl-link-squashfs.service"
-  ln -sfn /etc/systemd/system/fbl-link-squashfs.service \\
-    "$root/etc/systemd/system/graphical.target.wants/fbl-link-squashfs.service"
-fi
-if [ -f /etc/xdg/autostart/fbl-liveinst.desktop ]; then
-  cp /etc/xdg/autostart/fbl-liveinst.desktop \\
-    "$root/etc/xdg/autostart/fbl-liveinst.desktop"
-fi
-if [ -f /etc/polkit-1/rules.d/00-fbl-liveinst.rules ]; then
-  cp /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
-    "$root/etc/polkit-1/rules.d/00-fbl-liveinst.rules"
-  cp /etc/polkit-1/rules.d/00-fbl-liveinst.rules \\
-    "$root/usr/share/polkit-1/rules.d/00-fbl-liveinst.rules"
-  chmod 644 "$root/etc/polkit-1/rules.d/00-fbl-liveinst.rules" \\
-    "$root/usr/share/polkit-1/rules.d/00-fbl-liveinst.rules"
-  pref=
-  for p in "$root/usr/share/polkit-1/rules.d/50-default.rules" \\
-           "$root/usr/share/polkit-1/rules.d/11-fedora-kde-policy.rules"; do
-    if [ -f "$p" ]; then
-      pref=$p
-      break
-    fi
-  done
-  if [ -n "$pref" ]; then
-    chcon --reference="$pref" \\
-      "$root/etc/polkit-1/rules.d/00-fbl-liveinst.rules" \\
-      "$root/usr/share/polkit-1/rules.d/00-fbl-liveinst.rules" >> "$log" 2>&1 || true
-  fi
-fi
-# Replace the official action with our allow-yes file, then copy the
-# xattr from a sibling policy. Do not sed the squashfs copy (0.6.47).
-mkdir -p "$root/usr/share/polkit-1/actions" "$root/usr/libexec"
-if [ -f /fbl-pkexec.policy ]; then
-  cp /fbl-pkexec.policy "$root/usr/libexec/fbl-liveinst.policy"
-  cp /fbl-pkexec.policy \\
-    "$root/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy"
-  chmod 644 "$root/usr/libexec/fbl-liveinst.policy" \\
-    "$root/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy"
-  polref=
-  for p in "$root/usr/share/polkit-1/actions/org.freedesktop.locale1.policy" \\
-           "$root/usr/share/polkit-1/actions/org.freedesktop.NetworkManager.policy"; do
-    if [ -f "$p" ]; then
-      polref=$p
-      break
-    fi
-  done
-  if [ -n "$polref" ]; then
-    chcon --reference="$polref" \\
-      "$root/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy" \\
-      "$root/usr/libexec/fbl-liveinst.policy" >> "$log" 2>&1 || true
-  fi
-fi
-# restorecon on /sysroot/usr/bin/liveinst matches no file_contexts rule
-# (0.6.45 unlabeled_t → setroubleshoot). setfiles -r NEWROOT uses the
-# live policy. After pivot the oneshot restorecon's again.
-fc="$root/etc/selinux/targeted/contexts/files/file_contexts"
-sf=
-for p in "$root/usr/sbin/setfiles" "$root/sbin/setfiles"; do
-  if [ -x "$p" ]; then
-    sf=$p
-    break
-  fi
-done
-if [ -n "$sf" ] && [ -f "$fc" ]; then
-  LD_LIBRARY_PATH="$root/usr/lib64:$root/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \\
-    "$sf" -F -r "$root" "$fc" \\
-    "$root/ks.cfg" "$root/usr/bin/liveinst" "$root/usr/bin/liveinst.real" \\
-    "$root/usr/sbin/liveinst" "$root/usr/sbin/liveinst.real" \\
-    "$root/usr/libexec/fbl-link-squashfs" "$root/usr/libexec/fbl-selinux" \\
-    "$root/etc/systemd/system/fbl-link-squashfs.service" \\
-    "$root/etc/xdg/autostart/fbl-liveinst.desktop" \\
-    "$root/etc/polkit-1/rules.d/00-fbl-liveinst.rules" \\
-    "$root/usr/share/polkit-1/rules.d/00-fbl-liveinst.rules" \\
-    "$root/usr/share/polkit-1/actions/org.fedoraproject.pkexec.liveinst.policy" \\
-    "$root/usr/libexec/fbl-liveinst.policy" \\
-    "$root/var/log/firstboot-fedora.log" >> "$log" 2>&1 || true
-fi
-mkdir -p "$root/etc/xdg/autostart" "$root/etc/systemd/system"
-for name in sealertauto setroubleshoot seapplet setroubleshoot-applet \\
-            org.fedorahosted.setroubleshoot org.fedoraproject.setroubleshoot \\
-            kxkb2locale1 org.kde.plasma-welcome plasma-welcome \\
-            org.fedoraproject.welcome-screen; do
-  printf '%s\\n' '[Desktop Entry]' 'Hidden=true' > "$root/etc/xdg/autostart/${name}.desktop"
-done
-ln -sfn /dev/null "$root/etc/systemd/system/setroubleshootd.service"
-echo "ks=$(test -f "$root/ks.cfg" && echo yes || echo no) liveinst=$(test -x "$root/usr/bin/liveinst" && echo yes || echo no) real=$(test -f "$root/usr/bin/liveinst.real" -o -f "$root/usr/sbin/liveinst.real" && echo yes || echo no)" >> "$log"
-exit 0
+# Leave official /usr/bin/liveinst alone. Do not ln sbin→bin on usr-merge.
+echo "ks=$(test -f "$root/ks.cfg" && echo yes || echo no) anaconda=$(test -x "$root/usr/libexec/fbl-anaconda" && echo yes || echo no) getty=$(test -f "$root/etc/systemd/system/getty@tty1.service" && echo yes || echo no) liveinst=$(test -x "$root/usr/bin/liveinst" && echo yes || echo no)" >> "$log"
 """
 
 SHIM_GRUB = """# First Boot Linux — Fedora shim (Secure Boot)
@@ -586,6 +334,103 @@ menuentry "Install {name}" {{
     initrd /boot/osinstall/initrd
 }}
 """
+
+
+# Chrooted on the installed system. Anaconda copies leftover live
+# cmdline into BLS; systemd.unit=multi-user.target and systemd.mask=sddm
+# then boot a getty instead of Plasma.
+STRIP_INSTALLER_CMDLINE_PY = r"""
+import glob, pathlib, re, sys
+DROP_EXACT = {"inst.cmdline", "fbl.install", "enforcing=0", "---"}
+DROP_PFX = (
+    "systemd.unit=",
+    "systemd.mask=",
+    "iso-scan/",
+    "root=live:",
+    "rd.live.",
+)
+
+def keep(tok):
+    if tok in DROP_EXACT:
+        return False
+    return not tok.startswith(DROP_PFX)
+
+def clean(s):
+    toks = [t for t in s.split() if keep(t)]
+    if "rhgb" not in toks:
+        toks.append("rhgb")
+    if "quiet" not in toks:
+        toks.append("quiet")
+    return " ".join(toks)
+
+def patch_text(text):
+    def grub_repl(m):
+        return f"{m.group(1)}={m.group(2)}{clean(m.group(3))}{m.group(2)}"
+    text = re.sub(
+        r'^(GRUB_CMDLINE_LINUX(?:_DEFAULT)?)=([\"\'])(.*)\2\s*$',
+        grub_repl,
+        text,
+        flags=re.M,
+    )
+    out = []
+    for line in text.splitlines(True):
+        if line.startswith("options "):
+            nl = "\n" if line.endswith("\n") else ""
+            out.append("options " + clean(line[len("options "):].strip()) + nl)
+        else:
+            out.append(line)
+    return "".join(out)
+"""
+
+KICKSTART_POST_DESKTOP = (
+    "python3 - <<'PY' || true\n"
+    + STRIP_INSTALLER_CMDLINE_PY
+    + r"""
+paths = [
+    "/etc/default/grub",
+    "/etc/kernel/cmdline",
+    *glob.glob("/boot/loader/entries/*.conf"),
+    *glob.glob("/boot/efi/loader/entries/*.conf"),
+]
+for path in paths:
+    p = pathlib.Path(path)
+    if not p.is_file():
+        continue
+    old = p.read_text(encoding="utf-8", errors="replace")
+    new = patch_text(old)
+    if path.endswith("cmdline") and "\n" not in old.strip():
+        new = clean(old.strip()) + "\n"
+    if new != old:
+        p.write_text(new, encoding="utf-8")
+        print("cleaned", path, file=sys.stderr)
+PY
+if command -v grubby >/dev/null; then
+  grubby --update-kernel=ALL --remove-args="systemd.unit=multi-user.target systemd.mask=display-manager.service systemd.mask=sddm.service inst.cmdline fbl.install enforcing=0 rd.live.image rd.live.ram=1 rd.live.overlay.overlayfs" 2>/dev/null || true
+  grubby --update-kernel=ALL --args="rhgb quiet" 2>/dev/null || true
+fi
+if command -v grub2-mkconfig >/dev/null && [ -d /boot/grub2 ]; then
+  grub2-mkconfig -o /boot/grub2/grub.cfg 2>/dev/null || true
+fi
+ln -sfn /usr/lib/systemd/system/graphical.target /etc/systemd/system/default.target
+if [ -L /etc/systemd/system/sddm.service ] && [ "$(readlink /etc/systemd/system/sddm.service)" = /dev/null ]; then
+  rm -f /etc/systemd/system/sddm.service
+fi
+if [ -L /etc/systemd/system/display-manager.service ] && [ "$(readlink /etc/systemd/system/display-manager.service)" = /dev/null ]; then
+  rm -f /etc/systemd/system/display-manager.service
+fi
+rm -f /etc/systemd/system-generators/fbl-anaconda-gen \
+  /usr/libexec/fbl-anaconda /usr/libexec/fbl-link-squashfs /ks.cfg \
+  /etc/systemd/system/multi-user.target.wants/fbl-anaconda.service
+if [ -f /etc/systemd/system/getty@tty1.service ] && grep -q fbl-anaconda /etc/systemd/system/getty@tty1.service; then
+  rm -f /etc/systemd/system/getty@tty1.service
+fi
+if [ -f /usr/lib/systemd/system/sddm.service ]; then
+  ln -sfn /usr/lib/systemd/system/sddm.service /etc/systemd/system/display-manager.service
+  mkdir -p /etc/systemd/system/graphical.target.wants
+  ln -sfn /usr/lib/systemd/system/sddm.service /etc/systemd/system/graphical.target.wants/sddm.service
+fi
+"""
+)
 
 
 def fedora_boot_files(iso_mnt: str) -> tuple[str, str]:
@@ -612,7 +457,7 @@ def fedora_kickstart(identity: OsIdentity, target_path: str) -> str:
     return (
         "#version=F44\n"
         "# First Boot Linux — Fedora Plasma live install\n"
-        "graphical\n"
+        "cmdline\n"
         f"liveimg --url=file://{SQUASH_LINK}\n"
         "lang en_US.UTF-8\n"
         "keyboard --vckeymap=us --xlayouts='us'\n"
@@ -626,7 +471,9 @@ def fedora_kickstart(identity: OsIdentity, target_path: str) -> str:
         "zerombr\n"
         f"clearpart --all --initlabel --disklabel=gpt --drives={drive}\n"
         "autopart --type=btrfs\n"
-        f"bootloader --location=mbr --boot-drive={drive}\n"
+        f"bootloader --location=mbr --boot-drive={drive} --append=\"rhgb quiet\"\n"
+        "selinux --enforcing\n"
+        "services --enabled=sddm,NetworkManager\n"
         "reboot\n"
         "%addon com_redhat_kdump --disable\n"
         "%end\n"
@@ -681,7 +528,10 @@ def fedora_kickstart(identity: OsIdentity, target_path: str) -> str:
         "/usr/lib/systemd/user/plasma-setup.service 2>/dev/null || true\n"
         "mkdir -p /var/lib/plasma-setup\n"
         "touch /var/lib/plasma-setup/completed\n"
-        "%end\n"
+        # Installer cmdline (multi-user, mask sddm) must not stick on
+        # the installed kernel. Overlay copies of getty@tty1 must go.
+        + KICKSTART_POST_DESKTOP
+        + "%end\n"
     )
 
 
@@ -690,7 +540,10 @@ def fedora_kernel_args(iso_rel: str, label: str, *, toram: bool) -> str:
     vol = (label or LIVE_LABEL).strip() or LIVE_LABEL
     return (
         f"root=live:CDLABEL={vol} rd.live.image iso-scan/filename={iso_rel} "
-        f"{ram}{LINUX_FLAG}"
+        f"{ram}rd.live.overlay.overlayfs enforcing=0 "
+        f"systemd.unit=multi-user.target "
+        f"systemd.mask=display-manager.service systemd.mask=sddm.service "
+        f"inst.cmdline {LINUX_FLAG}"
     )
 
 
@@ -799,14 +652,10 @@ class Fedora44Plasma:
     ) -> dict[str, str | bytes]:
         return {
             "ks.cfg": fedora_kickstart(identity, target_path),
-            "fbl-liveinst": LIVEINST_WRAPPER,
-            "fbl-pkexec.policy": LIVEINST_POLICY,
             "usr/libexec/fbl-link-squashfs": LINK_SQUASH,
-            "usr/libexec/fbl-selinux": FBL_SELINUX,
-            "usr/libexec/fbl-liveinst.policy": LIVEINST_POLICY,
-            "etc/systemd/system/fbl-link-squashfs.service": LINK_SERVICE,
-            "etc/xdg/autostart/fbl-liveinst.desktop": AUTOSTART_DESKTOP,
-            "etc/polkit-1/rules.d/00-fbl-liveinst.rules": POLKIT_RULE,
+            "usr/libexec/fbl-anaconda": ANACONDA_SCRIPT,
+            "etc/systemd/system/getty@tty1.service": ANACONDA_SERVICE,
+            "etc/systemd/system-generators/fbl-anaconda-gen": GENERATOR,
             "var/lib/dracut/hooks/pre-pivot/90-fbl-ks.sh": DRACUT_HOOK,
         }
 

@@ -51,6 +51,10 @@ class AssetTests(unittest.TestCase):
     def test_clock_format(self) -> None:
         now = dt.datetime(2026, 8, 13, 0, 42)
         self.assertEqual(format_clock(now), "13 Aug 00:42")
+        utc = dt.datetime(2026, 8, 13, 0, 42, tzinfo=dt.timezone.utc)
+        from firstboot.timezone import clock_in_offset
+
+        self.assertEqual(format_clock(clock_in_offset(330, utc)), "13 Aug 06:12")
 
 
 if __name__ == "__main__":

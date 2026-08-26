@@ -59,7 +59,68 @@ window.firstboot button {
   font-size: 13px;
   font-weight: 500;
   color: #f6f5f4;
-  padding: 0 12px;
+  padding: 0 4px;
+}
+
+.shell-panel.clock-menu {
+  border-radius: 16px;
+  padding: 10px;
+  min-width: 0;
+}
+
+.tz-spin {
+  min-width: 168px;
+  min-height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+window.firstboot.light .tz-spin {
+  border-color: rgba(0, 0, 0, 0.14);
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.tz-spin-value {
+  min-width: 7.6em;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.tz-spin-btns {
+  min-width: 28px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+window.firstboot.light .tz-spin-btns {
+  border-left-color: rgba(0, 0, 0, 0.08);
+}
+
+.tz-spin-btn {
+  min-width: 28px;
+  min-height: 20px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+}
+
+.tz-spin-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+window.firstboot.light .tz-spin-btn:hover:not(:disabled) {
+  background-color: rgba(0, 0, 0, 0.10);
+}
+
+.tz-spin-btn + .tz-spin-btn {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+window.firstboot.light .tz-spin-btn + .tz-spin-btn {
+  border-top-color: rgba(0, 0, 0, 0.08);
 }
 
 .panel-btn {

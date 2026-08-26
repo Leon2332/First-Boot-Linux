@@ -124,7 +124,8 @@ html[data-theme="light"] {
 html[data-theme="light"] .quick-settings .sym,
 html[data-theme="light"] .network-menu .sym,
 html[data-theme="light"] .power-menu .sym,
-html[data-theme="light"] .app-menu .sym {
+html[data-theme="light"] .app-menu .sym,
+html[data-theme="light"] .clock-menu .sym {
   filter: none;
   opacity: 0.85;
 }
@@ -371,9 +372,15 @@ button:disabled {
   padding: 0 12px;
   display: flex;
   align-items: center;
+  border-radius: 999px;
   font-variant-numeric: tabular-nums;
-  pointer-events: none;
   user-select: none;
+  transition: background-color var(--transition-fast);
+}
+
+.clock-display:hover,
+.clock-display[aria-expanded="true"] {
+  background-color: rgba(255, 255, 255, 0.12);
 }
 
 .status-area {
@@ -424,7 +431,8 @@ button:disabled {
 .quick-settings,
 .network-menu,
 .power-menu,
-.app-menu {
+.app-menu,
+.clock-menu {
   position: fixed;
   top: calc(var(--panel-height) + 8px);
   right: 10px;
@@ -450,7 +458,8 @@ button:disabled {
 .quick-settings .sym,
 .network-menu .sym,
 .power-menu .sym,
-.app-menu .sym {
+.app-menu .sym,
+.clock-menu .sym {
   filter: brightness(0) invert(1);
   opacity: 0.9;
 }
@@ -459,6 +468,7 @@ button:disabled {
 .network-menu[hidden],
 .power-menu[hidden],
 .app-menu[hidden],
+.clock-menu[hidden],
 .app-window[hidden],
 .backdrop[hidden],
 .modal[hidden],
@@ -962,6 +972,73 @@ html[data-theme="light"] .wifi-row.active .wifi-unhide {
 
 html[data-theme="light"] .app-menu-item-sub {
   color: rgba(28, 28, 28, 0.4);
+}
+
+/* Clock / timezone */
+.clock-menu {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: auto;
+  padding: 10px;
+  border-radius: 16px;
+}
+
+.tz-spin {
+  display: flex;
+  align-items: stretch;
+  min-height: 40px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-muted);
+}
+
+.tz-spin-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 7.6em;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.tz-spin-btns {
+  display: flex;
+  flex-direction: column;
+  width: 28px;
+  border-left: 1px solid var(--border);
+}
+
+.tz-spin-btn {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+
+.tz-spin-btn:hover:not(:disabled) {
+  background-color: var(--surface-muted-hover);
+}
+
+.tz-spin-btn + .tz-spin-btn {
+  border-top: 1px solid var(--border);
+}
+
+.tz-caret {
+  width: 10px;
+  height: 10px;
+}
+
+.tz-caret-up {
+  transform: rotate(-90deg);
+}
+
+.tz-caret-down {
+  transform: rotate(90deg);
 }
 
 /* Power menu */

@@ -62,12 +62,11 @@ from .common import (
     iso_volume_id,
     run_checked,
 )
-from .fedora_44_plasma import AUTOSTART_DESKTOP as FEDORA_AUTOSTART_DESKTOP
+from .fedora_44_plasma import ANACONDA_SCRIPT as FEDORA_ANACONDA_SCRIPT
+from .fedora_44_plasma import ANACONDA_SERVICE as FEDORA_ANACONDA_SERVICE
 from .fedora_44_plasma import DRACUT_HOOK as FEDORA_DRACUT_HOOK
-from .fedora_44_plasma import LINK_SERVICE as FEDORA_LINK_SERVICE
 from .fedora_44_plasma import LINK_SQUASH as FEDORA_LINK_SQUASH
 from .fedora_44_plasma import LINUX_FLAG as FEDORA_LINUX_FLAG
-from .fedora_44_plasma import LIVEINST_WRAPPER as FEDORA_LIVEINST_WRAPPER
 from .fedora_44_plasma import LIVE_LABEL as FEDORA_LIVE_LABEL
 from .fedora_44_plasma import SQUASH_LINK as FEDORA_SQUASH_LINK
 from .fedora_44_plasma import fedora_boot_files as _fedora_boot_files
@@ -668,9 +667,12 @@ def _write_tree_files(root: str, files: dict[str, str | bytes]) -> None:
         executable = (
             "casper-bottom" in rel
             or "dracut/hooks/" in rel
+            or "system-generators" in rel
             or rel.endswith("firstboot-efi-cleanup")
             or rel.endswith("fbl-liveinst")
             or rel.endswith("fbl-link-squashfs")
+            or rel.endswith("fbl-anaconda")
+            or rel.endswith("fbl-anaconda-gen")
             or rel.endswith("fbl-selinux")
             or rel.endswith("/liveinst")
         )

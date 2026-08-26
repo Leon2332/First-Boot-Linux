@@ -57,9 +57,17 @@
       </button>
     </div>
 
-    <div class="clock-display" id="clock-btn" aria-label="Date and time">
+    <button
+      type="button"
+      class="clock-display"
+      id="clock-btn"
+      aria-label="Date and time"
+      aria-expanded="false"
+      aria-haspopup="true"
+      aria-controls="clock-menu"
+    >
       <span id="clock-text">—</span>
-    </div>
+    </button>
 
     <div class="status-area">
       <button
@@ -188,6 +196,20 @@
       <img class="app-menu-item-icon" src="assets/apps/org.gnome.Terminal.png" alt="" draggable="false" />
       <span>Terminal</span>
     </button>
+  </div>
+
+  <div class="clock-menu" id="clock-menu" role="dialog" aria-label="Time zone" hidden>
+    <div class="tz-spin" role="group" aria-label="Time zone">
+      <span class="tz-spin-value" id="tz-value" aria-live="polite">UTC+0000</span>
+      <div class="tz-spin-btns">
+        <button type="button" class="tz-spin-btn" id="tz-up" aria-label="Later time zone">
+          <img class="sym tz-caret tz-caret-up" src="assets/status/go-next-symbolic.svg" alt="" draggable="false" />
+        </button>
+        <button type="button" class="tz-spin-btn" id="tz-down" aria-label="Earlier time zone">
+          <img class="sym tz-caret tz-caret-down" src="assets/status/go-next-symbolic.svg" alt="" draggable="false" />
+        </button>
+      </div>
+    </div>
   </div>
 
   <div class="power-menu" id="power-menu" role="menu" aria-label="Power Off" hidden>

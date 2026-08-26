@@ -31,6 +31,16 @@ from firstboot.net import (
     wifi_row_actions,
 )
 from firstboot.brightness import BrightnessState, get_brightness_backend
+from firstboot.timezone import (
+    TZ_MINUTES_MAX,
+    TZ_MINUTES_MIN,
+    TZ_MINUTES_STEP,
+    apply_tz_minutes,
+    clock_in_offset,
+    current_tz_minutes,
+    format_tz_offset,
+    snap_tz_minutes,
+)
 from firstboot.volume import MemoryVolume, Volume, VolumeState, get_volume_backend
 
 if TYPE_CHECKING:
@@ -310,7 +320,10 @@ class Shell:
         self._net_gen = 0
         self.qs_popover = None
         self.app_popover = None
+        self.clock_popover = None
         self.qs_stack = None
+        self.tz_minutes = current_tz_minutes()
+        self._tz_apply_id = 0
         self._ignore_popover_closed = False
         self._popover_closed_at = 0.0
         self._popover_closed_which: str | None = None
@@ -335,7 +348,14 @@ class Shell:
         self.net_panel = self._build_network()
         self.power_menu = self._build_power()
         self.app_menu = self._build_apps()
-        for panel in (self.qs, self.net_panel, self.power_menu, self.app_menu):
+        self.clock_panel = self._build_clock()
+        for panel in (
+            self.qs,
+            self.net_panel,
+            self.power_menu,
+            self.app_menu,
+            self.clock_panel,
+        ):
             panel.set_visible(False)
         self._built = True
         try:
@@ -351,6 +371,7 @@ class Shell:
             self.net_panel,
             self.power_menu,
             self.app_menu,
+            self.clock_panel,
         ]
 
     def apply_theme(self, dark: bool) -> None:
@@ -366,7 +387,7 @@ class Shell:
         self.refresh_icons()
 
     def tick_clock(self) -> bool:
-        self.clock.set_label(format_clock(dt.datetime.now()))
+        self.clock.set_label(format_clock(clock_in_offset(self.tz_minutes)))
         return True
 
     def refresh_net(self) -> bool:
@@ -465,8 +486,13 @@ class Shell:
         if self.locked and name is not None:
             return
         if name is not None and self.app_popover is not None:
-            which = "apps" if name == "apps" else "qs"
-            if name not in {"apps", "qs", "network", "power"}:
+            if name == "apps":
+                which = "apps"
+            elif name == "clock":
+                which = "clock"
+            elif name in {"qs", "network", "power"}:
+                which = "qs"
+            else:
                 which = None
             if (
                 which is not None
@@ -489,6 +515,7 @@ class Shell:
             self.net_panel.set_visible(name == "network")
             self.power_menu.set_visible(name == "power")
             self.app_menu.set_visible(name == "apps")
+            self.clock_panel.set_visible(name == "clock")
         if name == "qs":
             self.sys_btn.add_css_class("open")
         else:
@@ -497,6 +524,12 @@ class Shell:
             self.app_btn.add_css_class("open")
         else:
             self.app_btn.remove_css_class("open")
+        if name == "clock":
+            self.clock_btn.add_css_class("open")
+            self._paint_tz()
+            self.clock_panel.grab_focus()
+        else:
+            self.clock_btn.remove_css_class("open")
         if name == "network":
             if self.allow_scan:
                 self._request_net(scan=not self._wifi_expanded)
@@ -515,7 +548,13 @@ class Shell:
 
         if self.app_popover is not None:
             return
-        for panel in (self.qs, self.net_panel, self.power_menu, self.app_menu):
+        for panel in (
+            self.qs,
+            self.net_panel,
+            self.power_menu,
+            self.app_menu,
+            self.clock_panel,
+        ):
             panel.set_visible(True)
             panel.set_margin_top(0)
             panel.set_margin_end(0)
@@ -532,8 +571,10 @@ class Shell:
 
         self.qs_popover = self._make_popover(self.qs_stack, self.sys_btn)
         self.app_popover = self._make_popover(self.app_menu, self.app_btn)
+        self.clock_popover = self._make_popover(self.clock_panel, self.clock_btn)
         self.qs_popover.connect("closed", self._on_popover_closed)
         self.app_popover.connect("closed", self._on_popover_closed)
+        self.clock_popover.connect("closed", self._on_popover_closed)
 
     def _make_popover(self, child, parent):
         from gi.repository import Gtk
@@ -553,26 +594,41 @@ class Shell:
         try:
             if name == "apps":
                 self.qs_popover.popdown()
+                self.clock_popover.popdown()
                 self.app_popover.popup()
+            elif name == "clock":
+                self.qs_popover.popdown()
+                self.app_popover.popdown()
+                self.clock_popover.popup()
             elif name in {"qs", "network", "power"}:
                 self.app_popover.popdown()
+                self.clock_popover.popdown()
                 self.qs_stack.set_visible_child_name(name)
                 self.qs_popover.popup()
             else:
                 self.app_popover.popdown()
                 self.qs_popover.popdown()
+                self.clock_popover.popdown()
         finally:
             self._ignore_popover_closed = False
 
     def _on_popover_closed(self, pop) -> None:
         if self._ignore_popover_closed:
             return
-        which = "apps" if pop is self.app_popover else "qs"
+        if pop is self.app_popover:
+            which = "apps"
+        elif pop is self.clock_popover:
+            which = "clock"
+        else:
+            which = "qs"
         self._popover_closed_at = time.monotonic()
         self._popover_closed_which = which
         if which == "apps" and self.open_menu == "apps":
             self.open_menu = None
             self.app_btn.remove_css_class("open")
+        elif which == "clock" and self.open_menu == "clock":
+            self.open_menu = None
+            self.clock_btn.remove_css_class("open")
         elif which == "qs" and self.open_menu in {"qs", "network", "power"}:
             self.open_menu = None
             self.sys_btn.remove_css_class("open")
@@ -608,9 +664,15 @@ class Shell:
         left.append(self.app_btn)
         bar.set_start_widget(left)
 
+        self.clock_btn = Gtk.Button()
+        self.clock_btn.add_css_class("panel-btn")
+        self.clock_btn.set_tooltip_text("Date and time")
+        self.clock_btn.set_has_frame(False)
         self.clock = Gtk.Label(label="—")
         self.clock.add_css_class("clock")
-        bar.set_center_widget(self.clock)
+        self.clock_btn.set_child(self.clock)
+        self.clock_btn.connect("clicked", lambda *_: self.show_menu("clock"))
+        bar.set_center_widget(self.clock_btn)
 
         self.sys_btn = Gtk.Button()
         self.sys_btn.add_css_class("panel-btn")
@@ -632,6 +694,121 @@ class Shell:
         right.append(self.sys_btn)
         bar.set_end_widget(right)
         return bar
+
+    def _build_clock(self) -> Gtk.Widget:
+        from gi.repository import Gdk, Gtk
+
+        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        panel.add_css_class("shell-panel")
+        panel.add_css_class("clock-menu")
+        panel.set_halign(Gtk.Align.CENTER)
+        panel.set_valign(Gtk.Align.START)
+        panel.set_margin_top(40)
+        panel.set_focusable(True)
+        steal = Gtk.GestureClick()
+        steal.connect("pressed", lambda *a: True)
+        panel.add_controller(steal)
+
+        spin = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        spin.add_css_class("tz-spin")
+        self.tz_value = Gtk.Label(label=format_tz_offset(self.tz_minutes))
+        self.tz_value.add_css_class("tz-spin-value")
+        self.tz_value.set_hexpand(True)
+        self.tz_value.set_xalign(0.5)
+        btns = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        btns.add_css_class("tz-spin-btns")
+        self.tz_up = Gtk.Button()
+        self.tz_down = Gtk.Button()
+        self.tz_up_img = Gtk.Image()
+        self.tz_down_img = Gtk.Image()
+        self.tz_up.set_child(self.tz_up_img)
+        self.tz_down.set_child(self.tz_down_img)
+        self.tz_up.add_css_class("tz-spin-btn")
+        self.tz_down.add_css_class("tz-spin-btn")
+        self.tz_up.set_has_frame(False)
+        self.tz_down.set_has_frame(False)
+        self.tz_up.set_tooltip_text("Later time zone")
+        self.tz_down.set_tooltip_text("Earlier time zone")
+        self.tz_up.connect("clicked", lambda *_: self._nudge_tz(TZ_MINUTES_STEP))
+        self.tz_down.connect("clicked", lambda *_: self._nudge_tz(-TZ_MINUTES_STEP))
+        btns.append(self.tz_up)
+        btns.append(self.tz_down)
+        spin.append(self.tz_value)
+        spin.append(btns)
+        panel.append(spin)
+
+        key = Gtk.EventControllerKey()
+
+        def on_key(_c, keyval: int, *_a: object) -> bool:
+            if keyval in (Gdk.KEY_Up, Gdk.KEY_Page_Up):
+                self._nudge_tz(TZ_MINUTES_STEP)
+                return True
+            if keyval in (Gdk.KEY_Down, Gdk.KEY_Page_Down):
+                self._nudge_tz(-TZ_MINUTES_STEP)
+                return True
+            return False
+
+        key.connect("key-pressed", on_key)
+        panel.add_controller(key)
+        self._paint_tz()
+        return panel
+
+    def _nudge_tz(self, delta: int) -> None:
+        self._set_tz_minutes(self.tz_minutes + delta)
+
+    def _set_tz_minutes(self, minutes: int) -> None:
+        minutes = snap_tz_minutes(minutes)
+        if minutes == self.tz_minutes:
+            self._paint_tz()
+            return
+        self.tz_minutes = minutes
+        self._paint_tz()
+        self.tick_clock()
+        self._schedule_apply_tz()
+
+    def _paint_tz(self) -> None:
+        if not getattr(self, "tz_value", None):
+            return
+        self.tz_value.set_label(format_tz_offset(self.tz_minutes))
+        self.tz_up.set_sensitive(self.tz_minutes < TZ_MINUTES_MAX)
+        self.tz_down.set_sensitive(self.tz_minutes > TZ_MINUTES_MIN)
+        self._paint_tz_carets()
+
+    def _paint_tz_carets(self) -> None:
+        if not getattr(self, "tz_up_img", None):
+            return
+        path = find_status("go-next-symbolic.svg")
+        if not path:
+            return
+        from gi.repository import Gdk, GdkPixbuf
+
+        pb = symbolic_pixbuf(path, self._fg(), 12)
+        if pb is None:
+            self.tz_up_img.set_from_file(path)
+            self.tz_down_img.set_from_file(path)
+            return
+        up = pb.rotate_simple(GdkPixbuf.PixbufRotation.COUNTERCLOCKWISE)
+        down = pb.rotate_simple(GdkPixbuf.PixbufRotation.CLOCKWISE)
+        if up is not None:
+            self.tz_up_img.set_from_paintable(Gdk.Texture.new_for_pixbuf(up))
+        if down is not None:
+            self.tz_down_img.set_from_paintable(Gdk.Texture.new_for_pixbuf(down))
+        self.tz_up_img.set_pixel_size(12)
+        self.tz_down_img.set_pixel_size(12)
+
+    def _schedule_apply_tz(self) -> None:
+        from gi.repository import GLib
+
+        self._tz_apply_id += 1
+        token = self._tz_apply_id
+
+        def run() -> bool:
+            if token != self._tz_apply_id:
+                return False
+            apply_tz_minutes(self.tz_minutes)
+            return False
+
+        GLib.timeout_add(250, run)
 
     def _build_qs(self) -> Gtk.Widget:
         from gi.repository import Gtk
@@ -1246,6 +1423,7 @@ class Shell:
                 tex = _texture(path, fg, 24)
                 if tex is not None:
                     self._app_download.set_from_paintable(tex)
+        self._paint_tz_carets()
         self._paint_net()
         self.refresh_volume()
         try:

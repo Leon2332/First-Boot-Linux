@@ -1,0 +1,2 @@
+Defaults:firstboot !lecture
+firstboot ALL=(root) NOPASSWD: /usr/libexec/firstboot/set-timezone
