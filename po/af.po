@@ -308,7 +308,7 @@ msgid "Modern Plasma desktop"
 msgstr "Moderne Plasma-werkskerm"
 
 msgid "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults."
-msgstr "Huidige vrye sagteware met ’n afgewerkte KDE Plasma-ervaring. ’n Goeie keuse as jy onlangse pakkette en stewige standaardinstellings wil hê."
+msgstr "Hedendaagse vrye sagteware met ’n afgewerkte KDE Plasma-ervaring. ’n Goeie keuse as jy onlangse pakkette en stewige standaardinstellings wil hê."
 
 msgid "This will erase the internal disk and copy First Boot Linux onto it."
 msgstr "Dit sal die interne skyf uitvee en First Boot Linux daarop kopieer."
