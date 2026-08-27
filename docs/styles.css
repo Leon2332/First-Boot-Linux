@@ -473,7 +473,9 @@ button:disabled {
 .backdrop[hidden],
 .modal[hidden],
 .toast[hidden],
-.screen[hidden] {
+.screen[hidden],
+.qs-home[hidden],
+.qs-language[hidden] {
   display: none !important;
 }
 
@@ -486,10 +488,27 @@ button:disabled {
   }
 }
 
+.qs-home {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.quick-settings.is-language {
+  padding: 12px;
+  gap: 0;
+}
+
+.qs-language {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .qs-toolbar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
 }
 
 .qs-toolbar-group {
@@ -668,6 +687,87 @@ html[data-theme="light"] .qs-slider::-webkit-slider-thumb,
 html[data-theme="light"] .qs-slider::-moz-range-thumb {
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+}
+
+.lang-search {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 36px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 12px;
+  background: var(--surface-muted);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.lang-search::placeholder {
+  color: var(--surface-fg-dim);
+}
+
+.lang-search:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.lang-empty {
+  margin: 16px 4px;
+  font-size: 13px;
+  color: var(--surface-fg-dim);
+  text-align: center;
+}
+
+.lang-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  border-radius: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.lang-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.lang-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+}
+
+.lang-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.lang-item:hover {
+  background-color: var(--surface-muted);
+}
+
+.lang-item .lang-check {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.lang-item[aria-checked="true"] .lang-check {
+  opacity: 1;
 }
 
 /* Network menu */

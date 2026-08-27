@@ -88,63 +88,90 @@
   </header>
 
   <div class="quick-settings" id="quick-settings" role="dialog" aria-label="Quick Settings" hidden>
-    <div class="qs-toolbar">
-      <div class="qs-toolbar-group">
-        <button type="button" class="qs-round-btn" id="power-menu-btn" title="Power Off" aria-label="Power menu" aria-haspopup="true">
-          <img class="sym" src="assets/status/system-shutdown-symbolic.svg" alt="" draggable="false" />
+    <div class="qs-home" id="qs-home">
+      <div class="qs-toolbar">
+        <div class="qs-toolbar-group">
+          <button type="button" class="qs-round-btn" id="language-btn" title="Language" aria-label="Language">
+            <img class="sym" src="assets/status/languages-symbolic.svg" alt="" draggable="false" />
+          </button>
+        </div>
+        <div class="qs-toolbar-group">
+          <button type="button" class="qs-round-btn" id="power-menu-btn" title="Power Off" aria-label="Power menu" aria-haspopup="true">
+            <img class="sym" src="assets/status/system-shutdown-symbolic.svg" alt="" draggable="false" />
+          </button>
+        </div>
+      </div>
+
+      <div class="qs-toggles">
+        <button type="button" class="qs-toggle has-menu" id="network-toggle" data-toggle="network" aria-pressed="false">
+          <span class="qs-toggle-main">
+            <img class="sym" id="qs-net-icon" src="assets/status/network-wired-symbolic.svg" alt="" draggable="false" />
+            <span class="qs-toggle-text">
+              <span class="qs-toggle-label" id="qs-net-label">Network</span>
+              <span class="qs-toggle-sub" id="qs-net-sub">Off</span>
+            </span>
+          </span>
+          <img class="sym sym-sm qs-toggle-chevron" src="assets/status/go-next-symbolic.svg" alt="" draggable="false" />
         </button>
+
+        <button type="button" class="qs-toggle active" id="dark-mode-toggle" data-toggle="dark" aria-pressed="true">
+          <span class="qs-toggle-main">
+            <img class="sym" src="assets/status/dark-mode-symbolic.svg" alt="" draggable="false" />
+            <span class="qs-toggle-text">
+              <span class="qs-toggle-label">Dark Style</span>
+            </span>
+          </span>
+        </button>
+      </div>
+
+      <div class="qs-slider-row">
+        <button type="button" class="qs-slider-icon" id="qs-volume-mute" title="Mute" aria-label="Mute" aria-pressed="false">
+          <img class="sym" id="qs-volume-icon" src="assets/status/audio-volume-medium-symbolic.svg" alt="" draggable="false" />
+        </button>
+        <input
+          type="range"
+          class="qs-slider"
+          id="qs-volume"
+          min="0"
+          max="100"
+          value="70"
+          aria-label="Volume"
+        />
+      </div>
+      <div class="qs-slider-row">
+        <button type="button" class="qs-slider-icon" id="qs-brightness-icon" title="Brightness" aria-label="Brightness">
+          <img class="sym" id="qs-brightness-img" src="assets/status/display-brightness-symbolic.svg" alt="" draggable="false" />
+        </button>
+        <input
+          type="range"
+          class="qs-slider"
+          id="qs-brightness"
+          min="0"
+          max="100"
+          value="100"
+          aria-label="Brightness"
+        />
       </div>
     </div>
 
-    <div class="qs-toggles">
-      <button type="button" class="qs-toggle has-menu" id="network-toggle" data-toggle="network" aria-pressed="false">
-        <span class="qs-toggle-main">
-          <img class="sym" id="qs-net-icon" src="assets/status/network-wired-symbolic.svg" alt="" draggable="false" />
-          <span class="qs-toggle-text">
-            <span class="qs-toggle-label" id="qs-net-label">Network</span>
-            <span class="qs-toggle-sub" id="qs-net-sub">Off</span>
-          </span>
-        </span>
-        <img class="sym sym-sm qs-toggle-chevron" src="assets/status/go-next-symbolic.svg" alt="" draggable="false" />
-      </button>
-
-      <button type="button" class="qs-toggle active" id="dark-mode-toggle" data-toggle="dark" aria-pressed="true">
-        <span class="qs-toggle-main">
-          <img class="sym" src="assets/status/dark-mode-symbolic.svg" alt="" draggable="false" />
-          <span class="qs-toggle-text">
-            <span class="qs-toggle-label">Dark Style</span>
-          </span>
-        </span>
-      </button>
-    </div>
-
-    <div class="qs-slider-row">
-      <button type="button" class="qs-slider-icon" id="qs-volume-mute" title="Mute" aria-label="Mute" aria-pressed="false">
-        <img class="sym" id="qs-volume-icon" src="assets/status/audio-volume-medium-symbolic.svg" alt="" draggable="false" />
-      </button>
+    <div class="qs-language" id="qs-language" hidden>
+      <div class="menu-header">
+        <button type="button" class="menu-back" id="language-back" aria-label="Back">
+          <img class="sym" src="assets/status/go-next-symbolic.svg" alt="" draggable="false" style="transform: scaleX(-1)" />
+        </button>
+        <span>Language</span>
+      </div>
       <input
-        type="range"
-        class="qs-slider"
-        id="qs-volume"
-        min="0"
-        max="100"
-        value="70"
-        aria-label="Volume"
+        class="lang-search"
+        id="language-search"
+        type="search"
+        placeholder="Search"
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="Search languages"
       />
-    </div>
-    <div class="qs-slider-row">
-      <button type="button" class="qs-slider-icon" id="qs-brightness-icon" title="Brightness" aria-label="Brightness">
-        <img class="sym" id="qs-brightness-img" src="assets/status/display-brightness-symbolic.svg" alt="" draggable="false" />
-      </button>
-      <input
-        type="range"
-        class="qs-slider"
-        id="qs-brightness"
-        min="0"
-        max="100"
-        value="100"
-        aria-label="Brightness"
-      />
+      <p class="lang-empty" id="language-empty" hidden>No matching languages</p>
+      <ul class="lang-list" id="language-list" role="listbox" aria-label="Languages"></ul>
     </div>
   </div>
 

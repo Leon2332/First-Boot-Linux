@@ -3,6 +3,42 @@
 
   const LOGO = (id) => `assets/distros/${id}.png`;
 
+  const LANGUAGES = [
+    { id: "af", name: "Afrikaans", en: "Afrikaans" },
+    { id: "ar", name: "العربية", en: "Arabic" },
+    { id: "ca", name: "Català", en: "Catalan" },
+    { id: "cs", name: "Čeština", en: "Czech" },
+    { id: "da", name: "Dansk", en: "Danish" },
+    { id: "de", name: "Deutsch", en: "German" },
+    { id: "el", name: "Ελληνικά", en: "Greek" },
+    { id: "en", name: "English", en: "English" },
+    { id: "es", name: "Español", en: "Spanish" },
+    { id: "et", name: "Eesti", en: "Estonian" },
+    { id: "fi", name: "Suomi", en: "Finnish" },
+    { id: "fr", name: "Français", en: "French" },
+    { id: "he", name: "עברית", en: "Hebrew" },
+    { id: "hi", name: "हिन्दी", en: "Hindi" },
+    { id: "hu", name: "Magyar", en: "Hungarian" },
+    { id: "id", name: "Bahasa Indonesia", en: "Indonesian" },
+    { id: "it", name: "Italiano", en: "Italian" },
+    { id: "ja", name: "日本語", en: "Japanese" },
+    { id: "ko", name: "한국어", en: "Korean" },
+    { id: "nb", name: "Norsk bokmål", en: "Norwegian Bokmål" },
+    { id: "nl", name: "Nederlands", en: "Dutch" },
+    { id: "pl", name: "Polski", en: "Polish" },
+    { id: "pt", name: "Português", en: "Portuguese" },
+    { id: "pt-br", name: "Português (Brasil)", en: "Portuguese (Brazil)" },
+    { id: "ro", name: "Română", en: "Romanian" },
+    { id: "ru", name: "Русский", en: "Russian" },
+    { id: "sv", name: "Svenska", en: "Swedish" },
+    { id: "tr", name: "Türkçe", en: "Turkish" },
+    { id: "uk", name: "Українська", en: "Ukrainian" },
+    { id: "vi", name: "Tiếng Việt", en: "Vietnamese" },
+    { id: "zh-cn", name: "简体中文", en: "Chinese (Simplified)" },
+    { id: "zh-tw", name: "繁體中文", en: "Chinese (Traditional)" },
+    { id: "zu", name: "isiZulu", en: "Zulu" },
+  ];
+
   const SEARCH_ENGINES = [
     {
       id: "google",
@@ -349,6 +385,8 @@
       -720,
       Math.min(840, Math.round(-new Date().getTimezoneOffset() / 30) * 30)
     ),
+    language: "en",
+    languageQuery: "",
   };
 
   const $ = (id) => document.getElementById(id);
@@ -362,6 +400,13 @@
     tzDown: $("tz-down"),
     systemMenuBtn: $("system-menu-btn"),
     quickSettings: $("quick-settings"),
+    qsHome: $("qs-home"),
+    qsLanguage: $("qs-language"),
+    languageBtn: $("language-btn"),
+    languageBack: $("language-back"),
+    languageSearch: $("language-search"),
+    languageList: $("language-list"),
+    languageEmpty: $("language-empty"),
     networkMenu: $("network-menu"),
     powerMenu: $("power-menu"),
     powerMenuBtn: $("power-menu-btn"),
@@ -498,6 +543,7 @@
     els.appMenuBtn.setAttribute("aria-expanded", "false");
     if (els.clockBtn) els.clockBtn.setAttribute("aria-expanded", "false");
     els.backdrop.hidden = true;
+    showQsHome();
     if (state.wifiExpanded) {
       setWifiExpanded(null);
       renderWifi();
@@ -1008,6 +1054,72 @@
     els.quickSettings.hidden = false;
     els.systemMenuBtn.setAttribute("aria-expanded", "true");
     els.backdrop.hidden = false;
+  }
+
+  function showQsHome() {
+    if (els.qsHome) els.qsHome.hidden = false;
+    if (els.qsLanguage) els.qsLanguage.hidden = true;
+    if (els.quickSettings) els.quickSettings.classList.remove("is-language");
+    if (els.languageSearch) els.languageSearch.value = "";
+    state.languageQuery = "";
+  }
+
+  function languageMatches(lang, query) {
+    const tokens = query
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!tokens.length) return true;
+    const hay = `${lang.name} ${lang.en}`.toLowerCase();
+    return tokens.every((t) => hay.includes(t));
+  }
+
+  function renderLanguages() {
+    if (!els.languageList) return;
+    const hits = LANGUAGES.filter((lang) =>
+      languageMatches(lang, state.languageQuery)
+    ).slice();
+    hits.sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    );
+    els.languageList.innerHTML = "";
+    if (els.languageEmpty) els.languageEmpty.hidden = hits.length > 0;
+    hits.forEach((lang) => {
+      const li = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "lang-item";
+      btn.setAttribute("role", "option");
+      btn.setAttribute("aria-checked", String(lang.id === state.language));
+      btn.dataset.lang = lang.id;
+      const name = document.createElement("span");
+      name.textContent = lang.name;
+      const check = document.createElement("img");
+      check.className = "sym lang-check";
+      check.src = "assets/status/object-select-symbolic.svg";
+      check.alt = "";
+      check.draggable = false;
+      btn.append(name, check);
+      btn.addEventListener("click", () => {
+        state.language = lang.id;
+        renderLanguages();
+      });
+      li.appendChild(btn);
+      els.languageList.appendChild(li);
+    });
+  }
+
+  function showLanguageList() {
+    if (!els.qsLanguage || !els.qsHome) return;
+    els.qsHome.hidden = true;
+    els.qsLanguage.hidden = false;
+    els.quickSettings.classList.add("is-language");
+    els.quickSettings.hidden = false;
+    els.systemMenuBtn.setAttribute("aria-expanded", "true");
+    els.backdrop.hidden = false;
+    renderLanguages();
+    if (els.languageSearch) els.languageSearch.focus();
   }
 
   function openAppMenu() {
@@ -2114,6 +2226,24 @@
 
     els.backdrop.addEventListener("click", closeMenus);
 
+    if (els.languageBtn) {
+      els.languageBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        showLanguageList();
+      });
+    }
+    if (els.languageBack) {
+      els.languageBack.addEventListener("click", () => {
+        showQsHome();
+      });
+    }
+    if (els.languageSearch) {
+      els.languageSearch.addEventListener("input", () => {
+        state.languageQuery = els.languageSearch.value;
+        renderLanguages();
+      });
+    }
+
     els.networkToggle.addEventListener("click", () => {
       els.quickSettings.hidden = true;
       els.networkMenu.hidden = false;
@@ -2235,6 +2365,10 @@
         if (!els.networkMenu.hidden) {
           els.networkMenu.hidden = true;
           els.quickSettings.hidden = false;
+          return;
+        }
+        if (els.qsLanguage && !els.qsLanguage.hidden && !els.quickSettings.hidden) {
+          showQsHome();
           return;
         }
         if (
@@ -2381,6 +2515,10 @@
     if (q.get("catalog") === "open") openCatalog();
     if (menu === "apps") openAppMenu();
     if (menu === "qs") openQuickSettings();
+    if (menu === "language") {
+      openQuickSettings();
+      showLanguageList();
+    }
     if (menu === "clock") openClockMenu();
     if (menu === "network") {
       openNetworkMenu();
