@@ -25,6 +25,8 @@ UTF-8, `key = value`, `#` comments. Paths are relative to the payload root. No a
 | `support` | yes | Contact line (chooser footer “Support”) |
 | `wallpaper_dark` | yes | Dark-style image, under `wallpapers/` |
 | `wallpaper_light` | yes | Light-style image, under `wallpapers/` |
+| `language` | no | Shop default language id (`en`, `af`, …). Missing means `en`. Only languages the chooser ships. |
+| `timezone` | no | Shop default UTC offset (`UTC+0000`, `UTC+0200`, `UTC+0530`, …). 30-minute steps from `UTC-1200` to `UTC+1400`. Missing means the live session keeps the seed UTC until the customer sets the clock. |
 
 See [`examples/retailer.conf`](examples/retailer.conf).
 
@@ -112,7 +114,7 @@ Logos are bundled in the chooser by `id` (`assets/distros/<id>.png` in the mocku
 
 ## Validation (creator, before write)
 
-1. `retailer.conf` has the five keys; wallpapers exist.
+1. `retailer.conf` has the required keys; wallpapers exist. `language` and `timezone` are optional.
 2. `catalog.json` matches `catalog.schema.json`.
 3. Every distro `id` / edition exists in `official-catalog.json`.
 4. Every `local` edition file exists under `images/` and matches `sha256`.

@@ -298,6 +298,8 @@ async function startWrite() {
   const body = {
     name: $("name").value.trim(),
     support: $("support").value.trim(),
+    language: $("language").value || "en",
+    timezone: $("timezone").value || "UTC+0000",
     password: $("empty-pw").checked ? "" : $("pass").value,
     empty_password: $("empty-pw").checked,
     staged: selected(),
@@ -356,6 +358,30 @@ async function poll() {
 
 async function init() {
   state = await api("/api/state");
+  const langSel = $("language");
+  langSel.innerHTML = "";
+  const langs = state.languages && state.languages.length
+    ? state.languages
+    : [{ id: "en", name: "English" }, { id: "af", name: "Afrikaans" }];
+  langs.forEach((lang) => {
+    const o = document.createElement("option");
+    o.value = lang.id;
+    o.textContent = lang.name;
+    if (lang.id === "en") o.selected = true;
+    langSel.appendChild(o);
+  });
+  const tzSel = $("timezone");
+  tzSel.innerHTML = "";
+  for (let m = -12 * 60; m <= 14 * 60; m += 30) {
+    const sign = m < 0 ? "-" : "+";
+    const abs = Math.abs(m);
+    const label = `UTC${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}${String(abs % 60).padStart(2, "0")}`;
+    const o = document.createElement("option");
+    o.value = label;
+    o.textContent = label;
+    if (label === "UTC+0000") o.selected = true;
+    tzSel.appendChild(o);
+  }
   $("img-path").value = state.default_image;
   $("dark-preview").src = "/api/wallpaper/dark";
   $("light-preview").src = "/api/wallpaper/light";

@@ -226,6 +226,8 @@ install_chooser() {
     "$ROOTFS/usr/libexec/firstboot/install-os"
   install -D -m 0755 "$REPO_DIR/chooser/firstboot-set-timezone" \
     "$ROOTFS/usr/libexec/firstboot/set-timezone"
+  install -D -m 0755 "$REPO_DIR/chooser/firstboot-set-language" \
+    "$ROOTFS/usr/libexec/firstboot/set-language"
   install -d -m 0755 \
     "$ROOTFS/usr/share/firstboot/python" \
     "$ROOTFS/usr/share/firstboot/distros" \
@@ -266,6 +268,23 @@ install_chooser() {
       fi
     done
   fi
+  if [[ -f $REPO_DIR/po/languages.json ]]; then
+    install -D -m 0644 "$REPO_DIR/po/languages.json" \
+      "$ROOTFS/usr/share/firstboot/languages.json"
+  fi
+  local po code
+  for po in "$REPO_DIR/po/"*.po; do
+    [[ -f $po ]] || continue
+    code=$(basename "$po" .po)
+    install -d -m 0755 \
+      "$ROOTFS/usr/share/firstboot/locale/$code/LC_MESSAGES"
+    install -m 0644 "$po" \
+      "$ROOTFS/usr/share/firstboot/locale/$code/LC_MESSAGES/firstboot.po"
+    if command -v msgfmt >/dev/null; then
+      install -d -m 0755 "$ROOTFS/usr/share/locale/$code/LC_MESSAGES"
+      msgfmt -o "$ROOTFS/usr/share/locale/$code/LC_MESSAGES/firstboot.mo" "$po" || true
+    fi
+  done
   PYTHONPATH="$REPO_DIR/chooser${PYTHONPATH:+:$PYTHONPATH}" python3 -c \
     "from firstboot.browser import write_start_page; write_start_page('$ROOTFS/usr/share/firstboot/start.html')"
   chown -R root:root "$ROOTFS/usr/share/firstboot"

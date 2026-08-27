@@ -1,0 +1,461 @@
+# Afrikaans translation for First Boot Linux.
+# English is the source. Do not translate distro or desktop names.
+msgid ""
+msgstr ""
+"Project-Id-Version: firstboot\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-27\n"
+"PO-Revision-Date: 2026-08-27\n"
+"Last-Translator: \n"
+"Language-Team: Afrikaans\n"
+"Language: af\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Language"
+msgstr "Taal"
+
+msgid "Search"
+msgstr "Soek"
+
+msgid "No matching languages"
+msgstr "Geen tale pas"
+
+msgid "Back"
+msgstr "Terug"
+
+msgid "Power Off"
+msgstr "Skakel af"
+
+msgid "Network"
+msgstr "Netwerk"
+
+msgid "Dark Style"
+msgstr "Donker styl"
+
+msgid "Brightness"
+msgstr "Helderheid"
+
+msgid "Mute"
+msgstr "Dower"
+
+msgid "Unmute"
+msgstr "Ontdower"
+
+msgid "Applications"
+msgstr "Toepassings"
+
+msgid "Date and time"
+msgstr "Datum en tyd"
+
+msgid "System menu"
+msgstr "Stelselkieslys"
+
+msgid "Later time zone"
+msgstr "Later tydsone"
+
+msgid "Earlier time zone"
+msgstr "Vroeër tydsone"
+
+msgid "Ethernet"
+msgstr "Ethernet"
+
+msgid "Cable unplugged"
+msgstr "Kabel is ontkoppel"
+
+msgid "Connect"
+msgstr "Koppel"
+
+msgid "Disconnect"
+msgstr "Ontkoppel"
+
+msgid "Connecting…"
+msgstr "Koppel tans…"
+
+msgid "WI-FI"
+msgstr "WI-FI"
+
+msgid "Wi-Fi"
+msgstr "Wi-Fi"
+
+msgid "Off"
+msgstr "Af"
+
+msgid "Turn on"
+msgstr "Skakel aan"
+
+msgid "No Wi-Fi adapter"
+msgstr "Geen Wi-Fi-adapter"
+
+msgid "No networks found"
+msgstr "Geen netwerke gevind"
+
+msgid "Password"
+msgstr "Wagwoord"
+
+msgid "Unhide"
+msgstr "Wys"
+
+msgid "Hide"
+msgstr "Versteek"
+
+msgid "Forget"
+msgstr "Vergeet"
+
+msgid "Connected"
+msgstr "Gekoppel"
+
+msgid "Password required"
+msgstr "Wagwoord word vereis"
+
+msgid "Wired"
+msgstr "Bedraad"
+
+msgid "Not connected"
+msgstr "Nie gekoppel nie"
+
+msgid "No Ethernet adapter"
+msgstr "Geen Ethernet-adapter"
+
+msgid "Cable detected"
+msgstr "Kabel bespeur"
+
+msgid "Offline"
+msgstr "Vanlyn"
+
+msgid "Restart…"
+msgstr "Herbegin…"
+
+msgid "Power Off…"
+msgstr "Skakel af…"
+
+msgid "Web browser"
+msgstr "Blaaier"
+
+msgid "System details"
+msgstr "Besonderhede"
+
+msgid "Terminal"
+msgstr "Terminaal"
+
+msgid "Install to this device"
+msgstr "Installeer op hierdie toestel"
+
+msgid "Other options"
+msgstr "Ander opsies"
+
+msgid "Configured by {name}"
+msgstr "Opgestel deur {name}"
+
+msgid "Support: {support}"
+msgstr "Hulpraad: {support}"
+
+msgid "No matching systems"
+msgstr "Geen stelsels pas"
+
+msgid "←  Back"
+msgstr "←  Terug"
+
+msgid "Install"
+msgstr "Installeer"
+
+msgid "Download"
+msgstr "Laai af"
+
+msgid "Desktop environment"
+msgstr "Werkskermomgewing"
+
+msgid "Connect to a network first"
+msgstr "Koppel eers aan ’n netwerk"
+
+msgid "Restart?"
+msgstr "Herbegin?"
+
+msgid "Power Off?"
+msgstr "Skakel af?"
+
+msgid "The computer will restart."
+msgstr "Die rekenaar sal herbegin."
+
+msgid "The computer will shut down."
+msgstr "Die rekenaar sal afskakel."
+
+msgid "Cancel"
+msgstr "Kanselleer"
+
+msgid "Restart"
+msgstr "Herbegin"
+
+msgid "Installing First Boot Linux"
+msgstr "Installeer First Boot Linux"
+
+msgid "You're all set"
+msgstr "Gereed"
+
+msgid "First Boot Linux is on this computer. Remove the USB stick and restart."
+msgstr "First Boot Linux is op hierdie rekenaar. Verwyder die USB-stokkie en herbegin."
+
+msgid "Restart now"
+msgstr "Herbegin nou"
+
+msgid "Install to this device?"
+msgstr "Installeer op hierdie toestel?"
+
+msgid "Hardware Information"
+msgstr "Hardeware-inligting"
+
+msgid "Software Information"
+msgstr "Sagteware-inligting"
+
+msgid "Close"
+msgstr "Sluit"
+
+msgid "Maximize"
+msgstr "Maksimeer"
+
+msgid "Enter address"
+msgstr "Voer adres in"
+
+msgid "Wi-Fi on"
+msgstr "Wi-Fi aan"
+
+msgid "Wi-Fi off"
+msgstr "Wi-Fi af"
+
+msgid "Disconnected Ethernet"
+msgstr "Ethernet ontkoppel"
+
+msgid "Connected via Ethernet"
+msgstr "Gekoppel via Ethernet"
+
+msgid "Passwords do not match."
+msgstr "Wagwoorde stem nie ooreen nie."
+
+msgid "Connected to {ssid}"
+msgstr "Gekoppel aan {ssid}"
+
+msgid "Forgot {ssid}"
+msgstr "{ssid} vergeet"
+
+msgid "Model"
+msgstr "Model"
+
+msgid "Memory"
+msgstr "Geheue"
+
+msgid "Processor"
+msgstr "Verwerker"
+
+msgid "Graphics"
+msgstr "Grafika"
+
+msgid "Graphics {n}"
+msgstr "Grafika {n}"
+
+msgid "Display"
+msgstr "Skerm"
+
+msgid "Display {n}"
+msgstr "Skerm {n}"
+
+msgid "Operating System"
+msgstr "Bedryfstelsel"
+
+msgid "OS Type"
+msgstr "OS-tipe"
+
+msgid "Windowing System"
+msgstr "Vensterstelsel"
+
+msgid "Kernel Version"
+msgstr "Kernweergawe"
+
+msgid "Firmware Version"
+msgstr "Fermware-weergawe"
+
+msgid "Configured by"
+msgstr "Opgestel deur"
+
+msgid "Disk"
+msgstr "Skyf"
+
+msgid "Disk ({path})"
+msgstr "Skyf ({path})"
+
+msgid "Web browser is not on this image yet."
+msgstr "Die blaaier is nie op hierdie beeld nie."
+
+msgid "Terminal is not on this image yet."
+msgstr "Die terminaal is nie op hierdie beeld nie."
+
+msgid "System details is not on this image yet."
+msgstr "Stelbesonderhede is nie op hierdie beeld nie."
+
+msgid "Popular and well-supported"
+msgstr "Gewild en goed ondersteun"
+
+msgid "A polished desktop with excellent hardware support and a large software library. A safe default for most laptops."
+msgstr "’n Afgewerkte werkskerm met uitstekende hardeware-ondersteuning en ’n groot sagtewarebiblioteek. ’n Veilige keuse vir die meeste skootrekenaars."
+
+msgid "Familiar and easy"
+msgstr "Bekend en maklik"
+
+msgid "A stable desktop that feels at home for people coming from Windows. Multimedia and drivers work out of the box."
+msgstr "’n Stabiele werkskerm wat tuis voel vir mense wat van Windows af kom. Multimedia en drywers werk dadelik."
+
+msgid "Modern Plasma desktop"
+msgstr "Moderne Plasma-werkskerm"
+
+msgid "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults."
+msgstr "Huidige vrye sagteware met ’n afgewerkte KDE Plasma-ervaring. ’n Goeie keuse as jy onlangse pakkette en stewige standaardinstellings wil hê."
+
+msgid "This will erase the internal disk and copy First Boot Linux onto it."
+msgstr "Dit sal die interne skyf uitvee en First Boot Linux daarop kopieer."
+
+msgid "Install {name}?"
+msgstr "Installeer {name}?"
+
+msgid "This will erase this computer and install {name}. Create the account you will use after restart."
+msgstr "Dit sal hierdie rekenaar uitvee en {name} installeer. Skep die rekening wat jy ná herbegin sal gebruik."
+
+msgid "Name"
+msgstr "Naam"
+
+msgid "Username"
+msgstr "Gebruikersnaam"
+
+msgid "Computer"
+msgstr "Rekenaar"
+
+msgid "Confirm"
+msgstr "Bevestig"
+
+msgid "Your name"
+msgstr "Jou naam"
+
+msgid "username"
+msgstr "gebruikersnaam"
+
+msgid "Installing {name}"
+msgstr "Installeer {name}"
+
+msgid "Downloading {name}"
+msgstr "Laai {name} af"
+
+msgid "Preparing the disk…"
+msgstr "Berei die skyf voor…"
+
+msgid "Copying boot files…"
+msgstr "Kopieer selflaailêers…"
+
+msgid "Copying First Boot…"
+msgstr "Kopieer First Boot…"
+
+msgid "Copying recommended systems…"
+msgstr "Kopieer aanbevole stelsels…"
+
+msgid "Finishing…"
+msgstr "Rond af…"
+
+msgid "Complete"
+msgstr "Klaar"
+
+msgid "Checking the image…"
+msgstr "Kontroleer die beeld…"
+
+msgid "Preparing {name}…"
+msgstr "Berei {name} voor…"
+
+msgid "Restarting to install {name}…"
+msgstr "Herbegin om {name} te installeer…"
+
+msgid "{name} will install after restart. This computer will be erased."
+msgstr "{name} sal ná herbegin installeer. Hierdie rekenaar sal uitgevee word."
+
+msgid "Downloading…"
+msgstr "Laai af…"
+
+msgid "Ready"
+msgstr "Gereed"
+
+msgid "Download is not available yet ({name})."
+msgstr "Aflaai is nog nie beskikbaar nie ({name})."
+
+msgid "Download finished, but the image is missing."
+msgstr "Aflaai is klaar, maar die beeld ontbreek."
+
+msgid "{name} install is not available yet."
+msgstr "{name}-installasie is nog nie beskikbaar nie."
+
+msgid "No internal disk to install to."
+msgstr "Geen interne skyf om op te installeer"
+
+msgid "Install to this device is only available when booted from USB."
+msgstr "Installeer op hierdie toestel is slegs beskikbaar wanneer van USB af gelaai is."
+
+msgid "This USB does not look like a First Boot install drive."
+msgstr "Hierdie USB lyk nie na ’n First Boot-installasiestokkie nie."
+
+msgid "Not running from a First Boot USB."
+msgstr "Loop nie van ’n First Boot-USB nie."
+
+msgid "Cannot install."
+msgstr "Kan nie installeer nie."
+
+msgid "Enter a name."
+msgstr "Voer ’n naam in."
+
+msgid "Username must start with a letter and use only a–z, 0–9, _ or -."
+msgstr "Gebruikersnaam moet met ’n letter begin en slegs a–z, 0–9, _ of - gebruik."
+
+msgid "Computer name must be letters, numbers, and hyphens."
+msgstr "Rekenaarnaam moet letters, syfers en koppeltekens wees."
+
+msgid "Password must be at least 6 characters."
+msgstr "Wagwoord moet minstens 6 karakters wees."
+
+msgid "Password cannot contain line breaks."
+msgstr "Wagwoord mag nie reëlbreektekens bevat nie."
+
+msgid "This computer needs about {size} of memory to install {name} from the internal disk."
+msgstr "Hierdie rekenaar het sowat {size} geheue nodig om {name} van die interne skyf af te installeer."
+
+msgid "Internal disk is too small ({have}; need {need})."
+msgstr "Interne skyf is te klein ({have}; {need} word benodig)."
+
+msgid "This disk is too small ({have}; need {need})."
+msgstr "Hierdie skyf is te klein ({have}; {need} word benodig)."
+
+msgid "Could not write the boot partition."
+msgstr "Kon nie die selflaaipartisie skryf nie."
+
+msgid "Could not find the First Boot system partition."
+msgstr "Kon nie die First Boot-stelselpartisie vind nie."
+
+msgid "The image file is missing."
+msgstr "Die beeldlêer ontbreek."
+
+msgid "The image is damaged. It does not match the checksum."
+msgstr "Die beeld is beskadig. Dit pas nie by die kontrolesom nie."
+
+msgid "The image path is not a staged ISO."
+msgstr "Die beeldpad is nie ’n voorbereide ISO nie."
+
+msgid "Cannot gain permission to install."
+msgstr "Kan nie toestemming kry om te installeer nie."
+
+msgid "This edition has no image file name."
+msgstr "Hierdie uitgawe het geen beeldlêernaam."
+
+msgid "The image size does not match the catalog."
+msgstr "Die beeldgrootte pas nie by die katalogus nie."
+
+msgid "The download address is not valid."
+msgstr "Die aflaai-adres is ongeldig."
+
+msgid "The catalog checksum is not valid."
+msgstr "Die katalogus-kontrolesom is ongeldig."
+
+msgid "Not enough space for this image (need about {size} GB free)."
+msgstr "Nie genoeg spasie vir hierdie beeld nie (sowat {size} GB vrye spasie word benodig)."

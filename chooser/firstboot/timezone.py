@@ -14,6 +14,8 @@ TZ_MINUTES_MAX = 14 * 60
 TZ_MINUTES_STEP = 30
 HELPER = "/usr/libexec/firstboot/set-timezone"
 ZONEINFO_NAME = "FirstBoot/Offset"
+TIMEZONE_FILE = "timezone"
+DEFAULT_TZ_LABEL = "UTC+0000"
 
 
 def snap_tz_minutes(minutes: int) -> int:
@@ -102,6 +104,58 @@ def current_tz_minutes() -> int:
     return snap_tz_minutes(int(off.total_seconds() // 60))
 
 
+def timezone_file_path(payload_root: str) -> str:
+    return os.path.join(payload_root, TIMEZONE_FILE)
+
+
+def read_timezone_file(payload_root: str) -> int | None:
+    path = timezone_file_path(payload_root)
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for raw in fh:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                return parse_tz_offset(line)
+    except OSError:
+        return None
+    return None
+
+
+def load_timezone_minutes(
+    payload_root: str, retailer_timezone: str | None = None
+) -> int | None:
+    if payload_root:
+        from_file = read_timezone_file(payload_root)
+        if from_file is not None:
+            return snap_tz_minutes(from_file)
+    parsed = parse_tz_offset(retailer_timezone or "")
+    if parsed is not None:
+        return snap_tz_minutes(parsed)
+    return None
+
+
+def write_timezone_file(payload_root: str, minutes: int) -> None:
+    minutes = snap_tz_minutes(minutes)
+    os.makedirs(payload_root, exist_ok=True)
+    path = timezone_file_path(payload_root)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(format_tz_offset(minutes) + "\n")
+    os.replace(tmp, path)
+
+
+def persist_timezone(payload_root: str, minutes: int) -> bool:
+    minutes = snap_tz_minutes(minutes)
+    try:
+        write_timezone_file(payload_root, minutes)
+        return True
+    except OSError:
+        return False
+
+
 def clock_in_offset(
     tz_minutes: int, when: dt.datetime | None = None
 ) -> dt.datetime:
@@ -155,11 +209,21 @@ def apply_as_root(minutes: int, *, zoneinfo_root: str = "/usr/share/zoneinfo") -
             _write_timezone_name(named)
             _timedatectl_ntp()
             _timedatectl_timezone(named)
+            _persist_payload_tz(minutes)
             return
     _link_localtime(dest)
     _write_timezone_name(ZONEINFO_NAME)
     _timedatectl_ntp()
     _timedatectl_timezone(ZONEINFO_NAME)
+    _persist_payload_tz(minutes)
+
+
+def _persist_payload_tz(minutes: int) -> None:
+    if os.path.isdir("/run/payload"):
+        try:
+            write_timezone_file("/run/payload", minutes)
+        except OSError:
+            pass
 
 
 def _link_localtime(src: str) -> None:

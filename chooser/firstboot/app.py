@@ -43,6 +43,7 @@ from firstboot.catalog_search import (
     tokens,
 )
 from firstboot.isodownload import DownloadError, edition_dest
+from firstboot.i18n import _, apply_language, format_status, load_language
 from firstboot.payload import (
     Distro,
     Edition,
@@ -127,6 +128,12 @@ def run_window(
             )
             self.payload_root = root
             self.payload = load_payload(root)
+            retailer_lang = (
+                self.payload.retailer.language if self.payload.retailer else None
+            )
+            self.language = apply_language(
+                load_language(root, retailer_lang)
+            )
             self.dark = not light
             self.screenshot = screenshot
             self.open_id = open_id
@@ -145,6 +152,14 @@ def run_window(
             self.other_logo = None
             self._installing = False
             self._os_logo = False
+            self._install_title_kind = "shop"
+            self._install_distro: Distro | None = None
+            self._install_ed: Edition | None = None
+            self._install_step_raw = ""
+            self._done_msgid = (
+                "First Boot Linux is on this computer. Remove the USB stick and restart."
+            )
+            self._done_name = ""
             self._catalog_search: Gtk.SearchEntry | None = None
             self._catalog_view: Gtk.ListView | None = None
             self._catalog_scroll: Gtk.ScrolledWindow | None = None
@@ -155,6 +170,8 @@ def run_window(
             self._catalog_fields: dict[str, tuple[str, ...]] = {}
             self._catalog_query = ""
             self._catalog_tokens: tuple[str, ...] = ()
+            self.other_name = None
+            self._catalog_title = None
             self.connect("activate", self.on_activate)
 
         def on_activate(self, _app: Adw.Application) -> None:
@@ -253,6 +270,14 @@ def run_window(
                 on_sysinfo=on_sysinfo,
                 on_browser=on_browser,
                 show_shop_install=show_shop,
+                language=self.language,
+                payload_root=self.payload_root,
+                on_language=self._on_language,
+                retailer_timezone=(
+                    self.payload.retailer.timezone
+                    if self.payload.retailer
+                    else None
+                ),
             )
             self.shell.allow_scan = not bool(self.screenshot)
             topbar, menus = self.shell.build()
@@ -560,11 +585,46 @@ def run_window(
             if retailer is None:
                 lab.set_visible(False)
                 return lab
-            text = f"Configured by {retailer.name}"
-            if retailer.support:
-                text += f"\nSupport: {retailer.support}"
-            lab.set_label(text)
+            lab.set_label(self._footer_text(retailer))
             return lab
+
+        def _footer_text(self, retailer) -> str:
+            text = _("Configured by {name}").format(name=retailer.name)
+            if retailer.support:
+                text += "\n" + _("Support: {support}").format(support=retailer.support)
+            return text
+
+        def _on_language(self, lang_id: str) -> None:
+            self.language = lang_id
+            self._retranslate()
+
+        def _retranslate(self) -> None:
+            if getattr(self, "footer", None) is not None and self.payload.retailer:
+                self.footer.set_label(self._footer_text(self.payload.retailer))
+            if getattr(self, "other_name", None) is not None:
+                self.other_name.set_label(_("Other options"))
+            if getattr(self, "_catalog_title", None) is not None:
+                self._catalog_title.set_label(_("Other options"))
+            if self._catalog_search is not None:
+                self._catalog_search.set_placeholder_text(_("Search"))
+            if self._catalog_empty is not None:
+                self._catalog_empty.set_label(_("No matching systems"))
+            if self.overlay_mode == "detail" and self.detail_distro is not None:
+                self._fill_detail(
+                    self.detail_distro,
+                    from_catalog=self.detail_from_catalog,
+                    edition=self.detail_edition,
+                )
+            if getattr(self, "sysinfo", None) is not None:
+                self.sysinfo.retranslate()
+            if getattr(self, "main_box", None) is not None:
+                self._render_main()
+            self._paint_install_title()
+            if getattr(self, "install_step", None) is not None and self._install_step_raw:
+                shown = format_status(self._install_step_raw)
+                self.install_sub.set_label(shown)
+                self.install_step.set_label(shown)
+            self._paint_done_msg()
 
         def _render_main(self) -> None:
             self._clear(self.main_box)
@@ -573,7 +633,7 @@ def run_window(
 
             if p.errors and p.retailer is None and not p.recommended and not p.catalog:
                 note = Gtk.Label(
-                    label="This image has no usable payload.\n"
+                    label=_("This image has no usable payload.") + "\n"
                     + "\n".join(p.errors[:6])
                 )
                 note.set_justify(Gtk.Justification.CENTER)
@@ -590,7 +650,7 @@ def run_window(
                 self.main_box.append(self._card_rows(cards))
             else:
                 empty = Gtk.Label(
-                    label="No recommended distributions are listed on this image.",
+                    label=_("No recommended distributions are listed on this image."),
                     xalign=0,
                 )
                 empty.add_css_class("empty-note")
@@ -672,8 +732,9 @@ def run_window(
             self.other_logo = logo
             self._paint_other_logo()
             inner.append(logo)
-            name = Gtk.Label(label="Other options")
+            name = Gtk.Label(label=_("Other options"))
             name.add_css_class("card-name")
+            self.other_name = name
             desk = Gtk.Label(label="...")
             desk.add_css_class("card-desktop")
             ver = Gtk.Label(label="\u00a0")
@@ -713,7 +774,7 @@ def run_window(
             return btn
 
         def _back_button(self, on_click) -> Gtk.Button:
-            back = Gtk.Button(label="←  Back")
+            back = Gtk.Button(label=_("←  Back"))
             back.add_css_class("back-link")
             back.set_has_frame(False)
             back.set_halign(Gtk.Align.START)
@@ -783,13 +844,14 @@ def run_window(
             card.add_css_class("detail-card")
             card.add_css_class("catalog-card")
             card.set_size_request(480, -1)
-            title = Gtk.Label(label="Other options", xalign=0)
+            title = Gtk.Label(label=_("Other options"), xalign=0)
             title.add_css_class("catalog-title")
+            self._catalog_title = title
             card.append(title)
 
             search = Gtk.SearchEntry()
             search.add_css_class("catalog-search")
-            search.set_placeholder_text("Search")
+            search.set_placeholder_text(_("Search"))
             search.set_hexpand(True)
             if hasattr(search, "set_search_delay"):
                 search.set_search_delay(0)
@@ -841,7 +903,7 @@ def run_window(
             self._catalog_scroll = scroll
             card.append(scroll)
 
-            empty = Gtk.Label(label="No matching systems", xalign=0)
+            empty = Gtk.Label(label=_("No matching systems"), xalign=0)
             empty.add_css_class("catalog-empty")
             empty.set_visible(False)
             self._catalog_empty = empty
@@ -1029,21 +1091,21 @@ def run_window(
                 titles.append(dsk)
             ver = Gtk.Label(label=distro.version, xalign=0)
             ver.add_css_class("detail-version")
-            tag = Gtk.Label(label=distro.tagline, xalign=0)
+            tag = Gtk.Label(label=_(distro.tagline), xalign=0)
             tag.add_css_class("detail-tagline")
             titles.append(ver)
             titles.append(tag)
             hero.append(titles)
             card.append(hero)
 
-            desc = Gtk.Label(label=distro.description, xalign=0)
+            desc = Gtk.Label(label=_(distro.description), xalign=0)
             desc.set_wrap(True)
             desc.set_max_width_chars(48)
             desc.add_css_class("detail-desc")
             card.append(desc)
 
             if from_catalog and len(distro.editions) >= 1:
-                lab = Gtk.Label(label="Desktop environment", xalign=0)
+                lab = Gtk.Label(label=_("Desktop environment"), xalign=0)
                 lab.add_css_class("de-label")
                 card.append(lab)
                 for ed in distro.editions:
@@ -1053,7 +1115,7 @@ def run_window(
                 actions.set_halign(Gtk.Align.END)
                 actions.set_margin_top(12)
                 ed = show or distro.default_edition
-                btn = Gtk.Button(label="Install" if ed.on_disk else "Download")
+                btn = Gtk.Button(label=_("Install") if ed.on_disk else _("Download"))
                 btn.add_css_class("btn-primary")
                 btn.connect(
                     "clicked", lambda _b, d=distro, e=ed: self._act(d, e)
@@ -1088,18 +1150,22 @@ def run_window(
 
         def _act(self, distro: Distro, ed: Edition) -> None:
             if distro.install not in DRIVERS_READY:
-                self._toast(f"{distro.name} install is not available yet.")
+                self._toast(
+                    _("{name} install is not available yet.").format(name=distro.name)
+                )
                 return
             if ed.on_disk:
                 self._confirm_os_install(distro, ed)
                 return
             if not ed.url:
                 self._toast(
-                    f"Download is not available yet ({distro.name} {ed.name})."
+                    _("Download is not available yet ({name}).").format(
+                        name=f"{distro.name} {ed.name}"
+                    )
                 )
                 return
             if not self.shell.net.connected:
-                self._toast("Connect to a network first")
+                self._toast(_("Connect to a network first"))
                 self.shell.show_menu("network")
                 return
             self._start_download(distro, ed)
@@ -1122,9 +1188,7 @@ def run_window(
                 self._toast(str(exc))
                 return
             self._show_install_overlay()
-            self._set_os_brand(distro, ed)
-            de = f" ({ed.name})" if ed.name else ""
-            self.install_title.set_label(f"Downloading {distro.name}{de}")
+            self._set_os_brand(distro, ed, kind="download")
             self._set_shop_progress(0, "Downloading…")
             distro_id, ed_id = distro.id, ed.id
             from_catalog = self.detail_from_catalog
@@ -1171,7 +1235,7 @@ def run_window(
             distro, ed = self._lookup_edition(distro_id, edition_id)
             self._hide_shop_overlays()
             if distro is None or ed is None or not ed.on_disk:
-                self._toast("Download finished, but the image is missing.")
+                self._toast(_("Download finished, but the image is missing."))
                 return False
             if from_catalog:
                 self.open_detail(distro, from_catalog=True)
@@ -1179,7 +1243,7 @@ def run_window(
             return False
 
         def _toast(self, text: str) -> None:
-            self.toasts.add_toast(Adw.Toast.new(text))
+            self.toasts.add_toast(Adw.Toast.new(format_status(text)))
 
         def _build_install_overlay(self) -> Gtk.Widget:
             host = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -1197,7 +1261,7 @@ def run_window(
             self._paint_brand_logo()
             panel.append(self.install_logo)
 
-            self.install_title = Gtk.Label(label="Installing First Boot Linux")
+            self.install_title = Gtk.Label(label=_("Installing First Boot Linux"))
             self.install_title.add_css_class("install-title")
             panel.append(self.install_title)
 
@@ -1238,12 +1302,12 @@ def run_window(
             check.set_halign(Gtk.Align.CENTER)
             panel.append(check)
 
-            title = Gtk.Label(label="You're all set")
+            title = Gtk.Label(label=_("You're all set"))
             title.add_css_class("done-title")
             panel.append(title)
 
             self.done_msg = Gtk.Label(
-                label="First Boot Linux is on this computer. Remove the USB stick and restart."
+                label=_("First Boot Linux is on this computer. Remove the USB stick and restart.")
             )
             self.done_msg.add_css_class("done-msg")
             self.done_msg.set_wrap(True)
@@ -1251,7 +1315,7 @@ def run_window(
             self.done_msg.set_max_width_chars(36)
             panel.append(self.done_msg)
 
-            reboot = Gtk.Button(label="Restart now")
+            reboot = Gtk.Button(label=_("Restart now"))
             reboot.add_css_class("btn-primary")
             reboot.set_halign(Gtk.Align.CENTER)
             reboot.set_margin_top(8)
@@ -1278,13 +1342,40 @@ def run_window(
             else:
                 self.install_logo.set_from_file(path)
 
+        def _paint_install_title(self) -> None:
+            if getattr(self, "install_title", None) is None:
+                return
+            distro = self._install_distro
+            ed = self._install_ed
+            de = f" ({ed.name})" if ed and ed.name else ""
+            name = f"{distro.name}{de}" if distro is not None else ""
+            if self._install_title_kind == "download" and name:
+                self.install_title.set_label(_("Downloading {name}").format(name=name))
+            elif self._install_title_kind == "os" and name:
+                self.install_title.set_label(_("Installing {name}").format(name=name))
+            else:
+                self.install_title.set_label(_("Installing First Boot Linux"))
+
+        def _paint_done_msg(self) -> None:
+            if getattr(self, "done_msg", None) is None:
+                return
+            text = _(self._done_msgid)
+            if self._done_name:
+                text = text.format(name=self._done_name)
+            self.done_msg.set_label(text)
+
+        def _paint_step(self, text: str) -> None:
+            self._install_step_raw = text
+            shown = format_status(text)
+            self.install_sub.set_label(shown)
+            self.install_step.set_label(shown)
+
         def _set_shop_progress(self, pct: int, step: str | None = None) -> None:
             pct = max(0, min(100, pct))
             self.install_bar.set_fraction(pct / 100.0)
             self.install_pct.set_label(f"{pct}%")
             if step is not None:
-                self.install_sub.set_label(step)
-                self.install_step.set_label(step)
+                self._paint_step(step)
 
         def _show_install_overlay(self) -> None:
             self.close_detail()
@@ -1300,10 +1391,14 @@ def run_window(
             self.install_host.set_visible(True)
             self._set_shop_progress(0, "")
 
-        def _set_os_brand(self, distro: Distro, ed: Edition | None = None) -> None:
+        def _set_os_brand(
+            self, distro: Distro, ed: Edition | None = None, *, kind: str = "os"
+        ) -> None:
             self._os_logo = True
-            de = f" ({ed.name})" if ed and ed.name else ""
-            self.install_title.set_label(f"Installing {distro.name}{de}")
+            self._install_title_kind = kind
+            self._install_distro = distro
+            self._install_ed = ed
+            self._paint_install_title()
             path = find_logo(distro.id)
             if path:
                 self.install_logo.set_from_file(path)
@@ -1319,19 +1414,26 @@ def run_window(
             self.done_host.set_visible(False)
             self._set_dimmed(False)
             self._paint_brand_logo()
-            self.install_title.set_label("Installing First Boot Linux")
-            self.done_msg.set_label(
+            self._install_title_kind = "shop"
+            self._install_distro = None
+            self._install_ed = None
+            self._done_msgid = (
                 "First Boot Linux is on this computer. Remove the USB stick and restart."
             )
+            self._done_name = ""
+            self._paint_install_title()
+            self._paint_done_msg()
 
         def _confirm_shop_install(self) -> bool:
             self.shell.close_menus()
             dialog = Adw.AlertDialog(
-                heading="Install to this device?",
-                body="This will erase the internal disk and copy First Boot Linux onto it.",
+                heading=_("Install to this device?"),
+                body=_(
+                    "This will erase the internal disk and copy First Boot Linux onto it."
+                ),
             )
-            dialog.add_response("cancel", "Cancel")
-            dialog.add_response("ok", "Install")
+            dialog.add_response("cancel", _("Cancel"))
+            dialog.add_response("ok", _("Install"))
             dialog.set_response_appearance("ok", Adw.ResponseAppearance.DESTRUCTIVE)
             dialog.set_default_response("cancel")
             dialog.set_close_response("cancel")
@@ -1348,14 +1450,24 @@ def run_window(
             return False
 
         def _start_shop_install(self) -> None:
+            self._install_title_kind = "shop"
+            self._install_distro = None
+            self._install_ed = None
+            self._os_logo = False
+            self._done_msgid = (
+                "First Boot Linux is on this computer. Remove the USB stick and restart."
+            )
+            self._done_name = ""
             self._show_install_overlay()
+            self._paint_install_title()
+            self._paint_done_msg()
             if self.shop or self.screenshot:
                 self._preview_shop_progress()
                 return
             plan = live_plan(self.payload_root)
             if not plan.available or plan.target is None:
                 self._hide_shop_overlays()
-                self._toast(plan.reason or "No internal disk to install to.")
+                self._toast(_(plan.reason or "No internal disk to install to."))
                 return
 
             def work() -> None:
@@ -1376,8 +1488,7 @@ def run_window(
                     if event.progress is not None:
                         self._set_shop_progress(event.progress, event.text)
                     else:
-                        self.install_sub.set_label(event.text)
-                        self.install_step.set_label(event.text)
+                        self._paint_step(event.text)
                 elif event.kind == "progress" and event.progress is not None:
                     self._set_shop_progress(event.progress)
                 return False
@@ -1457,24 +1568,27 @@ def run_window(
             de = ""
             if distro is not None:
                 de = f" ({distro.default_edition.name})"
-            self.done_msg.set_label(
-                f"{name}{de} will install after restart. This computer will be erased."
+            self._done_msgid = (
+                "{name} will install after restart. This computer will be erased."
             )
+            self._done_name = f"{name}{de}"
+            self._paint_done_msg()
             self._show_shop_done()
             return False
 
         def _confirm_os_install(self, distro: Distro, ed: Edition) -> None:
             self.shell.close_menus()
             de = f" ({ed.name})" if ed.name else ""
+            name = f"{distro.name}{de}"
             dialog = Adw.AlertDialog(
-                heading=f"Install {distro.name}{de}?",
-                body=(
-                    f"This will erase this computer and install {distro.name}. "
+                heading=_("Install {name}?").format(name=name),
+                body=_(
+                    "This will erase this computer and install {name}. "
                     "Create the account you will use after restart."
-                ),
+                ).format(name=distro.name),
             )
-            dialog.add_response("cancel", "Cancel")
-            dialog.add_response("ok", "Install")
+            dialog.add_response("cancel", _("Cancel"))
+            dialog.add_response("ok", _("Install"))
             dialog.set_response_appearance("ok", Adw.ResponseAppearance.DESTRUCTIVE)
             dialog.set_default_response("cancel")
             dialog.set_close_response("cancel")
@@ -1490,9 +1604,9 @@ def run_window(
                 grid.attach(widget, 1, row, 1, 1)
 
             name_e = Gtk.Entry()
-            name_e.set_placeholder_text("Your name")
+            name_e.set_placeholder_text(_("Your name"))
             user_e = Gtk.Entry()
-            user_e.set_placeholder_text("username")
+            user_e.set_placeholder_text(_("username"))
             host_e = Gtk.Entry()
             drv = get_driver(distro.install)
             host_e.set_text(drv.default_hostname if drv is not None else "ubuntu")
@@ -1502,11 +1616,11 @@ def run_window(
             pw2_e = Gtk.Entry()
             pw2_e.set_visibility(False)
             pw2_e.set_input_purpose(Gtk.InputPurpose.PASSWORD)
-            labeled(0, "Name", name_e)
-            labeled(1, "Username", user_e)
-            labeled(2, "Computer", host_e)
-            labeled(3, "Password", pw_e)
-            labeled(4, "Confirm", pw2_e)
+            labeled(0, _("Name"), name_e)
+            labeled(1, _("Username"), user_e)
+            labeled(2, _("Computer"), host_e)
+            labeled(3, _("Password"), pw_e)
+            labeled(4, _("Confirm"), pw2_e)
             dialog.set_extra_child(grid)
             dialog.set_response_enabled("ok", False)
 
@@ -1543,7 +1657,7 @@ def run_window(
                 hostname = host_e.get_text().strip().lower()
                 password = pw_e.get_text()
                 if password != pw2_e.get_text():
-                    self._toast("Passwords do not match.")
+                    self._toast(_("Passwords do not match."))
                     return
                 err = validate_identity(hostname, username, realname, password)
                 if err:
@@ -1568,7 +1682,7 @@ def run_window(
             plan = live_os_plan(self.payload_root, distro, ed)
             if not plan.available:
                 self._hide_shop_overlays()
-                self._toast(plan.reason or "Cannot install.")
+                self._toast(_(plan.reason or "Cannot install."))
                 return
 
             def work() -> None:
@@ -1598,11 +1712,15 @@ def run_window(
                 self._toast(err)
                 return False
             de = f" ({ed.name})" if ed.name else ""
-            self.done_msg.set_label(
-                f"{distro.name}{de} will install after restart. This computer will be erased."
+            self._done_msgid = (
+                "{name} will install after restart. This computer will be erased."
             )
+            self._done_name = f"{distro.name}{de}"
+            self._paint_done_msg()
             if reboot and not self.screenshot:
-                self._set_shop_progress(100, f"Restarting to install {distro.name}…")
+                self._set_shop_progress(
+                    100, "Restarting to install {name}…\t" + distro.name
+                )
                 GLib.timeout_add(1200, self._reboot_now)
                 return False
             self._show_shop_done()
@@ -1613,15 +1731,15 @@ def run_window(
             return False
 
         def _confirm_power(self, action: str) -> None:
-            title = "Restart?" if action == "restart" else "Power Off?"
+            title = _("Restart?") if action == "restart" else _("Power Off?")
             body = (
-                "The computer will restart."
+                _("The computer will restart.")
                 if action == "restart"
-                else "The computer will shut down."
+                else _("The computer will shut down.")
             )
-            confirm = "Restart" if action == "restart" else "Power Off"
+            confirm = _("Restart") if action == "restart" else _("Power Off")
             dialog = Adw.AlertDialog(heading=title, body=body)
-            dialog.add_response("cancel", "Cancel")
+            dialog.add_response("cancel", _("Cancel"))
             dialog.add_response("ok", confirm)
             dialog.set_response_appearance("ok", Adw.ResponseAppearance.DESTRUCTIVE)
             dialog.set_default_response("cancel")
@@ -1749,6 +1867,7 @@ def main(argv: list[str] | None = None) -> int:
         choices=(
             "qs",
             "network",
+            "language",
             "apps",
             "power",
             "clock",

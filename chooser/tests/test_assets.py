@@ -37,6 +37,8 @@ class AssetTests(unittest.TestCase):
         self.assertTrue(find_app_icon("other-option-light.png"))
         self.assertTrue(find_status("folder-download-symbolic.svg"))
         self.assertTrue(find_status("display-brightness-symbolic.svg"))
+        self.assertTrue(find_status("languages-symbolic.svg"))
+        self.assertTrue(find_status("object-select-symbolic.svg"))
         self.assertTrue(find_brand_logo())
         self.assertTrue(find_brand_wordmark(True))
         self.assertTrue(find_brand_wordmark(False))

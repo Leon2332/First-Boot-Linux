@@ -134,8 +134,42 @@ class LoadPayloadTests(unittest.TestCase):
         self.assertIsNotNone(p.retailer)
         assert p.retailer is not None
         self.assertEqual(p.retailer.name, "Example Computers")
+        self.assertEqual(p.retailer.language, "en")
+        self.assertIsNone(p.retailer.timezone)
         self.assertTrue(p.wallpaper_dark and p.wallpaper_dark.endswith("dark.jpg"))
         self.assertTrue(p.wallpaper_light and p.wallpaper_light.endswith("light.jpg"))
+
+    def test_retailer_language_optional(self) -> None:
+        _write(
+            self.tmp,
+            "retailer.conf",
+            RETAILER + "language = af\n",
+        )
+        p = load_payload(self.tmp)
+        assert p.retailer is not None
+        self.assertEqual(p.retailer.language, "af")
+
+    def test_retailer_timezone_optional(self) -> None:
+        _write(
+            self.tmp,
+            "retailer.conf",
+            RETAILER + "timezone = UTC+0200\n",
+        )
+        p = load_payload(self.tmp)
+        assert p.retailer is not None
+        self.assertEqual(p.retailer.timezone, "UTC+0200")
+
+    def test_retailer_unknown_keys_do_not_drop_wallpapers(self) -> None:
+        _write(
+            self.tmp,
+            "retailer.conf",
+            RETAILER + "future_flag = yes\n",
+        )
+        p = load_payload(self.tmp)
+        assert p.retailer is not None
+        self.assertEqual(p.retailer.name, "Example Computers")
+        self.assertTrue(p.wallpaper_dark and p.wallpaper_dark.endswith("dark.jpg"))
+        self.assertFalse(any("unknown keys" in e for e in p.errors))
 
     def test_local_is_file_present_not_json_flag(self) -> None:
         p = load_payload(self.tmp)

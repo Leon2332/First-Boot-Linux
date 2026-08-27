@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from firstboot.browser import START_PAGE_PATH, START_PAGE_URI, drop_process_caps
+from firstboot.i18n import _
 
 WEB_BINS = ("epiphany", "epiphany-browser")
 CONSOLE_BINS = ("kgx",)
@@ -94,7 +95,7 @@ def spawn_app(
 def launch_web() -> tuple[str | None, subprocess.Popen | None]:
     cmd = resolve_command(*WEB_BINS)
     if not cmd:
-        return "Web browser is not on this image yet.", None
+        return _("Web browser is not on this image yet."), None
     argv = [cmd]
     if os.path.isfile(START_PAGE_PATH):
         argv.append(START_PAGE_URI)
@@ -108,7 +109,7 @@ def launch_web() -> tuple[str | None, subprocess.Popen | None]:
 def launch_console() -> tuple[str | None, subprocess.Popen | None]:
     cmd = resolve_command(*CONSOLE_BINS)
     if not cmd:
-        return "Terminal is not on this image yet.", None
+        return _("Terminal is not on this image yet."), None
     return spawn_app([cmd], log_name="firstboot-console.log")
 
 
@@ -116,5 +117,5 @@ def launch_sysinfo(*, dark: bool = True) -> tuple[str | None, subprocess.Popen |
     del dark  # libadwaita follows org.gnome.desktop.interface color-scheme
     cmd = resolve_command(SYSINFO_BIN)
     if not cmd:
-        return "System details is not on this image yet.", None
+        return _("System details is not on this image yet."), None
     return spawn_app([cmd], log_name="firstboot-sysinfo.log")

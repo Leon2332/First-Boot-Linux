@@ -44,6 +44,8 @@ class Retailer:
     support: str
     wallpaper_dark: str
     wallpaper_light: str
+    language: str = "en"
+    timezone: str | None = None
 
 
 @dataclass(frozen=True)
@@ -221,14 +223,24 @@ def _load_retailer(root: str) -> Retailer:
             raise PayloadError(f"retailer.conf: {key} is not a safe relative path")
         if not raw[key].startswith("wallpapers/"):
             raise PayloadError(f"retailer.conf: {key} must be under wallpapers/")
-    extra = set(raw) - {"schema_version", *required}
-    if extra:
-        raise PayloadError("retailer.conf: unknown keys: " + ", ".join(sorted(extra)))
+    # Extra keys are ignored. A newer creator may write optional fields
+    # (language, timezone, …) before the frozen squashfs knows them;
+    # rejecting the whole file dropped wallpapers and the shop name.
+    from firstboot.i18n import DEFAULT_LANGUAGE, normalize_id
+    from firstboot.timezone import DEFAULT_TZ_LABEL, format_tz_offset, parse_tz_offset
+
+    language = normalize_id(raw.get("language") or "") or DEFAULT_LANGUAGE
+    timezone = None
+    if "timezone" in raw:
+        tz = parse_tz_offset(raw["timezone"] or "")
+        timezone = format_tz_offset(tz) if tz is not None else DEFAULT_TZ_LABEL
     return Retailer(
         name=raw["name"],
         support=raw["support"],
         wallpaper_dark=raw["wallpaper_dark"],
         wallpaper_light=raw["wallpaper_light"],
+        language=language,
+        timezone=timezone,
     )
 
 

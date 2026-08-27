@@ -11,6 +11,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from firstboot.disk import Disk, Partition, live_lsblk
+from firstboot.i18n import _
 from firstboot.render import drm_card_names
 
 if TYPE_CHECKING:
@@ -125,16 +126,16 @@ class SysInfo:
     def hardware_fields(self) -> tuple[Field, ...]:
         rows: list[Field] = []
         if self.model:
-            rows.append(Field("Model", self.model))
+            rows.append(Field(_("Model"), self.model))
         if self.memory:
-            rows.append(Field("Memory", self.memory))
+            rows.append(Field(_("Memory"), self.memory))
         if self.processor:
-            rows.append(Field("Processor", self.processor))
+            rows.append(Field(_("Processor"), self.processor))
         for i, name in enumerate(self.graphics):
-            label = "Graphics" if i == 0 else f"Graphics {i}"
+            label = _("Graphics") if i == 0 else _("Graphics {n}").format(n=i)
             rows.append(Field(label, name))
         for i, disp in enumerate(self.displays):
-            label = "Display" if i == 0 else f"Display {i}"
+            label = _("Display") if i == 0 else _("Display {n}").format(n=i)
             rows.append(Field(label, disp.format()))
         rows.extend(self.disks)
         return tuple(rows)
@@ -142,15 +143,15 @@ class SysInfo:
     def software_fields(self) -> tuple[Field, ...]:
         rows: list[Field] = []
         if self.os:
-            rows.append(Field("Operating System", self.os))
+            rows.append(Field(_("Operating System"), self.os))
         if self.os_type:
-            rows.append(Field("OS Type", self.os_type))
+            rows.append(Field(_("OS Type"), self.os_type))
         if self.windowing:
-            rows.append(Field("Windowing System", self.windowing))
+            rows.append(Field(_("Windowing System"), self.windowing))
         if self.kernel:
-            rows.append(Field("Kernel Version", self.kernel))
+            rows.append(Field(_("Kernel Version"), self.kernel))
         if self.firmware:
-            rows.append(Field("Firmware Version", self.firmware))
+            rows.append(Field(_("Firmware Version"), self.firmware))
         return tuple(rows)
 
 
@@ -531,24 +532,24 @@ def primary_part(disk: Disk) -> Partition | None:
 def disk_label(disk: Disk, part: Partition | None) -> str:
     if part is not None:
         if "/" in part.mountpoints:
-            return "Disk (/)"
+            return _("Disk ({path})").format(path="/")
         for mount in part.mountpoints:
             if mount:
-                return f"Disk ({mount})"
+                return _("Disk ({path})").format(path=mount)
         if part.label:
-            return f"Disk ({part.label})"
-    return "Disk"
+            return _("Disk ({path})").format(path=part.label)
+    return _("Disk")
 
 
 def unique_disk_label(label: str, disk: Disk, used: set[str]) -> str:
     if label not in used:
         used.add(label)
         return label
-    alt = f"Disk ({os.path.basename(disk.path)})"
+    alt = _("Disk ({path})").format(path=os.path.basename(disk.path))
     if alt not in used:
         used.add(alt)
         return alt
-    alt = f"Disk ({disk.path})"
+    alt = _("Disk ({path})").format(path=disk.path)
     used.add(alt)
     return alt
 
@@ -654,6 +655,11 @@ class SysinfoWindow:
         self._sw_box = None
         self._retailer_box = None
         self._retailer_value = None
+        self._title = None
+        self._hw_heading = None
+        self._sw_heading = None
+        self._max_btn = None
+        self._close_btn = None
         self._dark = True
         self._maxed = False
         self._placed = False
@@ -692,17 +698,17 @@ class SysinfoWindow:
         cols.set_size_request(INFO_WIDTH - 40, -1)
 
         hw = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        hw_h = Gtk.Label(label="Hardware Information", xalign=0)
-        hw_h.add_css_class("info-heading")
-        hw.append(hw_h)
+        self._hw_heading = Gtk.Label(label=_("Hardware Information"), xalign=0)
+        self._hw_heading.add_css_class("info-heading")
+        hw.append(self._hw_heading)
         self._hw_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         hw.append(self._hw_box)
         cols.append(hw)
 
         sw = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        sw_h = Gtk.Label(label="Software Information", xalign=0)
-        sw_h.add_css_class("info-heading")
-        sw.append(sw_h)
+        self._sw_heading = Gtk.Label(label=_("Software Information"), xalign=0)
+        self._sw_heading.add_css_class("info-heading")
+        sw.append(self._sw_heading)
         self._brand = Gtk.Picture()
         self._brand.add_css_class("info-sw-brand")
         self._brand.set_can_shrink(True)
@@ -716,7 +722,7 @@ class SysinfoWindow:
         self._sw_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         sw.append(self._sw_box)
         self._retailer_box, self._retailer_value = self._make_field(
-            "Configured by", ""
+            _("Configured by"), ""
         )
         self._retailer_box.set_visible(False)
         sw.append(self._retailer_box)
@@ -730,9 +736,9 @@ class SysinfoWindow:
         from gi.repository import Adw, Gtk
 
         header = Adw.HeaderBar()
-        title = Gtk.Label(label="System details")
-        title.add_css_class("title")
-        header.set_title_widget(title)
+        self._title = Gtk.Label(label=_("System details"))
+        self._title.add_css_class("title")
+        header.set_title_widget(self._title)
         toolbar = Adw.ToolbarView()
         toolbar.add_top_bar(header)
         toolbar.set_content(scroll)
@@ -775,11 +781,11 @@ class SysinfoWindow:
         if cog:
             self._cog_img.set_from_file(cog)
         title_wrap.append(self._cog_img)
-        title = Gtk.Label(label="System details", xalign=0)
-        title.add_css_class("term-title")
-        title.set_ellipsize(Pango.EllipsizeMode.END)
-        title.set_hexpand(True)
-        title_wrap.append(title)
+        self._title = Gtk.Label(label=_("System details"), xalign=0)
+        self._title.add_css_class("term-title")
+        self._title.set_ellipsize(Pango.EllipsizeMode.END)
+        self._title.set_hexpand(True)
+        title_wrap.append(self._title)
         header.append(title_wrap)
 
         controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
@@ -788,7 +794,8 @@ class SysinfoWindow:
         max_btn.add_css_class("term-wc")
         max_btn.add_css_class("term-max")
         max_btn.set_has_frame(False)
-        max_btn.set_tooltip_text("Maximize")
+        self._max_btn = max_btn
+        max_btn.set_tooltip_text(_("Maximize"))
         max_mark = Gtk.Box()
         max_mark.add_css_class("term-max-mark")
         max_mark.set_halign(Gtk.Align.CENTER)
@@ -799,7 +806,8 @@ class SysinfoWindow:
         close_btn.add_css_class("term-wc")
         close_btn.add_css_class("term-close")
         close_btn.set_has_frame(False)
-        close_btn.set_tooltip_text("Close")
+        self._close_btn = close_btn
+        close_btn.set_tooltip_text(_("Close"))
         self._close_img = Gtk.Image()
         self._close_img.set_pixel_size(14)
         close_btn.set_child(self._close_img)
@@ -882,6 +890,25 @@ class SysinfoWindow:
             self.frame.set_size_request(INFO_WIDTH, INFO_HEIGHT)
             self.frame.set_overflow(Gtk.Overflow.HIDDEN)
             self._move(self._x, self._y)
+
+    def retranslate(self) -> None:
+        if self._title is not None:
+            self._title.set_label(_("System details"))
+        if self._hw_heading is not None:
+            self._hw_heading.set_label(_("Hardware Information"))
+        if self._sw_heading is not None:
+            self._sw_heading.set_label(_("Software Information"))
+        if self._max_btn is not None:
+            self._max_btn.set_tooltip_text(_("Maximize"))
+        if self._close_btn is not None:
+            self._close_btn.set_tooltip_text(_("Close"))
+        if self._retailer_box is not None:
+            lab = self._retailer_box.get_first_child()
+            if lab is not None:
+                lab.set_label(_("Configured by"))
+        if self.win is not None:
+            self.win.set_title(_("System details"))
+        self._paint_info()
 
     def apply_theme(self, dark: bool) -> None:
         self._dark = dark
@@ -1076,11 +1103,23 @@ def run_sysinfo(argv: list[str] | None = None) -> int:
     from firstboot.payload import load_payload
     from firstboot.style import SYSINFO_CSS
 
-    payload_root = os.environ.get("FIRSTBOOT_PAYLOAD") or "/run/payload"
+    from firstboot.i18n import apply_language, load_language
+
+    payload_root = (
+        os.environ.get("FIRSTBOOT_PAYLOAD")
+        or os.environ.get("FBL_PAYLOAD")
+        or "/run/payload"
+    )
     try:
-        retailer = load_payload(payload_root).retailer
+        payload = load_payload(payload_root)
+        retailer = payload.retailer
     except Exception:
         retailer = None
+    apply_language(
+        load_language(
+            payload_root, retailer.language if retailer is not None else None
+        )
+    )
 
     class SysinfoApp(Adw.Application):
         def __init__(self) -> None:
@@ -1100,7 +1139,7 @@ def run_sysinfo(argv: list[str] | None = None) -> int:
                 Gtk.StyleContext.add_provider_for_display(
                     display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
                 )
-            win = Adw.ApplicationWindow(application=self, title="System details")
+            win = Adw.ApplicationWindow(application=self, title=_("System details"))
             win.set_default_size(INFO_WIDTH, INFO_HEIGHT)
             page = SysinfoWindow(host_window=win, retailer=retailer)
             page.build()

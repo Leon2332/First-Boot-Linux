@@ -338,6 +338,8 @@ func TestRetailerFile(t *testing.T) {
 		"support = support@example.com",
 		"wallpaper_dark = wallpapers/dark.jpg",
 		"wallpaper_light = wallpapers/light.jpg",
+		"language = en",
+		"timezone = UTC+0000",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q in %s", want, got)
@@ -345,6 +347,56 @@ func TestRetailerFile(t *testing.T) {
 	}
 	if err := ValidateRetailer(Retailer{Name: "", Support: "x", WallpaperDark: dark, WallpaperLight: light}); err == nil {
 		t.Fatalf("empty name should fail")
+	}
+}
+
+func TestLoadLanguages(t *testing.T) {
+	langs, err := LoadLanguages("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := map[string]bool{}
+	for _, lang := range langs {
+		ids[lang.ID] = true
+	}
+	if !ids["en"] || !ids["af"] {
+		t.Fatalf("expected en and af, got %#v", langs)
+	}
+	if ValidLanguage("de", langs) {
+		t.Fatal("de is not shipped")
+	}
+	if NormalizeRetailerLanguage("", langs) != "en" {
+		t.Fatal("empty language should be en")
+	}
+	if NormalizeRetailerLanguage("AF", langs) != "af" {
+		t.Fatal("AF should normalize to af")
+	}
+}
+
+func TestTimezone(t *testing.T) {
+	if got := FormatTZ(0); got != "UTC+0000" {
+		t.Fatalf("0 → %s", got)
+	}
+	if got := FormatTZ(330); got != "UTC+0530" {
+		t.Fatalf("330 → %s", got)
+	}
+	if got := FormatTZ(-300); got != "UTC-0500" {
+		t.Fatalf("-300 → %s", got)
+	}
+	if m, ok := ParseTZ("UTC+0530"); !ok || m != 330 {
+		t.Fatalf("parse +0530: %d %v", m, ok)
+	}
+	if m, ok := ParseTZ("utc-0500"); !ok || m != -300 {
+		t.Fatalf("parse -0500: %d %v", m, ok)
+	}
+	if _, ok := ParseTZ("Europe/Paris"); ok {
+		t.Fatal("named zone should fail")
+	}
+	if NormalizeRetailerTimezone("") != "UTC+0000" {
+		t.Fatal("empty tz")
+	}
+	if NormalizeRetailerTimezone("UTC+2") != "UTC+0200" {
+		t.Fatal("UTC+2")
 	}
 }
 

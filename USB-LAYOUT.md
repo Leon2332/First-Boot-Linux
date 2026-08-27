@@ -63,6 +63,8 @@ USB
 │
 └── payload                     (p3, FBL-DATA, ext4)
     ├── retailer.conf
+    ├── language                optional live language id (customer choice)
+    ├── timezone                optional live UTC offset (customer choice)
     ├── catalog.json
     ├── checksums.sha256        sums for this partition
     ├── wallpapers
@@ -87,7 +89,11 @@ name = Example Computers
 support = support@example.com  /  012 345 6789
 wallpaper_dark = wallpapers/dark.jpg
 wallpaper_light = wallpapers/light.jpg
+language = en
+timezone = UTC+0000
 ```
+
+`language` is the shop default (`en`, `af`, …). Optional; missing means English. `timezone` is the shop default UTC offset (`UTC+0000`, `UTC+0200`, …). Optional; missing means the live session stays on the seed’s UTC until the customer sets the clock. The live chooser may also write `payload/language` and `payload/timezone` when the customer changes those; they are the current choice and are not in `checksums.sha256`.
 
 
 ### `catalog.json`

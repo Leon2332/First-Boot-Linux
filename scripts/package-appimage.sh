@@ -84,6 +84,7 @@ mkdir -p \
 cp -a "$REPO_DIR/creator/bin/firstboot-creator" "$appdir/usr/bin/"
 cp -a "$REPO_DIR/creator/bin/firstboot-write-usb" "$appdir/usr/bin/"
 cp -a "$REPO_DIR/schemas/official-catalog.json" "$share/"
+cp -a "$REPO_DIR/po/languages.json" "$share/"
 cp -a "$REPO_DIR/image/grub.cfg" "$share/boot/"
 cp -a "$REPO_DIR/image/efi-grub.cfg" "$share/boot/"
 cp -a "$REPO_DIR/docs/assets/Wallpaper/annie-spratt-nJGaLopCqJk-unsplash.jpg" \

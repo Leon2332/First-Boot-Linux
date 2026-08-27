@@ -12,6 +12,7 @@ import tempfile
 import time
 from collections.abc import Callable
 
+from firstboot.i18n import _, apply_payload_language
 from firstboot.disk import (
     ESP_MIB_DEFAULT,
     SLACK_BYTES,
@@ -311,7 +312,7 @@ def _progress(n: int) -> None:
 
 def apply_plan(plan: InstallPlan) -> None:
     if not plan.available or plan.source is None or plan.target is None:
-        raise InstallError(plan.reason or "No internal disk to install to.")
+        raise InstallError(plan.reason or _("No internal disk to install to."))
     if os.geteuid() != 0:
         raise InstallError("must run as root")
     source, target = plan.source, plan.target
@@ -324,9 +325,9 @@ def apply_plan(plan: InstallPlan) -> None:
     src_sys = source.part_named("FBL-SYS")
     src_data = source.part_named("FBL-DATA")
     if src_esp is None or src_sys is None or src_data is None:
-        raise InstallError("This USB does not look like a First Boot install drive.")
+        raise InstallError(_("This USB does not look like a First Boot install drive."))
 
-    emit("STEP", "Preparing the disk…")
+    emit("STEP", _("Preparing the disk…"))
     _progress(4)
     try:
         unmount_disk(target)
@@ -340,7 +341,7 @@ def _apply_formatted(plan: InstallPlan, source: Disk, target: Disk) -> None:
     src_sys = source.part_named("FBL-SYS")
     src_data = source.part_named("FBL-DATA")
     if src_esp is None or src_sys is None or src_data is None:
-        raise InstallError("This USB does not look like a First Boot install drive.")
+        raise InstallError(_("This USB does not look like a First Boot install drive."))
     run_checked(["wipefs", "-a", target.path], what=f"wipe {target.path}")
     run_checked(["sgdisk", "--zap-all", target.path], what="clear GPT")
     esp_mib = bytes_to_mib(plan.esp_bytes) if plan.esp_bytes else ESP_MIB_DEFAULT
@@ -399,7 +400,7 @@ def _apply_formatted(plan: InstallPlan, source: Disk, target: Disk) -> None:
         dst_sys_mnt = mount(dst_sys, os.path.join(work, "dst-sys"))
         dst_data_mnt = mount(dst_data, os.path.join(work, "dst-data"))
 
-        emit("STEP", "Copying boot files…")
+        emit("STEP", _("Copying boot files…"))
         _progress(13)
 
         def on_esp(pct: int) -> None:
@@ -408,7 +409,7 @@ def _apply_formatted(plan: InstallPlan, source: Disk, target: Disk) -> None:
         copy_tree(src_esp_mnt, dst_esp_mnt, fat=True, on_percent=on_esp)
         _progress(34)
 
-        emit("STEP", "Copying First Boot…")
+        emit("STEP", _("Copying First Boot…"))
 
         def on_sys(pct: int) -> None:
             _progress(map_range(pct, 35, 58))
@@ -416,7 +417,7 @@ def _apply_formatted(plan: InstallPlan, source: Disk, target: Disk) -> None:
         copy_tree(src_sys_mnt, dst_sys_mnt, on_percent=on_sys)
         _progress(58)
 
-        emit("STEP", "Copying recommended systems…")
+        emit("STEP", _("Copying recommended systems…"))
 
         def on_data(pct: int) -> None:
             _progress(map_range(pct, 59, 96))
@@ -424,13 +425,13 @@ def _apply_formatted(plan: InstallPlan, source: Disk, target: Disk) -> None:
         copy_tree(src_data_mnt, dst_data_mnt, on_percent=on_data)
         _progress(96)
 
-        emit("STEP", "Finishing…")
+        emit("STEP", _("Finishing…"))
         sys_uuid = blkid_uuid(dst_sys)
         rewrite_grub(dst_esp_mnt, dst_sys_mnt, sys_uuid)
         os.sync()
         _register_efi(target.path)
         _progress(100)
-        emit("STEP", "Complete")
+        emit("STEP", _("Complete"))
         emit("DONE")
     finally:
         for dest in reversed(mounts):
@@ -581,6 +582,7 @@ def _apply_cli(target: str, source: str | None) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    apply_payload_language()
     parser = argparse.ArgumentParser(description="Install First Boot Linux onto a disk")
     parser.add_argument("--plan", action="store_true", help="print the install plan as JSON")
     parser.add_argument("--apply", action="store_true", help="write the target disk (root)")

@@ -68,11 +68,24 @@ type ShopEdition struct {
 	SizeBytes int64  `json:"size_bytes"`
 }
 
+type Language struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	En   string `json:"en"`
+}
+
+type languageFile struct {
+	SchemaVersion int        `json:"schema_version"`
+	Languages     []Language `json:"languages"`
+}
+
 type Retailer struct {
-	Name            string
-	Support         string
-	WallpaperDark   string
-	WallpaperLight  string
+	Name           string
+	Support        string
+	WallpaperDark  string
+	WallpaperLight string
+	Language       string
+	Timezone       string
 }
 
 func LoadOfficial(path string) (*Official, error) {
@@ -218,6 +231,74 @@ func looksSHA256(s string) bool {
 	return true
 }
 
+func LoadLanguages(path string) ([]Language, error) {
+	if path == "" {
+		var err error
+		path, err = assets.LanguagesJSON()
+		if err != nil {
+			return fallbackLanguages(), nil
+		}
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fallbackLanguages(), nil
+	}
+	var file languageFile
+	if err := json.Unmarshal(raw, &file); err != nil {
+		return nil, fmt.Errorf("languages: %w", err)
+	}
+	out := make([]Language, 0, len(file.Languages))
+	seen := map[string]bool{}
+	for _, lang := range file.Languages {
+		id := strings.ToLower(strings.TrimSpace(lang.ID))
+		name := strings.TrimSpace(lang.Name)
+		if id == "" || name == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		en := strings.TrimSpace(lang.En)
+		if en == "" {
+			en = name
+		}
+		out = append(out, Language{ID: id, Name: name, En: en})
+	}
+	if !seen["en"] {
+		out = append([]Language{{ID: "en", Name: "English", En: "English"}}, out...)
+	}
+	if len(out) == 0 {
+		return fallbackLanguages(), nil
+	}
+	return out, nil
+}
+
+func fallbackLanguages() []Language {
+	return []Language{
+		{ID: "en", Name: "English", En: "English"},
+		{ID: "af", Name: "Afrikaans", En: "Afrikaans"},
+	}
+}
+
+func ValidLanguage(id string, langs []Language) bool {
+	id = strings.ToLower(strings.TrimSpace(id))
+	if id == "" {
+		return false
+	}
+	for _, lang := range langs {
+		if lang.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func NormalizeRetailerLanguage(id string, langs []Language) string {
+	id = strings.ToLower(strings.TrimSpace(id))
+	if ValidLanguage(id, langs) {
+		return id
+	}
+	return "en"
+}
+
 func ValidateRetailer(r Retailer) error {
 	if err := oneLine("Shop name", r.Name, 1, 80); err != nil {
 		return err
@@ -234,7 +315,108 @@ func ValidateRetailer(r Retailer) error {
 	if !assets.FileExists(r.WallpaperLight) {
 		return fmt.Errorf("light wallpaper not found")
 	}
+	langs, err := LoadLanguages("")
+	if err != nil {
+		return err
+	}
+	if r.Language != "" && !ValidLanguage(r.Language, langs) {
+		return fmt.Errorf("unknown default language")
+	}
+	if r.Timezone != "" && !ValidTimezone(r.Timezone) {
+		return fmt.Errorf("unknown default time zone")
+	}
 	return nil
+}
+
+const (
+	tzMin  = -12 * 60
+	tzMax  = 14 * 60
+	tzStep = 30
+)
+
+func SnapTZ(minutes int) int {
+	if minutes < 0 {
+		minutes = -((-minutes + tzStep/2) / tzStep * tzStep)
+	} else {
+		minutes = (minutes + tzStep/2) / tzStep * tzStep
+	}
+	if minutes < tzMin {
+		return tzMin
+	}
+	if minutes > tzMax {
+		return tzMax
+	}
+	return minutes
+}
+
+func FormatTZ(minutes int) string {
+	minutes = SnapTZ(minutes)
+	sign := "+"
+	abs := minutes
+	if minutes < 0 {
+		sign = "-"
+		abs = -minutes
+	}
+	return fmt.Sprintf("UTC%s%02d%02d", sign, abs/60, abs%60)
+}
+
+func ParseTZ(s string) (int, bool) {
+	s = strings.ToUpper(strings.TrimSpace(s))
+	s = strings.ReplaceAll(s, " ", "")
+	s = strings.ReplaceAll(s, ":", "")
+	if strings.HasPrefix(s, "UTC") {
+		s = s[3:]
+	}
+	if s == "" || s == "0" || s == "00" || s == "0000" {
+		return 0, true
+	}
+	if len(s) < 2 || (s[0] != '+' && s[0] != '-') {
+		return 0, false
+	}
+	sign := 1
+	if s[0] == '-' {
+		sign = -1
+	}
+	digits := s[1:]
+	for _, c := range digits {
+		if c < '0' || c > '9' {
+			return 0, false
+		}
+	}
+	hours, mins := 0, 0
+	switch len(digits) {
+	case 1, 2:
+		fmt.Sscanf(digits, "%d", &hours)
+	case 3:
+		hours = int(digits[0] - '0')
+		fmt.Sscanf(digits[1:], "%d", &mins)
+	case 4:
+		fmt.Sscanf(digits[:2], "%d", &hours)
+		fmt.Sscanf(digits[2:], "%d", &mins)
+	default:
+		return 0, false
+	}
+	if mins != 0 && mins != 30 {
+		return 0, false
+	}
+	total := sign * (hours*60 + mins)
+	if total < tzMin || total > tzMax {
+		return 0, false
+	}
+	return total, true
+}
+
+func ValidTimezone(s string) bool {
+	_, ok := ParseTZ(s)
+	return ok
+}
+
+func NormalizeRetailerTimezone(s string) string {
+	minutes, ok := ParseTZ(s)
+	if !ok {
+		return "UTC+0000"
+	}
+	return FormatTZ(minutes)
 }
 
 func oneLine(label, s string, min, max int) error {
@@ -253,10 +435,17 @@ func oneLine(label, s string, min, max int) error {
 }
 
 func RetailerFile(r Retailer) string {
+	lang := strings.ToLower(strings.TrimSpace(r.Language))
+	if lang == "" {
+		lang = "en"
+	}
+	tz := NormalizeRetailerTimezone(r.Timezone)
 	return fmt.Sprintf(
-		"schema_version = 1\nname = %s\nsupport = %s\nwallpaper_dark = wallpapers/dark.jpg\nwallpaper_light = wallpapers/light.jpg\n",
+		"schema_version = 1\nname = %s\nsupport = %s\nwallpaper_dark = wallpapers/dark.jpg\nwallpaper_light = wallpapers/light.jpg\nlanguage = %s\ntimezone = %s\n",
 		sanitizeValue(r.Name),
 		sanitizeValue(r.Support),
+		sanitizeValue(lang),
+		sanitizeValue(tz),
 	)
 }
 

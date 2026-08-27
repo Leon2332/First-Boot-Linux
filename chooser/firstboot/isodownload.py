@@ -15,6 +15,7 @@ import urllib.request
 from collections.abc import Callable
 from urllib.parse import unquote, urlparse
 
+from firstboot.i18n import _
 from firstboot.payload import FILE_RE, Edition
 
 USER_AGENT = "FirstBootLinux/1.0"
@@ -34,7 +35,7 @@ def edition_relpath(edition: Edition) -> str:
         rel = f"images/{base}"
         if FILE_RE.fullmatch(rel):
             return rel
-    raise DownloadError("This edition has no image file name.")
+    raise DownloadError(_("This edition has no image file name."))
 
 
 def edition_dest(payload_root: str, edition: Edition) -> str:
@@ -65,7 +66,7 @@ def _sha256_file(path: str, size: int = 0) -> str:
                 break
             digest.update(chunk)
     if size and os.path.getsize(path) != size:
-        raise DownloadError("The image size does not match the catalog.")
+        raise DownloadError(_("The image size does not match the catalog."))
     return digest.hexdigest()
 
 
@@ -90,10 +91,10 @@ def download_iso(
     on_progress: Callable[[int], None] | None = None,
 ) -> None:
     if not url.startswith(("https://", "http://")):
-        raise DownloadError("The download address is not valid.")
+        raise DownloadError(_("The download address is not valid."))
     want = sha256.strip().lower()
     if len(want) != 64:
-        raise DownloadError("The catalog checksum is not valid.")
+        raise DownloadError(_("The catalog checksum is not valid."))
     dest = os.path.abspath(dest)
     parent = os.path.dirname(dest)
     try:
@@ -127,7 +128,9 @@ def download_iso(
     if avail < need:
         gb = need / 1_000_000_000
         raise DownloadError(
-            f"Not enough space for this image (need about {gb:.1f} GB free)."
+            _("Not enough space for this image (need about {size} GB free).").format(
+                size=f"{gb:.1f}"
+            )
         )
 
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})

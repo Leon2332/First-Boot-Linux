@@ -287,6 +287,17 @@ func buildDATA(req Request, root string, isos map[string]string) error {
 	if err := os.WriteFile(filepath.Join(root, "retailer.conf"), []byte(catalog.RetailerFile(req.Retailer)), 0o644); err != nil {
 		return err
 	}
+	lang := strings.TrimSpace(req.Retailer.Language)
+	if lang == "" {
+		lang = "en"
+	}
+	if err := os.WriteFile(filepath.Join(root, "language"), []byte(lang+"\n"), 0o644); err != nil {
+		return err
+	}
+	tz := catalog.NormalizeRetailerTimezone(req.Retailer.Timezone)
+	if err := os.WriteFile(filepath.Join(root, "timezone"), []byte(tz+"\n"), 0o644); err != nil {
+		return err
+	}
 	shopJSON, err := marshalShop(req.Shop)
 	if err != nil {
 		return err

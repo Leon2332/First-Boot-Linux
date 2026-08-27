@@ -1,0 +1,449 @@
+# First Boot Linux chooser strings.
+# English is the source. Do not translate distro or desktop names.
+msgid ""
+msgstr ""
+"Project-Id-Version: firstboot\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-27\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Language"
+msgstr ""
+
+msgid "Search"
+msgstr ""
+
+msgid "No matching languages"
+msgstr ""
+
+msgid "Back"
+msgstr ""
+
+msgid "Power Off"
+msgstr ""
+
+msgid "Network"
+msgstr ""
+
+msgid "Dark Style"
+msgstr ""
+
+msgid "Brightness"
+msgstr ""
+
+msgid "Mute"
+msgstr ""
+
+msgid "Unmute"
+msgstr ""
+
+msgid "Applications"
+msgstr ""
+
+msgid "Date and time"
+msgstr ""
+
+msgid "System menu"
+msgstr ""
+
+msgid "Later time zone"
+msgstr ""
+
+msgid "Earlier time zone"
+msgstr ""
+
+msgid "Ethernet"
+msgstr ""
+
+msgid "Cable unplugged"
+msgstr ""
+
+msgid "Connect"
+msgstr ""
+
+msgid "Disconnect"
+msgstr ""
+
+msgid "Connecting…"
+msgstr ""
+
+msgid "WI-FI"
+msgstr ""
+
+msgid "Wi-Fi"
+msgstr ""
+
+msgid "Off"
+msgstr ""
+
+msgid "Turn on"
+msgstr ""
+
+msgid "No Wi-Fi adapter"
+msgstr ""
+
+msgid "No networks found"
+msgstr ""
+
+msgid "Password"
+msgstr ""
+
+msgid "Unhide"
+msgstr ""
+
+msgid "Hide"
+msgstr ""
+
+msgid "Forget"
+msgstr ""
+
+msgid "Connected"
+msgstr ""
+
+msgid "Password required"
+msgstr ""
+
+msgid "Wired"
+msgstr ""
+
+msgid "Not connected"
+msgstr ""
+
+msgid "No Ethernet adapter"
+msgstr ""
+
+msgid "Cable detected"
+msgstr ""
+
+msgid "Offline"
+msgstr ""
+
+msgid "Restart…"
+msgstr ""
+
+msgid "Power Off…"
+msgstr ""
+
+msgid "Web browser"
+msgstr ""
+
+msgid "System details"
+msgstr ""
+
+msgid "Terminal"
+msgstr ""
+
+msgid "Install to this device"
+msgstr ""
+
+msgid "Other options"
+msgstr ""
+
+msgid "Configured by {name}"
+msgstr ""
+
+msgid "Support: {support}"
+msgstr ""
+
+msgid "No matching systems"
+msgstr ""
+
+msgid "←  Back"
+msgstr ""
+
+msgid "Install"
+msgstr ""
+
+msgid "Download"
+msgstr ""
+
+msgid "Desktop environment"
+msgstr ""
+
+msgid "Connect to a network first"
+msgstr ""
+
+msgid "Restart?"
+msgstr ""
+
+msgid "Power Off?"
+msgstr ""
+
+msgid "The computer will restart."
+msgstr ""
+
+msgid "The computer will shut down."
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Restart"
+msgstr ""
+
+msgid "Installing First Boot Linux"
+msgstr ""
+
+msgid "You're all set"
+msgstr ""
+
+msgid "First Boot Linux is on this computer. Remove the USB stick and restart."
+msgstr ""
+
+msgid "Restart now"
+msgstr ""
+
+msgid "Install to this device?"
+msgstr ""
+
+msgid "Hardware Information"
+msgstr ""
+
+msgid "Software Information"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid "Maximize"
+msgstr ""
+
+msgid "Enter address"
+msgstr ""
+
+msgid "No Ethernet adapter"
+msgstr ""
+
+msgid "Wi-Fi on"
+msgstr ""
+
+msgid "Wi-Fi off"
+msgstr ""
+
+msgid "Disconnected Ethernet"
+msgstr ""
+
+msgid "Connected via Ethernet"
+msgstr ""
+
+msgid "Passwords do not match."
+msgstr ""
+
+msgid "Model"
+msgstr ""
+
+msgid "Memory"
+msgstr ""
+
+msgid "Processor"
+msgstr ""
+
+msgid "Graphics"
+msgstr ""
+
+msgid "Graphics {n}"
+msgstr ""
+
+msgid "Display"
+msgstr ""
+
+msgid "Display {n}"
+msgstr ""
+
+msgid "Operating System"
+msgstr ""
+
+msgid "OS Type"
+msgstr ""
+
+msgid "Windowing System"
+msgstr ""
+
+msgid "Kernel Version"
+msgstr ""
+
+msgid "Firmware Version"
+msgstr ""
+
+msgid "Configured by"
+msgstr ""
+
+msgid "Disk"
+msgstr ""
+
+msgid "Disk ({path})"
+msgstr ""
+
+msgid "Popular and well-supported"
+msgstr ""
+
+msgid "A polished desktop with excellent hardware support and a large software library. A safe default for most laptops."
+msgstr ""
+
+msgid "Familiar and easy"
+msgstr ""
+
+msgid "A stable desktop that feels at home for people coming from Windows. Multimedia and drivers work out of the box."
+msgstr ""
+
+msgid "Modern Plasma desktop"
+msgstr ""
+
+msgid "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults."
+msgstr ""
+
+msgid "This will erase the internal disk and copy First Boot Linux onto it."
+msgstr ""
+
+msgid "Install {name}?"
+msgstr ""
+
+msgid "This will erase this computer and install {name}. Create the account you will use after restart."
+msgstr ""
+
+msgid "Name"
+msgstr ""
+
+msgid "Username"
+msgstr ""
+
+msgid "Computer"
+msgstr ""
+
+msgid "Confirm"
+msgstr ""
+
+msgid "Your name"
+msgstr ""
+
+msgid "username"
+msgstr ""
+
+msgid "Installing {name}"
+msgstr ""
+
+msgid "Downloading {name}"
+msgstr ""
+
+msgid "Preparing the disk…"
+msgstr ""
+
+msgid "Copying boot files…"
+msgstr ""
+
+msgid "Copying First Boot…"
+msgstr ""
+
+msgid "Copying recommended systems…"
+msgstr ""
+
+msgid "Finishing…"
+msgstr ""
+
+msgid "Complete"
+msgstr ""
+
+msgid "Checking the image…"
+msgstr ""
+
+msgid "Preparing {name}…"
+msgstr ""
+
+msgid "Restarting to install {name}…"
+msgstr ""
+
+msgid "{name} will install after restart. This computer will be erased."
+msgstr ""
+
+msgid "Downloading…"
+msgstr ""
+
+msgid "Ready"
+msgstr ""
+
+msgid "Download is not available yet ({name})."
+msgstr ""
+
+msgid "Download finished, but the image is missing."
+msgstr ""
+
+msgid "{name} install is not available yet."
+msgstr ""
+
+msgid "No internal disk to install to."
+msgstr ""
+
+msgid "Install to this device is only available when booted from USB."
+msgstr ""
+
+msgid "This USB does not look like a First Boot install drive."
+msgstr ""
+
+msgid "Not running from a First Boot USB."
+msgstr ""
+
+msgid "Cannot install."
+msgstr ""
+
+msgid "Enter a name."
+msgstr ""
+
+msgid "Username must start with a letter and use only a–z, 0–9, _ or -."
+msgstr ""
+
+msgid "Computer name must be letters, numbers, and hyphens."
+msgstr ""
+
+msgid "Password must be at least 6 characters."
+msgstr ""
+
+msgid "Password cannot contain line breaks."
+msgstr ""
+
+msgid "This computer needs about {size} of memory to install {name} from the internal disk."
+msgstr ""
+
+msgid "Internal disk is too small ({have}; need {need})."
+msgstr ""
+
+msgid "This disk is too small ({have}; need {need})."
+msgstr ""
+
+msgid "Could not write the boot partition."
+msgstr ""
+
+msgid "Could not find the First Boot system partition."
+msgstr ""
+
+msgid "The image file is missing."
+msgstr ""
+
+msgid "The image is damaged. It does not match the checksum."
+msgstr ""
+
+msgid "The image path is not a staged ISO."
+msgstr ""
+
+msgid "Cannot gain permission to install."
+msgstr ""
+
+msgid "This edition has no image file name."
+msgstr ""
+
+msgid "The image size does not match the catalog."
+msgstr ""
+
+msgid "The download address is not valid."
+msgstr ""
+
+msgid "The catalog checksum is not valid."
+msgstr ""
+
+msgid "Not enough space for this image (need about {size} GB free)."
+msgstr ""

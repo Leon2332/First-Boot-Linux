@@ -40,6 +40,7 @@ from firstboot.disk import (
 )
 from firstboot.isodownload import DownloadError, dest_is_payload_image, download_iso
 from firstboot.install import blkid_uuid
+from firstboot.i18n import _, apply_payload_language
 from firstboot.payload import Distro, Edition
 
 from . import fedora_44_plasma, mint_223, ubuntu_2604
@@ -158,7 +159,7 @@ def privilege_prefix() -> list[str]:
     pkexec = shutil.which("pkexec")
     if pkexec:
         return [pkexec]
-    raise OsInstallError("Cannot gain permission to install.")
+    raise OsInstallError(_("Cannot gain permission to install."))
 
 
 def suggest_username(realname: str) -> str:
@@ -185,15 +186,15 @@ def suggest_hostname(username: str) -> str:
 def validate_identity(hostname: str, username: str, realname: str, password: str) -> str | None:
     realname = realname.strip()
     if not realname or len(realname) > 64 or ":" in realname or "\n" in realname:
-        return "Enter a name."
+        return _("Enter a name.")
     if not USER_RE.fullmatch(username):
-        return "Username must start with a letter and use only a–z, 0–9, _ or -."
+        return _("Username must start with a letter and use only a–z, 0–9, _ or -.")
     if not HOST_RE.fullmatch(hostname):
-        return "Computer name must be letters, numbers, and hyphens."
+        return _("Computer name must be letters, numbers, and hyphens.")
     if len(password) < 6:
-        return "Password must be at least 6 characters."
+        return _("Password must be at least 6 characters.")
     if "\n" in password or "\r" in password:
-        return "Password cannot contain line breaks."
+        return _("Password cannot contain line breaks.")
     return None
 
 
@@ -366,8 +367,10 @@ def plan_os_target(disks, live) -> tuple:
         return target, reason
     if live.size < MIN_TARGET_BYTES:
         return None, (
-            f"This disk is too small "
-            f"({format_size(live.size)}; need {format_size(MIN_TARGET_BYTES)})."
+            _("This disk is too small ({have}; need {need}).").format(
+                have=format_size(live.size),
+                need=format_size(MIN_TARGET_BYTES),
+            )
         )
     return live, ""
 
@@ -427,7 +430,7 @@ def verify_iso(
     on_progress: Callable[[int], None] | None = None,
 ) -> None:
     if not os.path.isfile(path):
-        raise OsInstallError("The image file is missing.")
+        raise OsInstallError(_("The image file is missing."))
     try:
         total = os.path.getsize(path)
     except OSError as exc:
@@ -453,7 +456,7 @@ def verify_iso(
     got = digest.hexdigest()
     want = sha256.strip().lower()
     if got != want:
-        raise OsInstallError("The image is damaged. It does not match the checksum.")
+        raise OsInstallError(_("The image is damaged. It does not match the checksum."))
 
 
 def disk_udev_serial(dev: str) -> str:
@@ -777,7 +780,7 @@ def _remount_rw(mp: str) -> None:
         text=True,
     )
     if proc.returncode != 0:
-        raise OsInstallError("Could not write the boot partition.")
+        raise OsInstallError(_("Could not write the boot partition."))
 
 
 def _live_image_size(iso_mnt: str, fallback: int) -> int:
@@ -799,7 +802,7 @@ def prepare_os(
     on_progress: Callable[[int], None] | None = None,
 ) -> None:
     if not plan.available or plan.target is None or plan.live is None:
-        raise OsInstallError(plan.reason or "Cannot install.")
+        raise OsInstallError(plan.reason or _("Cannot install."))
     if os.geteuid() != 0:
         raise OsInstallError("must run as root")
     drv = get_driver(plan.driver)
@@ -812,7 +815,7 @@ def prepare_os(
         else:
             _progress(n)
 
-    emit("STEP", "Checking the image…")
+    emit("STEP", _("Checking the image…"))
     prog(2)
     verify_iso(
         plan.iso_path,
@@ -823,7 +826,7 @@ def prepare_os(
     prog(50)
 
     label = plan.distro_name or "the system"
-    emit("STEP", f"Preparing {label}…")
+    emit("STEP", _("Preparing {name}…").format(name=label))
     iso_mnt = tempfile.mkdtemp(prefix="fbl-iso-")
     mounted = False
     try:
@@ -839,14 +842,15 @@ def prepare_os(
         toram = have >= need
         if plan.same_disk and not toram:
             raise OsInstallError(
-                "This computer needs about "
-                f"{format_size(need)} of memory to install {label} from the internal disk."
+                _(
+                    "This computer needs about {size} of memory to install {name} from the internal disk."
+                ).format(size=format_size(need), name=label)
             )
         prog(58)
 
         sys_mp = _sys_mountpoint()
         if not sys_mp:
-            raise OsInstallError("Could not find the First Boot system partition.")
+            raise OsInstallError(_("Could not find the First Boot system partition."))
         _remount_rw(sys_mp)
         dest = os.path.join(sys_mp, OSINSTALL_REL)
         os.makedirs(dest, exist_ok=True)
@@ -907,7 +911,7 @@ def prepare_os(
         drv.after_prepare(iso_mnt, plan, sys_uuid, label, linux_args)
         os.sync()
         prog(100)
-        emit("STEP", f"Restarting to install {plan.distro_name or label}…")
+        emit("STEP", _("Restarting to install {name}…").format(name=plan.distro_name or label))
         emit("REBOOT")
     finally:
         if mounted:
@@ -930,7 +934,7 @@ def run_os_install(
     on_event: Callable[..., None] | None = None,
 ) -> None:
     if not plan.available or plan.target is None:
-        raise OsInstallError(plan.reason or "Cannot install.")
+        raise OsInstallError(plan.reason or _("Cannot install."))
     cmd = [
         *privilege_prefix(),
         helper_path(),
@@ -1030,8 +1034,8 @@ def fetch_iso(
     on_progress: Callable[[int], None] | None = None,
 ) -> None:
     if not dest_is_payload_image(payload_root, dest):
-        raise OsInstallError("The image path is not a staged ISO.")
-    emit("STEP", "Downloading…")
+        raise OsInstallError(_("The image path is not a staged ISO."))
+    emit("STEP", _("Downloading…"))
 
     def prog(n: int) -> None:
         if on_progress:
@@ -1043,7 +1047,7 @@ def fetch_iso(
         download_iso(url, dest, sha256, size_bytes, on_progress=prog)
     except DownloadError as exc:
         raise OsInstallError(str(exc)) from exc
-    emit("STEP", "Ready")
+    emit("STEP", _("Ready"))
     emit("DONE")
 
 
@@ -1068,7 +1072,7 @@ def run_iso_fetch(
 
         try:
             if on_event is not None:
-                on_event(HelperEvent("step", text="Downloading…"))
+                on_event(HelperEvent("step", text=_("Downloading…")))
             download_iso(url, dest, sha256, size_bytes, on_progress=prog)
             if on_event is not None:
                 on_event(HelperEvent("done", progress=100))
@@ -1140,6 +1144,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--edition", default="")
     parser.add_argument("--same-disk", action="store_true")
     args = parser.parse_args(argv)
+    apply_payload_language(args.payload)
     if args.fetch:
         if not args.url or not args.iso or not args.sha256:
             emit("ERROR", "missing --url / --iso / --sha256")

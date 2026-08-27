@@ -6,6 +6,8 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 
+from firstboot.i18n import _
+
 SKIP_IFACE_PREFIXES = (
     "lo",
     "veth",
@@ -99,25 +101,25 @@ class NetSnapshot:
     @property
     def label(self) -> str:
         if self.ethernet.connected:
-            return "Wired"
+            return _("Wired")
         if self.wifi.connected and self.wifi.ssid:
             return self.wifi.ssid
-        return "Network"
+        return _("Network")
 
     @property
     def sub(self) -> str:
         if self.connected:
-            return "Connected"
+            return _("Connected")
         if self.ethernet.connecting or self.wifi.connecting:
-            return "Connecting…"
-        return "Not connected"
+            return _("Connecting…")
+        return _("Not connected")
 
     @property
     def tooltip(self) -> str:
         return {
-            "wired": "Ethernet",
-            "wifi": self.wifi.ssid or "Wi-Fi",
-            "offline": "Offline",
+            "wired": _("Ethernet"),
+            "wifi": self.wifi.ssid or _("Wi-Fi"),
+            "offline": _("Offline"),
         }[self.kind]
 
 
@@ -408,14 +410,14 @@ def snapshot_from_text(
 def ethernet_detail(eth: Ethernet) -> tuple[str, str | None]:
     """(status line, button label or None if no action)."""
     if eth.device is None:
-        return "No Ethernet adapter", None
+        return _("No Ethernet adapter"), None
     if eth.connecting:
-        return "Connecting…", None
+        return _("Connecting…"), None
     if eth.connected:
-        return "Connected", "Disconnect"
+        return _("Connected"), _("Disconnect")
     if eth.plugged:
-        return "Cable detected", "Connect"
-    return "Cable unplugged", None
+        return _("Cable detected"), _("Connect")
+    return _("Cable unplugged"), None
 
 
 def run_nmcli(args: list[str], *, timeout: float = 12, write: bool = False) -> str:

@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "languages": [
+    {"id": "en", "name": "English", "en": "English"},
+    {"id": "af", "name": "Afrikaans", "en": "Afrikaans"}
+  ]
+}

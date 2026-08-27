@@ -128,6 +128,25 @@ func sharePath(elem ...string) []string {
 	return out
 }
 
+func LanguagesJSON() (string, error) {
+	if env := os.Getenv("FIRSTBOOT_LANGUAGES"); env != "" {
+		if fileExists(env) {
+			return env, nil
+		}
+		return "", fmt.Errorf("FIRSTBOOT_LANGUAGES: %s not found", env)
+	}
+	exe := ExecutableDir()
+	candidates := sharePath("languages.json")
+	candidates = append(candidates,
+		filepath.Join(exe, "languages.json"),
+		filepath.Join(exe, "data", "languages.json"),
+	)
+	if repo, err := RepoRoot(""); err == nil {
+		candidates = append(candidates, filepath.Join(repo, "po", "languages.json"))
+	}
+	return FirstExisting(candidates...)
+}
+
 func OfficialCatalog() (string, error) {
 	if env := os.Getenv("FIRSTBOOT_OFFICIAL_CATALOG"); env != "" {
 		if fileExists(env) {

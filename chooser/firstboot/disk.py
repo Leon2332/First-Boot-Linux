@@ -8,6 +8,8 @@ import re
 import subprocess
 from dataclasses import dataclass, field
 
+from firstboot.i18n import _
+
 SKIP_PREFIXES = ("loop", "ram", "sr", "zram", "fd", "md", "dm-")
 LIVE_MOUNTS = ("/cdrom", "/run/live/medium", "/lib/live/mount/medium")
 PAYLOAD_MOUNT = "/run/payload"
@@ -319,13 +321,15 @@ def find_target_disk(
     if not candidates:
         others = [d for d in disks if d.path != source.path]
         if not others:
-            return None, "No internal disk to install to."
+            return None, _("No internal disk to install to.")
         biggest = max(others, key=lambda d: d.size)
         if biggest.usb or biggest.removable:
-            return None, "No internal disk to install to."
+            return None, _("No internal disk to install to.")
         return None, (
-            f"Internal disk is too small "
-            f"({format_size(biggest.size)}; need {format_size(need_bytes)})."
+            _("Internal disk is too small ({have}; need {need}).").format(
+                have=format_size(biggest.size),
+                need=format_size(need_bytes),
+            )
         )
     candidates.sort(key=lambda d: d.size, reverse=True)
     return candidates[0], ""
@@ -353,17 +357,17 @@ def plan_install(
 ) -> InstallPlan:
     source = find_source_disk(disks, mounts)
     if source is None:
-        return InstallPlan(False, "Not running from a First Boot USB.")
+        return InstallPlan(False, _("Not running from a First Boot USB."))
     if not source.is_install_media():
         return InstallPlan(
             False,
-            "Install to this device is only available when booted from USB.",
+            _("Install to this device is only available when booted from USB."),
             source=source,
         )
     if source.part_named("FBL-SYS") is None or source.part_named("FBL-DATA") is None:
         return InstallPlan(
             False,
-            "This USB does not look like a First Boot install drive.",
+            _("This USB does not look like a First Boot install drive."),
             source=source,
         )
     esp_bytes, sys_bytes, data_need = plan_sizes(source, payload_used)

@@ -174,6 +174,88 @@ window.firstboot.light .shell-panel {
   padding: 0 0 2px;
 }
 
+.qs-language {
+  min-width: 0;
+}
+
+entry.lang-search {
+  min-height: 36px;
+  margin: 0 0 4px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 12px;
+  background-color: rgba(0, 0, 0, 0.28);
+  color: #eef1f6;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+  outline: none;
+}
+
+entry.lang-search:focus-within,
+entry.lang-search:focus {
+  border-color: #3584e4;
+}
+
+window.firstboot.light entry.lang-search {
+  background-color: rgba(0, 0, 0, 0.04);
+  color: #1c1c1c;
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+.lang-empty {
+  font-size: 13px;
+  color: rgba(246, 245, 244, 0.75);
+  padding: 12px 4px;
+}
+
+window.firstboot.light .lang-empty {
+  color: rgba(28, 28, 28, 0.7);
+}
+
+scrolledwindow.lang-scroll {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  min-height: 0;
+}
+
+scrolledwindow.lang-scroll scrollbar {
+  min-width: 8px;
+  min-height: 8px;
+}
+
+scrolledwindow.lang-scroll scrollbar slider {
+  min-width: 8px;
+  min-height: 8px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.22);
+}
+
+window.firstboot.light scrolledwindow.lang-scroll scrollbar slider {
+  background-color: rgba(0, 0, 0, 0.22);
+}
+
+button.lang-item {
+  min-height: 40px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
+}
+
+button.lang-item:hover {
+  background-color: rgba(255, 255, 255, 0.10);
+}
+
+window.firstboot.light button.lang-item:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.lang-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
 .qs-round {
   min-width: 40px;
   min-height: 40px;

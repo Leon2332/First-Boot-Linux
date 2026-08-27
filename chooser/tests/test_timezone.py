@@ -22,7 +22,9 @@ from firstboot.timezone import (  # noqa: E402
     clock_in_offset,
     format_tz_offset,
     iana_zone,
+    load_timezone_minutes,
     parse_tz_offset,
+    persist_timezone,
     posix_tz,
     snap_tz_minutes,
     tzif_bytes,
@@ -76,6 +78,17 @@ class PosixTests(unittest.TestCase):
         self.assertEqual(iana_zone(-300), "Etc/GMT+5")
         self.assertEqual(iana_zone(840), "Etc/GMT-14")
         self.assertIsNone(iana_zone(330))
+
+
+class PersistTests(unittest.TestCase):
+    def test_file_and_retailer(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="fbl-tz-") as tmp:
+            self.assertIsNone(load_timezone_minutes(tmp))
+            self.assertEqual(load_timezone_minutes(tmp, "UTC+0200"), 120)
+            self.assertTrue(persist_timezone(tmp, 330))
+            self.assertEqual(load_timezone_minutes(tmp, "UTC+0000"), 330)
+            with open(os.path.join(tmp, "timezone"), encoding="utf-8") as fh:
+                self.assertEqual(fh.read().strip(), "UTC+0530")
 
 
 class ClockTests(unittest.TestCase):
