@@ -45,6 +45,7 @@ from firstboot.timezone import (
 )
 from firstboot.volume import MemoryVolume, Volume, VolumeState, get_volume_backend
 from firstboot.i18n import (
+    DEFAULT_LANGUAGE,
     _,
     language_matches,
     persist_language,
@@ -305,7 +306,7 @@ class Shell:
         on_sysinfo: Callable[[], None] | None = None,
         on_browser: Callable[[], None] | None = None,
         show_shop_install: bool = False,
-        language: str = "en",
+        language: str = DEFAULT_LANGUAGE,
         payload_root: str | None = None,
         on_language: Callable[[str], None] | None = None,
         retailer_timezone: str | None = None,

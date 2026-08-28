@@ -1,4 +1,4 @@
-"""Chooser translations. English is the source; catalogs are GNU gettext .po."""
+"""Chooser translations. English (US) is the source; catalogs are GNU gettext .po."""
 
 from __future__ import annotations
 
@@ -10,14 +10,13 @@ import subprocess
 from dataclasses import dataclass
 
 DOMAIN = "firstboot"
-DEFAULT_LANGUAGE = "en"
+DEFAULT_LANGUAGE = "en-us"
 LANGUAGE_FILE = "language"
 HELPER = "/usr/libexec/firstboot/set-language"
 ID_RE = re.compile(r"^[a-z]{2,3}(?:-[a-z0-9]+)*$")
 LANG_JSON = "languages.json"
 ALIASES = {
-    "en-us": "en",
-    "en-gb": "en",
+    "en": "en-us",
     "af-za": "af",
 }
 
@@ -34,6 +33,11 @@ class Language:
     @property
     def search_text(self) -> str:
         return f"{self.name} {self.en}"
+
+
+def is_english(lang_id: str) -> bool:
+    """True for the English source family (en, en-us, en-gb, …)."""
+    return lang_id == "en" or lang_id.startswith("en-")
 
 
 def _(message: str) -> str:
@@ -78,8 +82,6 @@ def normalize_id(value: str | None) -> str | None:
         return None
     if text in ALIASES:
         return ALIASES[text]
-    if text.startswith("en-"):
-        return "en"
     return text
 
 
@@ -145,15 +147,19 @@ def load_language_index() -> tuple[Language, ...]:
             seen.add(lid)
             out.append(Language(id=lid, name=name, en=en or name))
         if out:
-            if "en" not in seen:
-                out.insert(0, Language("en", "English", "English"))
+            if not any(is_english(item) for item in seen):
+                out.insert(
+                    0, Language(DEFAULT_LANGUAGE, "English (US)", "English (US)")
+                )
             return tuple(out)
-    return (Language("en", "English", "English"),)
+    return (Language(DEFAULT_LANGUAGE, "English (US)", "English (US)"),)
 
 
 def catalog_path(lang_id: str) -> str | None:
     lid = normalize_id(lang_id)
     if not lid or lid == DEFAULT_LANGUAGE:
+        return None
+    if lid == "en":
         return None
     for root in locale_dirs():
         candidates = (
@@ -169,9 +175,11 @@ def catalog_path(lang_id: str) -> str | None:
 
 def has_catalog(lang_id: str) -> bool:
     lid = normalize_id(lang_id)
-    if lid == DEFAULT_LANGUAGE:
+    if not lid:
+        return False
+    if lid == DEFAULT_LANGUAGE or is_english(lid):
         return True
-    return catalog_path(lid or "") is not None
+    return catalog_path(lid) is not None
 
 
 def supported_languages() -> tuple[Language, ...]:
@@ -180,8 +188,8 @@ def supported_languages() -> tuple[Language, ...]:
     for lang in load_language_index():
         if has_catalog(lang.id):
             out.append(lang)
-    if not any(lang.id == DEFAULT_LANGUAGE for lang in out):
-        out.insert(0, Language("en", "English", "English"))
+    if not any(is_english(lang.id) for lang in out):
+        out.insert(0, Language(DEFAULT_LANGUAGE, "English (US)", "English (US)"))
     return tuple(out)
 
 
@@ -291,7 +299,7 @@ def _unquote_po(token: str) -> str:
 
 def load_catalog(lang_id: str) -> dict[str, str]:
     lid = resolve_language(lang_id)
-    if lid == DEFAULT_LANGUAGE:
+    if lid == DEFAULT_LANGUAGE or lid == "en":
         return {}
     path = catalog_path(lid)
     if not path:

@@ -44,7 +44,8 @@ class Retailer:
     support: str
     wallpaper_dark: str
     wallpaper_light: str
-    language: str = "en"
+    language: str = "en-us"
+    keyboard: str = "us"
     timezone: str | None = None
 
 
@@ -226,10 +227,12 @@ def _load_retailer(root: str) -> Retailer:
     # Extra keys are ignored. A newer creator may write optional fields
     # (language, timezone, …) before the frozen squashfs knows them;
     # rejecting the whole file dropped wallpapers and the shop name.
-    from firstboot.i18n import DEFAULT_LANGUAGE, normalize_id
+    from firstboot.i18n import DEFAULT_LANGUAGE, normalize_id, resolve_language
+    from firstboot.keyboard import DEFAULT_KEYBOARD, resolve_keyboard
     from firstboot.timezone import DEFAULT_TZ_LABEL, format_tz_offset, parse_tz_offset
 
-    language = normalize_id(raw.get("language") or "") or DEFAULT_LANGUAGE
+    language = resolve_language(normalize_id(raw.get("language") or "") or DEFAULT_LANGUAGE)
+    keyboard = resolve_keyboard(raw.get("keyboard") or DEFAULT_KEYBOARD)
     timezone = None
     if "timezone" in raw:
         tz = parse_tz_offset(raw["timezone"] or "")
@@ -240,6 +243,7 @@ def _load_retailer(root: str) -> Retailer:
         wallpaper_dark=raw["wallpaper_dark"],
         wallpaper_light=raw["wallpaper_light"],
         language=language,
+        keyboard=keyboard,
         timezone=timezone,
     )
 

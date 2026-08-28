@@ -274,6 +274,8 @@ class YamlTests(unittest.TestCase):
         self.assertIn("First Boot Linux", text)
         self.assertIn("efibootmgr", text)
         self.assertIn(UBUNTU_HASH, text)
+        self.assertIn("locale: en_US.UTF-8", text)
+        self.assertIn("layout: us", text)
 
     def test_mint_preseed_is_not_autoinstall(self) -> None:
         ident = OsIdentity("shop-pc", "leon", "Leon", UBUNTU_HASH)
@@ -291,6 +293,8 @@ class YamlTests(unittest.TestCase):
         self.assertIn("ubiquity ubiquity/download_updates boolean false", text)
         self.assertIn("ubiquity ubiquity/reboot_on_failure boolean false", text)
         self.assertIn("localechooser/languagelist string en", text)
+        self.assertIn("debian-installer/locale string en_US.UTF-8", text)
+        self.assertIn("keyboard-configuration/layoutcode string us", text)
         self.assertIn("partman-auto/init_automatically_partition select regular", text)
         self.assertIn("/usr/lib/firstboot-efi-cleanup", text)
         self.assertNotIn("grub-installer/bootdev", text)

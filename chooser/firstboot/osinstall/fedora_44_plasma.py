@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import tempfile
 
+from firstboot.installlocale import InstallLocale
 from firstboot.osinstall.common import (
     OsIdentity,
     OsInstallError,
@@ -446,8 +447,13 @@ def fedora_boot_files(iso_mnt: str) -> tuple[str, str]:
     raise OsInstallError("This image is not a Fedora live ISO.")
 
 
-def fedora_kickstart(identity: OsIdentity, target_path: str) -> str:
+def fedora_kickstart(
+    identity: OsIdentity,
+    target_path: str,
+    locale: InstallLocale | None = None,
+) -> str:
     """Anaconda kickstart for Fedora 44 KDE Live. Not Ubiquity, not autoinstall."""
+    loc = locale or InstallLocale()
     disk = kernel_disk_path(target_path)
     drive = kickstart_disk_id(target_path)
     gecos = kickstart_gecos(identity.realname or identity.username)
@@ -459,8 +465,8 @@ def fedora_kickstart(identity: OsIdentity, target_path: str) -> str:
         "# First Boot Linux — Fedora Plasma live install\n"
         "cmdline\n"
         f"liveimg --url=file://{SQUASH_LINK}\n"
-        "lang en_US.UTF-8\n"
-        "keyboard --vckeymap=us --xlayouts='us'\n"
+        f"lang {loc.glibc}\n"
+        f"keyboard --vckeymap={loc.keyboard} --xlayouts='{loc.keyboard}'\n"
         "timezone UTC\n"
         f"network --hostname={host}\n"
         "rootpw --lock\n"
@@ -648,10 +654,14 @@ class Fedora44Plasma:
         return fedora_kernel_args(iso_rel, vol or LIVE_LABEL, toram=toram)
 
     def seed_files(
-        self, identity: OsIdentity, target_path: str, serial: str
+        self,
+        identity: OsIdentity,
+        target_path: str,
+        serial: str,
+        locale: InstallLocale | None = None,
     ) -> dict[str, str | bytes]:
         return {
-            "ks.cfg": fedora_kickstart(identity, target_path),
+            "ks.cfg": fedora_kickstart(identity, target_path, locale=locale),
             "usr/libexec/fbl-link-squashfs": LINK_SQUASH,
             "usr/libexec/fbl-anaconda": ANACONDA_SCRIPT,
             "etc/systemd/system/getty@tty1.service": ANACONDA_SERVICE,

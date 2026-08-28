@@ -37,36 +37,57 @@ from firstboot.i18n import (  # noqa: E402
 
 class IdTests(unittest.TestCase):
     def test_normalize(self) -> None:
-        self.assertEqual(normalize_id("EN"), "en")
+        self.assertEqual(normalize_id("EN"), "en-us")
         self.assertEqual(normalize_id("af_ZA"), "af")
         self.assertEqual(normalize_id("pt-br"), "pt-br")
-        self.assertEqual(normalize_id("en-US"), "en")
+        self.assertEqual(normalize_id("en-US"), "en-us")
+        self.assertEqual(normalize_id("en-GB"), "en-gb")
+        self.assertEqual(normalize_id("en"), "en-us")
         self.assertIsNone(normalize_id("English"))
         self.assertIsNone(normalize_id("../af"))
 
-    def test_resolve_unknown_is_english(self) -> None:
+    def test_resolve_unknown_is_english_us(self) -> None:
         self.assertEqual(resolve_language("de"), DEFAULT_LANGUAGE)
         self.assertEqual(resolve_language(None), DEFAULT_LANGUAGE)
         self.assertEqual(resolve_language("af"), "af")
+        self.assertEqual(resolve_language("en"), "en-us")
+        self.assertEqual(resolve_language("en-gb"), "en-gb")
+        self.assertEqual(resolve_language("en-za"), "en-za")
+        self.assertEqual(resolve_language("en_ZA"), "en-za")
+        self.assertEqual(DEFAULT_LANGUAGE, "en-us")
 
 
 class IndexTests(unittest.TestCase):
     def test_shipped_english_and_afrikaans(self) -> None:
         ids = [lang.id for lang in load_language_index()]
-        self.assertIn("en", ids)
+        self.assertIn("en-us", ids)
+        self.assertIn("en-gb", ids)
         self.assertIn("af", ids)
-        self.assertEqual(set(ids), {"en", "af"})
+        self.assertIn("en-za", ids)
+        self.assertEqual(set(ids), {"en-us", "en-gb", "en-za", "af"})
+        self.assertNotIn("en", ids)
 
     def test_supported_matches_catalogs(self) -> None:
         langs = supported_languages()
         ids = [lang.id for lang in langs]
-        self.assertIn("en", ids)
+        self.assertIn("en-us", ids)
+        self.assertIn("en-gb", ids)
+        self.assertIn("en-za", ids)
         self.assertIn("af", ids)
+        self.assertTrue(has_catalog("en-us"))
+        self.assertTrue(has_catalog("en-gb"))
+        self.assertTrue(has_catalog("en-za"))
         self.assertTrue(has_catalog("en"))
         self.assertTrue(has_catalog("af"))
         af = next(lang for lang in langs if lang.id == "af")
         self.assertEqual(af.name, "Afrikaans")
-        self.assertEqual(supported_ids(), frozenset({"en", "af"}))
+        us = next(lang for lang in langs if lang.id == "en-us")
+        self.assertEqual(us.name, "English (US)")
+        gb = next(lang for lang in langs if lang.id == "en-gb")
+        self.assertEqual(gb.name, "English (UK)")
+        za = next(lang for lang in langs if lang.id == "en-za")
+        self.assertEqual(za.name, "English (South Africa)")
+        self.assertEqual(supported_ids(), frozenset({"en-us", "en-gb", "en-za", "af"}))
 
     def test_not_the_mockup_list(self) -> None:
         ids = supported_ids()
@@ -103,7 +124,20 @@ class PoTests(unittest.TestCase):
         self.assertEqual(_("Language"), "Taal")
         self.assertEqual(_("Other options"), "Ander opsies")
         self.assertEqual(_("Configured by {name}").format(name="Shop"), "Opgestel deur Shop")
-        apply_language("en")
+        apply_language("en-gb")
+        self.assertEqual(current_language(), "en-gb")
+        self.assertEqual(_("Network"), "Network")
+        self.assertEqual(_("Maximize"), "Maximise")
+        self.assertEqual(_("No Wi-Fi adapter"), "No Wi-Fi adaptor")
+        self.assertEqual(
+            _("The catalog checksum is not valid."),
+            "The catalogue checksum is not valid.",
+        )
+        apply_language("en-za")
+        self.assertEqual(current_language(), "en-za")
+        self.assertEqual(_("Maximize"), "Maximise")
+        apply_language("en-us")
+        self.assertEqual(_("Maximize"), "Maximize")
         self.assertEqual(_("Network"), "Network")
 
     def test_geen_has_no_trailing_nie(self) -> None:
@@ -141,14 +175,14 @@ class PoTests(unittest.TestCase):
             _("No internal disk to install to."),
             "Geen interne skyf om op te installeer",
         )
-        apply_language("en")
+        apply_language("en-us")
         self.assertEqual(_("Preparing the disk…"), "Preparing the disk…")
 
     def test_distro_description(self) -> None:
         apply_language("af")
         self.assertEqual(_("Popular and well-supported"), "Gewild en goed ondersteun")
         self.assertIn("Afgewerkte werkskerm", _("A polished desktop with excellent hardware support and a large software library. A safe default for most laptops."))
-        apply_language("en")
+        apply_language("en-us")
         self.assertEqual(_("Popular and well-supported"), "Popular and well-supported")
 
     def test_parse_escapes(self) -> None:
@@ -162,11 +196,14 @@ class LayoutTests(unittest.TestCase):
     def test_seed_and_po_files(self) -> None:
         repo = os.path.abspath(os.path.join(CHOOSER_DIR, ".."))
         self.assertTrue(os.path.isfile(os.path.join(repo, "po", "af.po")))
+        self.assertTrue(os.path.isfile(os.path.join(repo, "po", "en-gb.po")))
+        self.assertTrue(os.path.isfile(os.path.join(repo, "po", "en-za.po")))
         self.assertTrue(os.path.isfile(os.path.join(repo, "po", "firstboot.pot")))
         self.assertTrue(os.path.isfile(os.path.join(repo, "po", "languages.json")))
         self.assertTrue(
             os.path.isfile(os.path.join(CHOOSER_DIR, "firstboot-set-language"))
         )
+        self.assertTrue(os.path.isfile(os.path.join(repo, "po", "keyboards.json")))
         sudoers = os.path.join(
             repo, "seed", "overlay", "etc", "sudoers.d", "firstboot-language"
         )
@@ -178,24 +215,29 @@ class LayoutTests(unittest.TestCase):
 class PersistTests(unittest.TestCase):
     def test_file_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory(prefix="fbl-lang-") as tmp:
-            self.assertEqual(load_language(tmp), "en")
+            self.assertEqual(load_language(tmp), "en-us")
             write_language_file(tmp, "af")
             path = os.path.join(tmp, LANGUAGE_FILE)
             with open(path, encoding="utf-8") as fh:
                 self.assertEqual(fh.read().strip(), "af")
             self.assertEqual(load_language(tmp), "af")
-            self.assertEqual(load_language(tmp, "en"), "af")
+            self.assertEqual(load_language(tmp, "en-us"), "af")
             os.remove(path)
             self.assertEqual(load_language(tmp, "af"), "af")
             self.assertTrue(persist_language(tmp, "en"))
-            self.assertEqual(load_language(tmp, "af"), "en")
+            with open(path, encoding="utf-8") as fh:
+                self.assertEqual(fh.read().strip(), "en-us")
+            self.assertEqual(load_language(tmp, "af"), "en-us")
+            self.assertTrue(persist_language(tmp, "en-gb"))
+            self.assertEqual(load_language(tmp), "en-gb")
 
     def test_unsupported_file_falls_back(self) -> None:
         with tempfile.TemporaryDirectory(prefix="fbl-lang-") as tmp:
             path = os.path.join(tmp, LANGUAGE_FILE)
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write("de\n")
-            self.assertEqual(load_language(tmp, "en"), "en")
+            self.assertEqual(load_language(tmp, "en"), "en-us")
+            self.assertEqual(load_language(tmp, "en-us"), "en-us")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Timezone UTC, C.UTF-8 default, generate en_US.UTF-8.
+# Timezone UTC, C.UTF-8 default, generate English US/UK/ZA and Afrikaans.
 set -euo pipefail
 
 echo UTC > /etc/timezone
@@ -7,7 +7,7 @@ ln -sfn /usr/share/zoneinfo/UTC /etc/localtime
 
 if [[ -f /usr/share/i18n/SUPPORTED ]]; then
   mkdir -p /etc/locale.gen.d
-  printf 'C.UTF-8 UTF-8\nen_US.UTF-8 UTF-8\naf_ZA.UTF-8 UTF-8\n' > /etc/locale.gen
+  printf 'C.UTF-8 UTF-8\nen_US.UTF-8 UTF-8\nen_GB.UTF-8 UTF-8\nen_ZA.UTF-8 UTF-8\naf_ZA.UTF-8 UTF-8\n' > /etc/locale.gen
   locale-gen
 fi
 

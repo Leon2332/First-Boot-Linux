@@ -6,6 +6,7 @@ Do not feed this YAML to Mint or Fedora.
 
 from __future__ import annotations
 
+from firstboot.installlocale import InstallLocale
 from firstboot.osinstall.common import (
     OsIdentity,
     casper_boot_files,
@@ -127,8 +128,12 @@ exit 0
 
 
 def autoinstall_yaml(
-    identity: OsIdentity, target_path: str, serial: str = ""
+    identity: OsIdentity,
+    target_path: str,
+    serial: str = "",
+    locale: InstallLocale | None = None,
 ) -> str:
+    loc = locale or InstallLocale()
     path = kernel_disk_path(target_path)
     if serial:
         match = (
@@ -138,12 +143,19 @@ def autoinstall_yaml(
         )
     else:
         match = "      match:\n" f"        path: {yaml_str(path)}\n"
+    packs = ""
+    if loc.langpack and loc.langpack != "en":
+        packs = (
+            "    - curtin in-target -- apt-get install -y "
+            f"language-pack-{loc.langpack} language-pack-gnome-{loc.langpack} "
+            "|| true\n"
+        )
     return (
         "autoinstall:\n"
         "  version: 1\n"
-        "  locale: en_US.UTF-8\n"
+        f"  locale: {loc.glibc}\n"
         "  keyboard:\n"
-        "    layout: us\n"
+        f"    layout: {loc.keyboard}\n"
         "  identity:\n"
         f"    hostname: {yaml_str(identity.hostname)}\n"
         f"    realname: {yaml_str(identity.realname)}\n"
@@ -182,7 +194,8 @@ def autoinstall_yaml(
         "        for n in $(efibootmgr 2>/dev/null | sed -n 's/^Boot\\([0-9A-Fa-f]\\{4\\}\\).*First Boot Linux.*/\\1/p'); do\n"
         "          efibootmgr -b \"$n\" -B || true\n"
         "        done\n"
-        "  apt:\n"
+        + packs
+        + "  apt:\n"
         "    fallback: offline-install\n"
         "    geoip: false\n"
         "  shutdown: reboot\n"
@@ -190,9 +203,14 @@ def autoinstall_yaml(
 
 
 def cloud_config_user_data(
-    identity: OsIdentity, target_path: str, serial: str = ""
+    identity: OsIdentity,
+    target_path: str,
+    serial: str = "",
+    locale: InstallLocale | None = None,
 ) -> str:
-    return "#cloud-config\n" + autoinstall_yaml(identity, target_path, serial=serial)
+    return "#cloud-config\n" + autoinstall_yaml(
+        identity, target_path, serial=serial, locale=locale
+    )
 
 
 class Ubuntu2604:
@@ -207,11 +225,19 @@ class Ubuntu2604:
         return casper_kernel_args(iso_rel, toram=toram, extra=LINUX_EXTRA)
 
     def seed_files(
-        self, identity: OsIdentity, target_path: str, serial: str
+        self,
+        identity: OsIdentity,
+        target_path: str,
+        serial: str,
+        locale: InstallLocale | None = None,
     ) -> dict[str, str | bytes]:
         return {
-            "autoinstall.yaml": autoinstall_yaml(identity, target_path, serial=serial),
-            "user-data": cloud_config_user_data(identity, target_path, serial=serial),
+            "autoinstall.yaml": autoinstall_yaml(
+                identity, target_path, serial=serial, locale=locale
+            ),
+            "user-data": cloud_config_user_data(
+                identity, target_path, serial=serial, locale=locale
+            ),
             "scripts/casper-bottom/29fbl-autoinstall": CASPER_BOTTOM,
         }
 

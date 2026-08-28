@@ -287,11 +287,18 @@ func buildDATA(req Request, root string, isos map[string]string) error {
 	if err := os.WriteFile(filepath.Join(root, "retailer.conf"), []byte(catalog.RetailerFile(req.Retailer)), 0o644); err != nil {
 		return err
 	}
-	lang := strings.TrimSpace(req.Retailer.Language)
+	lang := catalog.CanonicalLanguage(req.Retailer.Language)
 	if lang == "" {
-		lang = "en"
+		lang = "en-us"
 	}
 	if err := os.WriteFile(filepath.Join(root, "language"), []byte(lang+"\n"), 0o644); err != nil {
+		return err
+	}
+	kbd := catalog.CanonicalKeyboard(req.Retailer.Keyboard)
+	if kbd == "" {
+		kbd = "us"
+	}
+	if err := os.WriteFile(filepath.Join(root, "keyboard"), []byte(kbd+"\n"), 0o644); err != nil {
 		return err
 	}
 	tz := catalog.NormalizeRetailerTimezone(req.Retailer.Timezone)

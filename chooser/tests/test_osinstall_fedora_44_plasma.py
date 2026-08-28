@@ -70,6 +70,8 @@ class Fedora44PlasmaTests(unittest.TestCase):
         self.assertIn("rm -f /etc/systemd/system/getty@tty1.service", text)
         self.assertIn("fbl-anaconda-gen", text)
         self.assertNotIn("%packages", text)
+        self.assertIn("lang en_US.UTF-8", text)
+        self.assertIn("keyboard --vckeymap=us --xlayouts='us'", text)
         self.assertNotIn("boot=casper", text)
         args = fedora_kernel_args(
             "/images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso",

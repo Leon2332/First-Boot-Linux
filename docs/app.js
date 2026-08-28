@@ -11,7 +11,9 @@
     { id: "da", name: "Dansk", en: "Danish" },
     { id: "de", name: "Deutsch", en: "German" },
     { id: "el", name: "Ελληνικά", en: "Greek" },
-    { id: "en", name: "English", en: "English" },
+    { id: "en-gb", name: "English (UK)", en: "English (UK)" },
+    { id: "en-us", name: "English (US)", en: "English (US)" },
+    { id: "en-za", name: "English (South Africa)", en: "English (South Africa)" },
     { id: "es", name: "Español", en: "Spanish" },
     { id: "et", name: "Eesti", en: "Estonian" },
     { id: "fi", name: "Suomi", en: "Finnish" },
@@ -385,7 +387,7 @@
       -720,
       Math.min(840, Math.round(-new Date().getTimezoneOffset() / 30) * 30)
     ),
-    language: "en",
+    language: "en-us",
     languageQuery: "",
   };
 

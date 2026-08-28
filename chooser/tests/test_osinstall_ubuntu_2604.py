@@ -39,3 +39,5 @@ class Ubuntu2604Tests(unittest.TestCase):
         self.assertIn('hostname: "shop-pc"', text)
         self.assertNotIn("/dev/disk/by-id/", text)
         self.assertIn("/media/filesystem", text)
+        self.assertIn("locale: en_US.UTF-8", text)
+        self.assertIn("layout: us", text)

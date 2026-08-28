@@ -143,9 +143,11 @@ func (s *session) state(w http.ResponseWriter, r *http.Request) {
 		seedErr = s.seedErr.Error()
 	}
 	langs, _ := catalog.LoadLanguages("")
+	boards, _ := catalog.LoadKeyboards("")
 	writeJSON(w, map[string]any{
 		"distros":       list,
 		"languages":     langs,
+		"keyboards":     boards,
 		"seed_ok":       seedOK,
 		"seed_error":    seedErr,
 		"default_image": defaultImagePath(),
@@ -302,6 +304,7 @@ type startReq struct {
 	Name          string   `json:"name"`
 	Support       string   `json:"support"`
 	Language      string   `json:"language"`
+	Keyboard      string   `json:"keyboard"`
 	Timezone      string   `json:"timezone"`
 	Password      string   `json:"password"`
 	EmptyPassword bool     `json:"empty_password"`
@@ -330,10 +333,12 @@ func (s *session) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	langs, _ := catalog.LoadLanguages("")
+	boards, _ := catalog.LoadKeyboards("")
 	retailer := catalog.Retailer{
 		Name: req.Name, Support: req.Support,
 		WallpaperDark: s.dark, WallpaperLight: s.light,
 		Language: catalog.NormalizeRetailerLanguage(req.Language, langs),
+		Keyboard: catalog.NormalizeRetailerKeyboard(req.Keyboard, boards),
 		Timezone: catalog.NormalizeRetailerTimezone(req.Timezone),
 	}
 	s.busy = true

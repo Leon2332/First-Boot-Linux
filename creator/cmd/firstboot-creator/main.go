@@ -44,7 +44,8 @@ func usage(w io.Writer) {
 compose / estimate options:
   --name NAME
   --support TEXT
-  --language CODE      default live language (en, af; default en)
+  --language CODE      default live language (en-us, en-gb, en-za, af; default en-us)
+  --keyboard CODE      keyboard layout (us, gb, de, …; default us; not from language)
   --timezone UTC±HHMM  default live time zone (UTC+0000 … UTC+0530 … UTC+1400)
   --stage spec,spec      desktops to stage (distro:edition; bare distro = its default)
   --seed DIR             First Boot seed (default: build/seed)
@@ -87,7 +88,8 @@ func runCompose(args []string) int {
 	dark := fs.String("wallpaper-dark", "", "")
 	light := fs.String("wallpaper-light", "", "")
 	pwFile := fs.String("password-file", "", "")
-	language := fs.String("language", "en", "")
+	language := fs.String("language", "en-us", "")
+	keyboard := fs.String("keyboard", "us", "")
 	timezone := fs.String("timezone", "UTC+0000", "")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -121,9 +123,11 @@ func runCompose(args []string) int {
 		return 1
 	}
 	langs, _ := catalog.LoadLanguages("")
+	boards, _ := catalog.LoadKeyboards("")
 	r := catalog.Retailer{
 		Name: *name, Support: *support, WallpaperDark: *dark, WallpaperLight: *light,
 		Language: catalog.NormalizeRetailerLanguage(*language, langs),
+		Keyboard: catalog.NormalizeRetailerKeyboard(*keyboard, boards),
 		Timezone: catalog.NormalizeRetailerTimezone(*timezone),
 	}
 	if err := catalog.ValidateRetailer(r); err != nil {

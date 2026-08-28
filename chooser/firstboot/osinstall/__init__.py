@@ -41,6 +41,7 @@ from firstboot.disk import (
 from firstboot.isodownload import DownloadError, dest_is_payload_image, download_iso
 from firstboot.install import blkid_uuid
 from firstboot.i18n import _, apply_payload_language
+from firstboot.installlocale import payload_install_locale
 from firstboot.payload import Distro, Edition
 
 from . import fedora_44_plasma, mint_223, ubuntu_2604
@@ -800,6 +801,7 @@ def prepare_os(
     identity: OsIdentity,
     *,
     on_progress: Callable[[int], None] | None = None,
+    payload_root: str | None = None,
 ) -> None:
     if not plan.available or plan.target is None or plan.live is None:
         raise OsInstallError(plan.reason or _("Cannot install."))
@@ -861,7 +863,8 @@ def prepare_os(
         prog(78)
 
         serial = disk_udev_serial(plan.target.path)
-        files = drv.seed_files(identity, plan.target.path, serial)
+        loc = payload_install_locale(payload_root)
+        files = drv.seed_files(identity, plan.target.path, serial, locale=loc)
         seed_copy = (
             files.get("autoinstall.yaml")
             or files.get("preseed.cfg")
@@ -924,8 +927,9 @@ def prepare_ubuntu(
     identity: OsIdentity,
     *,
     on_progress: Callable[[int], None] | None = None,
+    payload_root: str | None = None,
 ) -> None:
-    prepare_os(plan, identity, on_progress=on_progress)
+    prepare_os(plan, identity, on_progress=on_progress, payload_root=payload_root)
 
 
 def run_os_install(
@@ -1190,7 +1194,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     try:
         plan = _plan_from_args(args)
-        prepare_os(plan, identity)
+        prepare_os(plan, identity, payload_root=args.payload)
     except OsInstallError as exc:
         emit("ERROR", str(exc))
         return 1

@@ -338,7 +338,8 @@ func TestRetailerFile(t *testing.T) {
 		"support = support@example.com",
 		"wallpaper_dark = wallpapers/dark.jpg",
 		"wallpaper_light = wallpapers/light.jpg",
-		"language = en",
+		"language = en-us",
+		"keyboard = us",
 		"timezone = UTC+0000",
 	} {
 		if !strings.Contains(got, want) {
@@ -359,17 +360,52 @@ func TestLoadLanguages(t *testing.T) {
 	for _, lang := range langs {
 		ids[lang.ID] = true
 	}
-	if !ids["en"] || !ids["af"] {
-		t.Fatalf("expected en and af, got %#v", langs)
+	if !ids["en-us"] || !ids["en-gb"] || !ids["en-za"] || !ids["af"] {
+		t.Fatalf("expected en-us, en-gb, en-za, and af, got %#v", langs)
+	}
+	if ids["en"] {
+		t.Fatal("bare en should not be listed")
 	}
 	if ValidLanguage("de", langs) {
 		t.Fatal("de is not shipped")
 	}
-	if NormalizeRetailerLanguage("", langs) != "en" {
-		t.Fatal("empty language should be en")
+	if !ValidLanguage("en", langs) {
+		t.Fatal("en should alias to en-us")
+	}
+	if NormalizeRetailerLanguage("", langs) != "en-us" {
+		t.Fatal("empty language should be en-us")
+	}
+	if NormalizeRetailerLanguage("EN", langs) != "en-us" {
+		t.Fatal("EN should normalize to en-us")
 	}
 	if NormalizeRetailerLanguage("AF", langs) != "af" {
 		t.Fatal("AF should normalize to af")
+	}
+	if NormalizeRetailerLanguage("en-GB", langs) != "en-gb" {
+		t.Fatal("en-GB should stay en-gb")
+	}
+}
+
+func TestLoadKeyboards(t *testing.T) {
+	boards, err := LoadKeyboards("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := map[string]bool{}
+	for _, kb := range boards {
+		ids[kb.ID] = true
+	}
+	if !ids["us"] || !ids["gb"] {
+		t.Fatalf("expected us and gb, got %#v", boards)
+	}
+	if ValidKeyboard("nope", boards) {
+		t.Fatal("nope is not a layout")
+	}
+	if NormalizeRetailerKeyboard("", boards) != "us" {
+		t.Fatal("empty keyboard should be us")
+	}
+	if NormalizeRetailerKeyboard("GB", boards) != "gb" {
+		t.Fatal("GB should normalize to gb")
 	}
 }
 

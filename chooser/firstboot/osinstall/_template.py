@@ -21,6 +21,7 @@ changed.
 
 from __future__ import annotations
 
+from firstboot.installlocale import InstallLocale
 from firstboot.osinstall.common import (
     OsIdentity,
     OsInstallError,
@@ -47,7 +48,11 @@ class Example:
         return casper_kernel_args(iso_rel, toram=toram, extra=extra)
 
     def seed_files(
-        self, identity: OsIdentity, target_path: str, serial: str
+        self,
+        identity: OsIdentity,
+        target_path: str,
+        serial: str,
+        locale: InstallLocale | None = None,
     ) -> dict[str, str | bytes]:
         # Files injected into the last cpio of the installer initrd.
         # Keys are paths relative to the initrd root.

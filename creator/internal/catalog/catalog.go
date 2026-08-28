@@ -79,13 +79,46 @@ type languageFile struct {
 	Languages     []Language `json:"languages"`
 }
 
+type Keyboard struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type keyboardFile struct {
+	SchemaVersion int        `json:"schema_version"`
+	Keyboards     []Keyboard `json:"keyboards"`
+}
+
 type Retailer struct {
 	Name           string
 	Support        string
 	WallpaperDark  string
 	WallpaperLight string
 	Language       string
+	Keyboard       string
 	Timezone       string
+}
+
+var languageAliases = map[string]string{
+	"en":    "en-us",
+	"af-za": "af",
+}
+
+func CanonicalLanguage(id string) string {
+	id = strings.ToLower(strings.TrimSpace(id))
+	id = strings.ReplaceAll(id, "_", "-")
+	if a, ok := languageAliases[id]; ok {
+		return a
+	}
+	return id
+}
+
+func isEnglishID(id string) bool {
+	return id == "en" || strings.HasPrefix(id, "en-")
+}
+
+func CanonicalKeyboard(id string) string {
+	return strings.ToLower(strings.TrimSpace(id))
 }
 
 func LoadOfficial(path string) (*Official, error) {
@@ -250,7 +283,7 @@ func LoadLanguages(path string) ([]Language, error) {
 	out := make([]Language, 0, len(file.Languages))
 	seen := map[string]bool{}
 	for _, lang := range file.Languages {
-		id := strings.ToLower(strings.TrimSpace(lang.ID))
+		id := CanonicalLanguage(lang.ID)
 		name := strings.TrimSpace(lang.Name)
 		if id == "" || name == "" || seen[id] {
 			continue
@@ -262,8 +295,15 @@ func LoadLanguages(path string) ([]Language, error) {
 		}
 		out = append(out, Language{ID: id, Name: name, En: en})
 	}
-	if !seen["en"] {
-		out = append([]Language{{ID: "en", Name: "English", En: "English"}}, out...)
+	hasEnglish := false
+	for id := range seen {
+		if isEnglishID(id) {
+			hasEnglish = true
+			break
+		}
+	}
+	if !hasEnglish {
+		out = append([]Language{{ID: "en-us", Name: "English (US)", En: "English (US)"}}, out...)
 	}
 	if len(out) == 0 {
 		return fallbackLanguages(), nil
@@ -273,13 +313,15 @@ func LoadLanguages(path string) ([]Language, error) {
 
 func fallbackLanguages() []Language {
 	return []Language{
-		{ID: "en", Name: "English", En: "English"},
+		{ID: "en-us", Name: "English (US)", En: "English (US)"},
+		{ID: "en-gb", Name: "English (UK)", En: "English (UK)"},
+		{ID: "en-za", Name: "English (South Africa)", En: "English (South Africa)"},
 		{ID: "af", Name: "Afrikaans", En: "Afrikaans"},
 	}
 }
 
 func ValidLanguage(id string, langs []Language) bool {
-	id = strings.ToLower(strings.TrimSpace(id))
+	id = CanonicalLanguage(id)
 	if id == "" {
 		return false
 	}
@@ -292,11 +334,75 @@ func ValidLanguage(id string, langs []Language) bool {
 }
 
 func NormalizeRetailerLanguage(id string, langs []Language) string {
-	id = strings.ToLower(strings.TrimSpace(id))
+	id = CanonicalLanguage(id)
 	if ValidLanguage(id, langs) {
 		return id
 	}
-	return "en"
+	return "en-us"
+}
+
+func LoadKeyboards(path string) ([]Keyboard, error) {
+	if path == "" {
+		var err error
+		path, err = assets.KeyboardsJSON()
+		if err != nil {
+			return fallbackKeyboards(), nil
+		}
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fallbackKeyboards(), nil
+	}
+	var file keyboardFile
+	if err := json.Unmarshal(raw, &file); err != nil {
+		return nil, fmt.Errorf("keyboards: %w", err)
+	}
+	out := make([]Keyboard, 0, len(file.Keyboards))
+	seen := map[string]bool{}
+	for _, kb := range file.Keyboards {
+		id := CanonicalKeyboard(kb.ID)
+		name := strings.TrimSpace(kb.Name)
+		if id == "" || name == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, Keyboard{ID: id, Name: name})
+	}
+	if !seen["us"] {
+		out = append([]Keyboard{{ID: "us", Name: "English (US)"}}, out...)
+	}
+	if len(out) == 0 {
+		return fallbackKeyboards(), nil
+	}
+	return out, nil
+}
+
+func fallbackKeyboards() []Keyboard {
+	return []Keyboard{
+		{ID: "us", Name: "English (US)"},
+		{ID: "gb", Name: "English (UK)"},
+	}
+}
+
+func ValidKeyboard(id string, boards []Keyboard) bool {
+	id = CanonicalKeyboard(id)
+	if id == "" {
+		return false
+	}
+	for _, kb := range boards {
+		if kb.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func NormalizeRetailerKeyboard(id string, boards []Keyboard) string {
+	id = CanonicalKeyboard(id)
+	if ValidKeyboard(id, boards) {
+		return id
+	}
+	return "us"
 }
 
 func ValidateRetailer(r Retailer) error {
@@ -321,6 +427,13 @@ func ValidateRetailer(r Retailer) error {
 	}
 	if r.Language != "" && !ValidLanguage(r.Language, langs) {
 		return fmt.Errorf("unknown default language")
+	}
+	boards, err := LoadKeyboards("")
+	if err != nil {
+		return err
+	}
+	if r.Keyboard != "" && !ValidKeyboard(r.Keyboard, boards) {
+		return fmt.Errorf("unknown keyboard layout")
 	}
 	if r.Timezone != "" && !ValidTimezone(r.Timezone) {
 		return fmt.Errorf("unknown default time zone")
@@ -435,16 +548,21 @@ func oneLine(label, s string, min, max int) error {
 }
 
 func RetailerFile(r Retailer) string {
-	lang := strings.ToLower(strings.TrimSpace(r.Language))
+	lang := CanonicalLanguage(r.Language)
 	if lang == "" {
-		lang = "en"
+		lang = "en-us"
+	}
+	kbd := CanonicalKeyboard(r.Keyboard)
+	if kbd == "" {
+		kbd = "us"
 	}
 	tz := NormalizeRetailerTimezone(r.Timezone)
 	return fmt.Sprintf(
-		"schema_version = 1\nname = %s\nsupport = %s\nwallpaper_dark = wallpapers/dark.jpg\nwallpaper_light = wallpapers/light.jpg\nlanguage = %s\ntimezone = %s\n",
+		"schema_version = 1\nname = %s\nsupport = %s\nwallpaper_dark = wallpapers/dark.jpg\nwallpaper_light = wallpapers/light.jpg\nlanguage = %s\nkeyboard = %s\ntimezone = %s\n",
 		sanitizeValue(r.Name),
 		sanitizeValue(r.Support),
 		sanitizeValue(lang),
+		sanitizeValue(kbd),
 		sanitizeValue(tz),
 	)
 }

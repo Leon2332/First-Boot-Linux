@@ -272,6 +272,10 @@ install_chooser() {
     install -D -m 0644 "$REPO_DIR/po/languages.json" \
       "$ROOTFS/usr/share/firstboot/languages.json"
   fi
+  if [[ -f $REPO_DIR/po/keyboards.json ]]; then
+    install -D -m 0644 "$REPO_DIR/po/keyboards.json" \
+      "$ROOTFS/usr/share/firstboot/keyboards.json"
+  fi
   local po code
   for po in "$REPO_DIR/po/"*.po; do
     [[ -f $po ]] || continue
@@ -321,7 +325,7 @@ preseed() {
   chroot_run debconf-set-selections <<'EOF'
 tzdata tzdata/Areas select Etc
 tzdata tzdata/Zones/Etc select UTC
-locales locales/locales_to_be_generated multiselect C.UTF-8 UTF-8, en_US.UTF-8 UTF-8
+locales locales/locales_to_be_generated multiselect C.UTF-8 UTF-8, en_US.UTF-8 UTF-8, en_GB.UTF-8 UTF-8, en_ZA.UTF-8 UTF-8, af_ZA.UTF-8 UTF-8
 locales locales/default_environment_locale select C.UTF-8
 keyboard-configuration keyboard-configuration/layoutcode string us
 keyboard-configuration keyboard-configuration/modelcode string pc105

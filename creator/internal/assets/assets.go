@@ -147,6 +147,25 @@ func LanguagesJSON() (string, error) {
 	return FirstExisting(candidates...)
 }
 
+func KeyboardsJSON() (string, error) {
+	if env := os.Getenv("FIRSTBOOT_KEYBOARDS"); env != "" {
+		if fileExists(env) {
+			return env, nil
+		}
+		return "", fmt.Errorf("FIRSTBOOT_KEYBOARDS: %s not found", env)
+	}
+	exe := ExecutableDir()
+	candidates := sharePath("keyboards.json")
+	candidates = append(candidates,
+		filepath.Join(exe, "keyboards.json"),
+		filepath.Join(exe, "data", "keyboards.json"),
+	)
+	if repo, err := RepoRoot(""); err == nil {
+		candidates = append(candidates, filepath.Join(repo, "po", "keyboards.json"))
+	}
+	return FirstExisting(candidates...)
+}
+
 func OfficialCatalog() (string, error) {
 	if env := os.Getenv("FIRSTBOOT_OFFICIAL_CATALOG"); env != "" {
 		if fileExists(env) {

@@ -7,6 +7,7 @@ Do not feed Mint an autoinstall YAML. Do not pass only-ubiquity.
 
 from __future__ import annotations
 
+from firstboot.installlocale import InstallLocale
 from firstboot.osinstall.common import (
     OsIdentity,
     casper_boot_files,
@@ -93,24 +94,38 @@ def preseed_line(owner: str, key: str, kind: str, value: str) -> str:
     return f"{owner} {key} {kind} {value}"
 
 
-def mint_preseed(identity: OsIdentity, target_path: str) -> str:
+def mint_preseed(
+    identity: OsIdentity,
+    target_path: str,
+    locale: InstallLocale | None = None,
+) -> str:
     """Ubiquity preseed for Mint 22.3. Not Subiquity autoinstall."""
+    loc = locale or InstallLocale()
     disk = kernel_disk_path(target_path)
+    packs = loc.langpack if loc.langpack == "en" else f"en, {loc.langpack}"
     lines = [
-        preseed_line("d-i", "debian-installer/locale", "string", "en_US.UTF-8"),
-        preseed_line("d-i", "debian-installer/language", "string", "en"),
-        preseed_line("d-i", "debian-installer/country", "string", "US"),
-        preseed_line("d-i", "localechooser/languagelist", "string", "en"),
-        preseed_line("d-i", "languagechooser/language-name", "string", "English"),
-        preseed_line("d-i", "countrychooser/shortlist", "select", "US"),
+        preseed_line("d-i", "debian-installer/locale", "string", loc.glibc),
+        preseed_line("d-i", "debian-installer/language", "string", loc.di_language),
+        preseed_line("d-i", "debian-installer/country", "string", loc.di_country),
+        preseed_line("d-i", "localechooser/languagelist", "string", loc.di_language),
         preseed_line(
-            "d-i", "localechooser/supported-locales", "multiselect", "en_US.UTF-8"
+            "d-i", "languagechooser/language-name", "string", loc.di_name
         ),
-        preseed_line("d-i", "keyboard-configuration/layoutcode", "string", "us"),
-        preseed_line("d-i", "keyboard-configuration/xkb-keymap", "select", "us"),
+        preseed_line("d-i", "countrychooser/shortlist", "select", loc.di_country),
+        preseed_line(
+            "d-i", "localechooser/supported-locales", "multiselect", loc.glibc
+        ),
+        preseed_line("d-i", "pkgsel/install-language-support", "boolean", "true"),
+        preseed_line("d-i", "pkgsel/language-packs", "multiselect", packs),
+        preseed_line(
+            "d-i", "keyboard-configuration/layoutcode", "string", loc.keyboard
+        ),
+        preseed_line(
+            "d-i", "keyboard-configuration/xkb-keymap", "select", loc.keyboard
+        ),
         preseed_line("d-i", "keyboard-configuration/modelcode", "string", "pc105"),
         preseed_line("d-i", "console-setup/ask_detect", "boolean", "false"),
-        preseed_line("d-i", "console-setup/layoutcode", "string", "us"),
+        preseed_line("d-i", "console-setup/layoutcode", "string", loc.keyboard),
         preseed_line("d-i", "time/zone", "string", "UTC"),
         preseed_line("d-i", "clock-setup/utc", "boolean", "true"),
         preseed_line("d-i", "clock-setup/ntp", "boolean", "false"),
@@ -172,10 +187,14 @@ class Mint223:
         return casper_kernel_args(iso_rel, toram=toram, extra=LINUX_EXTRA)
 
     def seed_files(
-        self, identity: OsIdentity, target_path: str, serial: str
+        self,
+        identity: OsIdentity,
+        target_path: str,
+        serial: str,
+        locale: InstallLocale | None = None,
     ) -> dict[str, str | bytes]:
         return {
-            "preseed.cfg": mint_preseed(identity, target_path),
+            "preseed.cfg": mint_preseed(identity, target_path, locale=locale),
             "usr/lib/firstboot-efi-cleanup": EFI_CLEANUP,
             "scripts/casper-bottom/29fbl-mint": CASPER_BOTTOM,
         }

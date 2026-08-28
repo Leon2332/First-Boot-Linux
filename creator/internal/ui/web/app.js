@@ -298,7 +298,8 @@ async function startWrite() {
   const body = {
     name: $("name").value.trim(),
     support: $("support").value.trim(),
-    language: $("language").value || "en",
+    language: $("language").value || "en-us",
+    keyboard: $("keyboard").value || "us",
     timezone: $("timezone").value || "UTC+0000",
     password: $("empty-pw").checked ? "" : $("pass").value,
     empty_password: $("empty-pw").checked,
@@ -362,13 +363,25 @@ async function init() {
   langSel.innerHTML = "";
   const langs = state.languages && state.languages.length
     ? state.languages
-    : [{ id: "en", name: "English" }, { id: "af", name: "Afrikaans" }];
+    : [{ id: "en-us", name: "English (US)" }, { id: "en-gb", name: "English (UK)" }, { id: "en-za", name: "English (South Africa)" }, { id: "af", name: "Afrikaans" }];
   langs.forEach((lang) => {
     const o = document.createElement("option");
     o.value = lang.id;
     o.textContent = lang.name;
-    if (lang.id === "en") o.selected = true;
+    if (lang.id === "en-us") o.selected = true;
     langSel.appendChild(o);
+  });
+  const kbdSel = $("keyboard");
+  kbdSel.innerHTML = "";
+  const boards = state.keyboards && state.keyboards.length
+    ? state.keyboards
+    : [{ id: "us", name: "English (US)" }, { id: "gb", name: "English (UK)" }];
+  boards.forEach((kb) => {
+    const o = document.createElement("option");
+    o.value = kb.id;
+    o.textContent = kb.name;
+    if (kb.id === "us") o.selected = true;
+    kbdSel.appendChild(o);
   });
   const tzSel = $("timezone");
   tzSel.innerHTML = "";

@@ -41,6 +41,9 @@ fi
 if [ -f "$PYDIR/firstboot/render.py" ] && command -v python3 >/dev/null 2>&1; then
   eval "$(PYTHONPATH="$PYDIR" python3 -c 'from firstboot.render import emit_session_env; emit_session_env()')"
 fi
+if [ -f "$PYDIR/firstboot/keyboard.py" ] && command -v python3 >/dev/null 2>&1; then
+  eval "$(PYTHONPATH="$PYDIR" python3 -c 'from firstboot.keyboard import emit_session_env; emit_session_env()')"
+fi
 export GSK_RENDERER="${GSK_RENDERER:-cairo}"
 export WLR_RENDERER="${WLR_RENDERER:-pixman}"
 note "GSK_RENDERER=$GSK_RENDERER WLR_RENDERER=$WLR_RENDERER XCURSOR_THEME=$XCURSOR_THEME"

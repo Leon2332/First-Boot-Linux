@@ -1,7 +1,9 @@
 {
   "schema_version": 1,
   "languages": [
-    {"id": "en", "name": "English", "en": "English"},
+    {"id": "en-us", "name": "English (US)", "en": "English (US)"},
+    {"id": "en-gb", "name": "English (UK)", "en": "English (UK)"},
+    {"id": "en-za", "name": "English (South Africa)", "en": "English (South Africa)"},
     {"id": "af", "name": "Afrikaans", "en": "Afrikaans"}
   ]
 }

@@ -134,7 +134,8 @@ class LoadPayloadTests(unittest.TestCase):
         self.assertIsNotNone(p.retailer)
         assert p.retailer is not None
         self.assertEqual(p.retailer.name, "Example Computers")
-        self.assertEqual(p.retailer.language, "en")
+        self.assertEqual(p.retailer.language, "en-us")
+        self.assertEqual(p.retailer.keyboard, "us")
         self.assertIsNone(p.retailer.timezone)
         self.assertTrue(p.wallpaper_dark and p.wallpaper_dark.endswith("dark.jpg"))
         self.assertTrue(p.wallpaper_light and p.wallpaper_light.endswith("light.jpg"))
@@ -148,6 +149,27 @@ class LoadPayloadTests(unittest.TestCase):
         p = load_payload(self.tmp)
         assert p.retailer is not None
         self.assertEqual(p.retailer.language, "af")
+
+    def test_retailer_en_alias_is_en_us(self) -> None:
+        _write(
+            self.tmp,
+            "retailer.conf",
+            RETAILER + "language = en\n",
+        )
+        p = load_payload(self.tmp)
+        assert p.retailer is not None
+        self.assertEqual(p.retailer.language, "en-us")
+
+    def test_retailer_keyboard_optional(self) -> None:
+        _write(
+            self.tmp,
+            "retailer.conf",
+            RETAILER + "keyboard = gb\n",
+        )
+        p = load_payload(self.tmp)
+        assert p.retailer is not None
+        self.assertEqual(p.retailer.keyboard, "gb")
+        self.assertEqual(p.retailer.language, "en-us")
 
     def test_retailer_timezone_optional(self) -> None:
         _write(

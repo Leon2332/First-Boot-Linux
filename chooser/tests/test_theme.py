@@ -79,6 +79,8 @@ class ChooserEnvTests(unittest.TestCase):
     def test_session_and_labwc_disable_adw_portal(self) -> None:
         session = Path(CHOOSER_DIR, "firstboot-session").read_text(encoding="utf-8")
         self.assertIn("ADW_DISABLE_PORTAL=1", session)
+        self.assertIn("firstboot.keyboard", session)
+        self.assertIn("emit_session_env", session)
         sysinfo = Path(CHOOSER_DIR, "firstboot-sysinfo").read_text(encoding="utf-8")
         self.assertIn('ADW_DISABLE_PORTAL', sysinfo)
         labwc = Path(
