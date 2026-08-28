@@ -289,12 +289,12 @@ fi
 install -d -m 0755 "$MNT/data/wallpapers" "$MNT/data/images"
 wall_src=$REPO_DIR/docs/assets/Wallpaper
 if [[ -d $wall_src ]]; then
-  if [[ ! -f $MNT/data/wallpapers/dark.jpg && -f $wall_src/annie-spratt-nJGaLopCqJk-unsplash.jpg ]]; then
-    install -m 0644 "$wall_src/annie-spratt-nJGaLopCqJk-unsplash.jpg" \
+  if [[ ! -f $MNT/data/wallpapers/dark.jpg && -f $wall_src/felix-mittermeier-L4-16dmZ-1c-unsplash.jpg ]]; then
+    install -m 0644 "$wall_src/felix-mittermeier-L4-16dmZ-1c-unsplash.jpg" \
       "$MNT/data/wallpapers/dark.jpg"
   fi
-  if [[ ! -f $MNT/data/wallpapers/light.jpg && -f $wall_src/ands-mahardika--MRPyzpWsh0-unsplash.jpg ]]; then
-    install -m 0644 "$wall_src/ands-mahardika--MRPyzpWsh0-unsplash.jpg" \
+  if [[ ! -f $MNT/data/wallpapers/light.jpg && -f $wall_src/sarah-barr-zYPCi2V6Ig4-unsplash.jpg ]]; then
+    install -m 0644 "$wall_src/sarah-barr-zYPCi2V6Ig4-unsplash.jpg" \
       "$MNT/data/wallpapers/light.jpg"
   fi
 fi

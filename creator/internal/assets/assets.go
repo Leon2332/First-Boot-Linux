@@ -254,10 +254,10 @@ func DefaultWallpaper(which string) (string, error) {
 	switch which {
 	case "dark":
 		name = "dark.jpg"
-		unsplash = "annie-spratt-nJGaLopCqJk-unsplash.jpg"
+		unsplash = "felix-mittermeier-L4-16dmZ-1c-unsplash.jpg"
 	case "light":
 		name = "light.jpg"
-		unsplash = "ands-mahardika--MRPyzpWsh0-unsplash.jpg"
+		unsplash = "sarah-barr-zYPCi2V6Ig4-unsplash.jpg"
 	default:
 		return "", fmt.Errorf("wallpaper must be dark or light")
 	}

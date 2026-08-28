@@ -93,9 +93,9 @@ for po in "$REPO_DIR/po/"*.po; do
 done
 cp -a "$REPO_DIR/image/grub.cfg" "$share/boot/"
 cp -a "$REPO_DIR/image/efi-grub.cfg" "$share/boot/"
-cp -a "$REPO_DIR/docs/assets/Wallpaper/annie-spratt-nJGaLopCqJk-unsplash.jpg" \
+cp -a "$REPO_DIR/docs/assets/Wallpaper/felix-mittermeier-L4-16dmZ-1c-unsplash.jpg" \
   "$share/wallpapers/dark.jpg"
-cp -a "$REPO_DIR/docs/assets/Wallpaper/ands-mahardika--MRPyzpWsh0-unsplash.jpg" \
+cp -a "$REPO_DIR/docs/assets/Wallpaper/sarah-barr-zYPCi2V6Ig4-unsplash.jpg" \
   "$share/wallpapers/light.jpg"
 cp -a "$REPO_DIR/docs/assets/distros/"*.png "$share/logos/"
 cp -a "$REPO_DIR/docs/Logo/First Boot Linux.png" "$share/icon.png"

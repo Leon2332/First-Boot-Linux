@@ -26,6 +26,24 @@ func TestOfficialCatalogPrefersAppDir(t *testing.T) {
 	}
 }
 
+func TestDefaultWallpaperRepoSources(t *testing.T) {
+	t.Setenv("APPDIR", "")
+	dark, err := DefaultWallpaper("dark")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(dark) != "felix-mittermeier-L4-16dmZ-1c-unsplash.jpg" {
+		t.Fatalf("dark source %s", dark)
+	}
+	light, err := DefaultWallpaper("light")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(light) != "sarah-barr-zYPCi2V6Ig4-unsplash.jpg" {
+		t.Fatalf("light source %s", light)
+	}
+}
+
 func TestDefaultWallpaperPrefersAppDir(t *testing.T) {
 	dir := t.TempDir()
 	want := filepath.Join(dir, "usr", "share", "firstboot", "wallpapers", "dark.jpg")

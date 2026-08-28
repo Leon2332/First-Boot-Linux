@@ -99,9 +99,9 @@ cp -a "$REPO_DIR/creator/bin/firstboot-write-usb" "$stage/"
 cp -a "$REPO_DIR/schemas/official-catalog.json" "$stage/"
 cp -a "$REPO_DIR/image/grub.cfg" "$stage/boot/"
 cp -a "$REPO_DIR/image/efi-grub.cfg" "$stage/boot/"
-cp -a "$REPO_DIR/docs/assets/Wallpaper/annie-spratt-nJGaLopCqJk-unsplash.jpg" \
+cp -a "$REPO_DIR/docs/assets/Wallpaper/felix-mittermeier-L4-16dmZ-1c-unsplash.jpg" \
   "$stage/wallpapers/dark.jpg"
-cp -a "$REPO_DIR/docs/assets/Wallpaper/ands-mahardika--MRPyzpWsh0-unsplash.jpg" \
+cp -a "$REPO_DIR/docs/assets/Wallpaper/sarah-barr-zYPCi2V6Ig4-unsplash.jpg" \
   "$stage/wallpapers/light.jpg"
 cp -a "$OUT/README.md" "$stage/"
 
