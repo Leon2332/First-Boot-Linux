@@ -6,7 +6,7 @@
 
 A disposable first-boot appliance for PCs and laptops. Retailers pre-install it. The buyer picks a Linux distribution. First Boot Linux then installs that system and replaces itself.
 
-![First Boot Linux screenshot](docs/screenshots/Screenshot-From-2026-08-21.png)
+![First Boot Linux screenshot](docs/screenshots/Screenshot%20From%202026-08-28.png)
 <p align="center"><i>First Boot Linux desktop environment</i></p>
 
 
@@ -49,10 +49,10 @@ The USB Creator provides a method for pre-installing First Boot Linux with its c
 > [!Note]
 > Currently, only an AppImage is available.
 
-![First Boot Creator screenshot](docs/screenshots/usb-creator_step-1.png)
-![First Boot Creator screenshot](docs/screenshots/usb-creator_step-2.png)
-![First Boot Creator screenshot](docs/screenshots/usb-creator_step-3.png)
-![First Boot Creator screenshot](docs/screenshots/usb-creator_step-4.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-01.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-02.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-03.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-04.png)
 
 
 # Good practice for recommendations
