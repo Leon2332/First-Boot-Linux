@@ -24,6 +24,7 @@ import (
 	"github.com/Leon2332/First-Boot-Linux/creator/internal/catalog"
 	"github.com/Leon2332/First-Boot-Linux/creator/internal/compose"
 	"github.com/Leon2332/First-Boot-Linux/creator/internal/devices"
+	"github.com/Leon2332/First-Boot-Linux/creator/internal/i18n"
 	"github.com/Leon2332/First-Boot-Linux/creator/internal/seedpath"
 )
 
@@ -75,6 +76,7 @@ func Run() error {
 	}
 	mux.Handle("/", http.FileServer(http.FS(static)))
 	mux.HandleFunc("/api/state", s.state)
+	mux.HandleFunc("/api/ui-language", s.setUILanguage)
 	mux.HandleFunc("/api/estimate", s.estimate)
 	mux.HandleFunc("/api/devices", s.listDevices)
 	mux.HandleFunc("/api/wallpaper", s.uploadWallpaper)
@@ -144,13 +146,39 @@ func (s *session) state(w http.ResponseWriter, r *http.Request) {
 	}
 	langs, _ := catalog.LoadLanguages("")
 	boards, _ := catalog.LoadKeyboards("")
+	uiLang := i18n.Load()
 	writeJSON(w, map[string]any{
 		"distros":       list,
-		"languages":     langs,
+		"languages":     i18n.Supported(langs),
 		"keyboards":     boards,
+		"ui_language":   uiLang,
+		"catalog":       i18n.CatalogFor(uiLang),
 		"seed_ok":       seedOK,
 		"seed_error":    seedErr,
 		"default_image": defaultImagePath(),
+	})
+}
+
+func (s *session) setUILanguage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Language string `json:"language"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, 400, err)
+		return
+	}
+	lid, err := i18n.Save(req.Language)
+	if err != nil {
+		httpError(w, 500, err)
+		return
+	}
+	writeJSON(w, map[string]any{
+		"language": lid,
+		"catalog":  i18n.CatalogFor(lid),
 	})
 }
 
@@ -185,6 +213,8 @@ func (s *session) estimate(w http.ResponseWriter, r *http.Request) {
 		"hint":     "On this stick: " + strings.Join(names, ", ") + ".",
 		"stick_gb": est.StickGB,
 		"disk_gb":  est.DiskGB,
+		"need":     est.NeedHuman,
+		"names":    names,
 	})
 }
 

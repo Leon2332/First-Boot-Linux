@@ -459,3 +459,198 @@ msgstr "Die katalogus-kontrolesom is ongeldig."
 
 msgid "Not enough space for this image (need about {size} GB free)."
 msgstr "Nie genoeg spasie vir hierdie beeld nie (sowat {size} GB vrye spasie word benodig)."
+
+msgid "USB creator"
+msgstr "USB-skepper"
+
+msgid "First Boot — USB creator"
+msgstr "First Boot — USB-skepper"
+
+msgid "Shop"
+msgstr "Winkel"
+
+msgid "Look"
+msgstr "Voorkoms"
+
+msgid "Recommendations"
+msgstr "Aanbevelings"
+
+msgid "Write"
+msgstr "Skryf"
+
+msgid "Shop details"
+msgstr "Winkelbesonderhede"
+
+msgid "Shop name"
+msgstr "Winkelnaam"
+
+msgid "Support"
+msgstr "Hulpraad"
+
+msgid "Default language"
+msgstr "Standaardtaal"
+
+msgid "Keyboard layout"
+msgstr "Sleutelborduitleg"
+
+msgid "Default time zone"
+msgstr "Standaardtydsone"
+
+msgid "Support password"
+msgstr "Hulpraadwagwoord"
+
+msgid "Used on tty2 and for sudo"
+msgstr "Word op tty2 en vir sudo gebruik"
+
+msgid "Same password again"
+msgstr "Dieselfde wagwoord weer"
+
+msgid "Example Computers"
+msgstr "Voorbeeld Rekenaars"
+
+msgid "VM / test image — leave the live user unlocked"
+msgstr "VM-/toetsbeeld — laat die lewendige gebruiker oopgesluit"
+
+msgid "Wallpapers"
+msgstr "Agtergronde"
+
+msgid "The live session switches between these with Dark Style. First Boot defaults are already selected."
+msgstr "Die lewendige sessie wissel tussen hierdie met Donker styl. First Boot se standaardwaardes is reeds gekies."
+
+msgid "Dark"
+msgstr "Donker"
+
+msgid "Light"
+msgstr "Lig"
+
+msgid "Dark wallpaper"
+msgstr "Donker agtergrond"
+
+msgid "Light wallpaper"
+msgstr "Lig agtergrond"
+
+msgid "Choose image…"
+msgstr "Kies beeld…"
+
+msgid "Reset to First Boot defaults"
+msgstr "Stel First Boot-standaardwaardes terug"
+
+msgid "Recommended options"
+msgstr "Aanbevole opsies"
+
+msgid "Tick up to 5 desktops to recommend and keep on the USB. Customers can download the rest."
+msgstr "Merk tot 5 werkskerms om aan te beveel en op die USB te hou. Kliënte kan die res aflaai."
+
+msgid "Selected desktops"
+msgstr "Gekose werkskerms"
+
+msgid "The creator builds a partitioned disk image first. Writing a stick only needs permission for that last copy."
+msgstr "Die skepper bou eers ’n skyfbeeld met partisies. Om ’n stokkie te skryf, word slegs toestemming vir daardie laaste kopie benodig."
+
+msgid "Save a disk image (boot it in a VM, or write later)"
+msgstr "Stoor ’n skyfbeeld (laai dit in ’n VM, of skryf later)"
+
+msgid "Write a USB stick now"
+msgstr "Skryf nou ’n USB-stokkie"
+
+msgid "Disk image"
+msgstr "Skyfbeeld"
+
+msgid "USB stick"
+msgstr "USB-stokkie"
+
+msgid "Refresh"
+msgstr "Verfris"
+
+msgid "Your disk will be formatted. All data will be permanently erased."
+msgstr "Jou skyf sal geformateer word. Alle data sal permanent uitgevee word."
+
+msgid "Continue"
+msgstr "Gaan voort"
+
+msgid "Enter the shop name."
+msgstr "Voer die winkelnaam in."
+
+msgid "Enter a support contact."
+msgstr "Voer ’n hulpraadkontak in."
+
+msgid "Set a support password, or tick the VM option."
+msgstr "Stel ’n hulpraadwagwoord, of merk die VM-opsie."
+
+msgid "Use at least 6 characters."
+msgstr "Gebruik minstens 6 karakters."
+
+msgid "Tick at least one desktop to keep on the USB."
+msgstr "Merk minstens een werkskerm om op die USB te hou."
+
+msgid "No First Boot seed on this computer."
+msgstr "Geen First Boot-saad op hierdie rekenaar."
+
+msgid "Choose a USB stick."
+msgstr "Kies ’n USB-stokkie."
+
+msgid "Choose a USB stick"
+msgstr "Kies ’n USB-stokkie"
+
+msgid "Choose where to save the disk image."
+msgstr "Kies waar om die skyfbeeld te stoor."
+
+msgid "{size} · on the USB"
+msgstr "{size} · op die USB"
+
+msgid "Install support is not ready"
+msgstr "Installasie-ondersteuning is nie gereed nie"
+
+msgid "Building disk image"
+msgstr "Bou skyfbeeld"
+
+msgid "Writing to disk"
+msgstr "Skryf na skyf"
+
+msgid "Downloading image"
+msgstr "Laai beeld af"
+
+msgid "Starting…"
+msgstr "Begin…"
+
+msgid "Waiting for permission…"
+msgstr "Wag vir toestemming…"
+
+msgid "Stopped."
+msgstr "Gestop."
+
+msgid "Cancelled."
+msgstr "Gekanselleer."
+
+msgid "Done."
+msgstr "Klaar."
+
+msgid "Done. You can boot PCs from that stick."
+msgstr "Klaar. Jy kan rekenaars van daardie stokkie af laai."
+
+msgid "Done. Disk image saved to {path}"
+msgstr "Klaar. Skyfbeeld gestoor by {path}"
+
+msgid "Working…"
+msgstr "Werk tans…"
+
+msgid "Ready."
+msgstr "Gereed."
+
+msgid "Formatting the system partition…"
+msgstr "Formateer die stelselpartisie…"
+
+msgid "Formatting the data partition…"
+msgstr "Formateer die datapartisie…"
+
+msgid "Formatting the boot partition…"
+msgstr "Formateer die selflaaipartisie…"
+
+msgid "This set needs {size} on the stick. Use a {stick} GB USB. The PC you install onto should have at least {disk} GB so the chosen OS can unpack."
+msgstr "Hierdie stel benodig {size} op die stokkie. Gebruik ’n {stick} GB USB. Die rekenaar waarop jy installeer, moet minstens {disk} GB hê sodat die gekose OS kan uitpak."
+
+msgid "On this stick: {names}."
+msgstr "Op hierdie stokkie: {names}."
+
+msgid "Erase {device} ({label}) and write First Boot?"
+msgstr "Vee {device} ({label}) uit en skryf First Boot?"

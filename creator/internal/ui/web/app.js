@@ -1,10 +1,88 @@
-const steps = ["Shop", "Look", "Recommendations", "Write"];
+const STEP_KEYS = ["Shop", "Look", "Recommendations", "Write"];
+const HTML_LANG = { "en-us": "en-US", "en-gb": "en-GB", "en-za": "en-ZA", "af": "af" };
+const STAGE_MSG = {
+  "Starting…": "Starting…",
+  "Waiting for permission…": "Waiting for permission…",
+  "Stopped.": "Stopped.",
+  "Cancelled.": "Cancelled.",
+  "Writing to disk": "Writing to disk",
+  "done": "Done.",
+  "assemble disk": "Building disk image",
+  "format FBL-SYS": "Formatting the system partition…",
+  "format FBL-DATA": "Formatting the data partition…",
+  "format FBL-ESP": "Formatting the boot partition…",
+};
+
 let state = null;
 let step = 0;
 let busy = false;
 let barFrac = 0;
+let catalog = {};
+let uiLang = "en-us";
+let lastError = "";
+let lastStage = "Ready.";
+let lastTasks = [];
 
 const $ = (id) => document.getElementById(id);
+
+function t(msg, vars) {
+  let out = (catalog && catalog[msg]) || msg;
+  if (vars) {
+    Object.keys(vars).forEach((k) => {
+      out = out.split("{" + k + "}").join(String(vars[k]));
+    });
+  }
+  return out;
+}
+
+function applyI18n() {
+  document.documentElement.lang = HTML_LANG[uiLang] || uiLang;
+  document.title = t("First Boot — USB creator");
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    el.textContent = t(el.getAttribute("data-i18n"));
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+    el.placeholder = t(el.getAttribute("data-i18n-placeholder"));
+  });
+  document.querySelectorAll("[data-i18n-aria]").forEach((el) => {
+    const src = el.getAttribute("data-i18n-aria");
+    el.setAttribute("aria-label", t(src));
+    if (el.hasAttribute("title")) el.setAttribute("title", t(src));
+  });
+  document.querySelectorAll("[data-i18n-alt]").forEach((el) => {
+    el.setAttribute("alt", t(el.getAttribute("data-i18n-alt")));
+  });
+  const pop = $("ui-lang-pop");
+  if (pop) pop.setAttribute("aria-label", t("Language"));
+  showError(lastError);
+  if ($("status")) $("status").textContent = tStage(lastStage);
+  renderLangPopover();
+  renderTasks(lastTasks);
+}
+
+function tStage(stage) {
+  if (!stage) return t("Working…");
+  if (STAGE_MSG[stage]) return t(STAGE_MSG[stage]);
+  if (catalog[stage]) return catalog[stage];
+  const saved = "Done. Disk image saved to ";
+  if (stage.startsWith(saved)) {
+    return t("Done. Disk image saved to {path}", { path: stage.slice(saved.length) });
+  }
+  if (stage.startsWith("download ")) {
+    return t("Downloading {name}", { name: stage.slice("download ".length) });
+  }
+  return t(stage);
+}
+
+function tLabel(label) {
+  if (!label) return "";
+  if (catalog[label]) return catalog[label];
+  const prefix = "Downloading ";
+  if (label.startsWith(prefix) && label.length > prefix.length) {
+    return t("Downloading {name}", { name: label.slice(prefix.length) });
+  }
+  return t(label);
+}
 
 async function api(path, opts) {
   const res = await fetch(path, opts);
@@ -16,16 +94,17 @@ async function api(path, opts) {
 }
 
 function showError(msg) {
-  $("error").textContent = msg || "";
+  lastError = msg || "";
+  $("error").textContent = lastError ? t(lastError) : "";
 }
 
 function renderSteps() {
   const nav = $("steps");
   nav.innerHTML = "";
-  steps.forEach((name, i) => {
+  STEP_KEYS.forEach((key, i) => {
     const b = document.createElement("button");
     b.type = "button";
-    b.innerHTML = `<span class="n">${i + 1}</span>${name}`;
+    b.innerHTML = `<span class="n">${i + 1}</span>${escapeHtml(t(key))}`;
     if (i === step) b.classList.add("current");
     else if (i < step) b.classList.add("done");
     b.disabled = i > step || busy;
@@ -88,20 +167,20 @@ function card(d) {
     const checked = ticked.includes(key);
     const locked = !ready || (full && !checked);
     const meta = ready
-      ? `${escapeHtml(ed.size)} · on the USB`
-      : "Install support is not ready";
+      ? t("{size} · on the USB", { size: ed.size })
+      : t("Install support is not ready");
     return `<label class="edition">
       <input type="checkbox" data-key="${escapeHtml(key)}" data-ready="${ready ? "1" : "0"}" ${checked ? "checked" : ""} ${locked ? "disabled" : ""}>
       <span class="ed-name">${escapeHtml(ed.name)}</span>
-      <span class="ed-meta">${meta}</span>
+      <span class="ed-meta">${escapeHtml(meta)}</span>
     </label>`;
   }).join("");
   el.innerHTML = `
     ${src ? `<img class="logo" src="${src}" alt="">` : "<span></span>"}
     <div>
       <h3>${escapeHtml(d.name)}</h3>
-      <p class="meta">${escapeHtml(d.version)} · ${escapeHtml(d.tagline)}</p>
-      <p>${escapeHtml(d.description)}</p>
+      <p class="meta">${escapeHtml(d.version)} · ${escapeHtml(t(d.tagline))}</p>
+      <p>${escapeHtml(t(d.description))}</p>
       <div class="editions">${editions}</div>
     </div>`;
   el.querySelectorAll("input[type=checkbox]").forEach((box) => {
@@ -204,10 +283,18 @@ async function refreshEstimate() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ staged: selected() }),
     });
-    $("size").textContent = est.summary;
-    $("hint").textContent = est.hint || "";
+    $("size").textContent = t(
+      "This set needs {size} on the stick. Use a {stick} GB USB. The PC you install onto should have at least {disk} GB so the chosen OS can unpack.",
+      {
+        size: est.need || "",
+        stick: String(est.stick_gb ?? ""),
+        disk: String(est.disk_gb ?? ""),
+      }
+    );
+    const names = (est.names || []).join(", ");
+    $("hint").textContent = names ? t("On this stick: {names}.", { names }) : "";
   } catch (e) {
-    $("size").textContent = e.message;
+    $("size").textContent = t(e.message);
     $("hint").textContent = "";
   }
 }
@@ -219,7 +306,7 @@ async function refreshDisks() {
   sel.innerHTML = "";
   const opt0 = document.createElement("option");
   opt0.value = "";
-  opt0.textContent = "Choose a USB stick";
+  opt0.textContent = t("Choose a USB stick");
   sel.appendChild(opt0);
   (data.disks || []).forEach((d) => {
     const o = document.createElement("option");
@@ -239,6 +326,7 @@ function updateDiskWarn() {
 }
 
 function renderTasks(tasks) {
+  lastTasks = tasks || [];
   const list = $("task-list");
   if (!tasks || !tasks.length) {
     list.hidden = true;
@@ -246,9 +334,9 @@ function renderTasks(tasks) {
     return;
   }
   list.hidden = false;
-  list.innerHTML = tasks.map((t) => {
-    const st = t.status === "done" || t.status === "active" || t.status === "error" ? t.status : "pending";
-    return `<li class="${st}"><span class="task-mark" aria-hidden="true"></span><span>${escapeHtml(t.label)}</span></li>`;
+  list.innerHTML = tasks.map((tk) => {
+    const st = tk.status === "done" || tk.status === "active" || tk.status === "error" ? tk.status : "pending";
+    return `<li class="${st}"><span class="task-mark" aria-hidden="true"></span><span>${escapeHtml(tLabel(tk.label))}</span></li>`;
   }).join("");
 }
 
@@ -260,12 +348,12 @@ function render() {
   $("back").disabled = step === 0 || busy;
   const next = $("next");
   if (busy) {
-    next.textContent = "Cancel";
+    next.textContent = t("Cancel");
     next.classList.remove("primary");
     next.classList.add("danger");
     next.disabled = false;
   } else {
-    next.textContent = step === 3 ? "Write" : "Continue";
+    next.textContent = step === 3 ? t("Write") : t("Continue");
     next.classList.add("primary");
     next.classList.remove("danger");
     next.disabled = false;
@@ -311,7 +399,10 @@ async function startWrite() {
   if (target === "usb") {
     const disk = (await api("/api/devices")).disks.find((d) => d.path === body.device);
     const label = disk ? disk.label : body.device;
-    if (!confirm(`Your disk will be formatted. All data will be permanently erased.\n\nErase ${body.device} (${label}) and write First Boot?`)) {
+    const msg = t("Your disk will be formatted. All data will be permanently erased.")
+      + "\n\n"
+      + t("Erase {device} ({label}) and write First Boot?", { device: body.device, label });
+    if (!confirm(msg)) {
       return;
     }
   }
@@ -326,7 +417,9 @@ async function startWrite() {
       body: JSON.stringify(body),
     });
     const first = await api("/api/progress");
+    lastStage = first.stage || "Starting…";
     renderTasks(first.tasks);
+    $("status").textContent = tStage(lastStage);
     poll();
   } catch (e) {
     busy = false;
@@ -340,11 +433,15 @@ async function poll() {
     const p = await api("/api/progress");
     renderTasks(p.tasks);
     setBar(p.fraction || 0);
-    $("status").textContent = p.stage || "Working…";
+    lastStage = p.stage || "Working…";
+    $("status").textContent = tStage(lastStage);
     if (p.done) {
       busy = false;
       if (p.error) showError(p.error);
-      else $("status").textContent = p.stage || "Done.";
+      else {
+        lastStage = p.stage || "Done.";
+        $("status").textContent = tStage(lastStage);
+      }
       render();
       return;
     }
@@ -357,8 +454,79 @@ async function poll() {
   setTimeout(poll, 250);
 }
 
+function closeLangPop() {
+  const pop = $("ui-lang-pop");
+  const btn = $("ui-lang-btn");
+  if (!pop || pop.hidden) return;
+  pop.hidden = true;
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function toggleLangPop() {
+  const pop = $("ui-lang-pop");
+  const btn = $("ui-lang-btn");
+  if (!pop) return;
+  const open = pop.hidden;
+  pop.hidden = !open;
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) renderLangPopover();
+}
+
+function renderLangPopover() {
+  const list = $("ui-lang-list");
+  if (!list) return;
+  list.innerHTML = "";
+  const langs = state?.languages && state.languages.length
+    ? state.languages
+    : [{ id: "en-us", name: "English (US)" }, { id: "af", name: "Afrikaans" }];
+  langs.forEach((lang) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "lang-item";
+    b.setAttribute("role", "option");
+    b.setAttribute("aria-selected", lang.id === uiLang ? "true" : "false");
+    b.dataset.id = lang.id;
+    const name = document.createElement("span");
+    name.textContent = lang.name;
+    b.appendChild(name);
+    if (lang.id === uiLang) {
+      const check = document.createElement("span");
+      check.className = "lang-check";
+      check.setAttribute("aria-hidden", "true");
+      b.appendChild(check);
+    }
+    b.onclick = () => { setUILanguage(lang.id); };
+    list.appendChild(b);
+  });
+}
+
+async function setUILanguage(id) {
+  if (!id) return;
+  try {
+    const data = await api("/api/ui-language", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language: id }),
+    });
+    uiLang = data.language || id;
+    catalog = data.catalog || {};
+    applyI18n();
+    render();
+    renderDistros();
+    if (step === 3) {
+      refreshEstimate().catch(() => {});
+      refreshDisks().catch(() => {});
+    }
+    closeLangPop();
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
 async function init() {
   state = await api("/api/state");
+  uiLang = state.ui_language || "en-us";
+  catalog = state.catalog || {};
   const langSel = $("language");
   langSel.innerHTML = "";
   const langs = state.languages && state.languages.length
@@ -398,11 +566,24 @@ async function init() {
   $("img-path").value = state.default_image;
   $("dark-preview").src = "/api/wallpaper/dark";
   $("light-preview").src = "/api/wallpaper/light";
+  applyI18n();
+  lastStage = "Ready.";
+  $("status").textContent = t("Ready.");
   renderDistros();
   $("distro-search").addEventListener("input", renderDistros);
   $("distro-search").addEventListener("search", renderDistros);
   await refreshDisks();
   render();
+
+  $("ui-lang-btn").onclick = (e) => {
+    e.stopPropagation();
+    toggleLangPop();
+  };
+  $("ui-lang-pop").addEventListener("click", (e) => e.stopPropagation());
+  document.addEventListener("click", () => closeLangPop());
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeLangPop();
+  });
 
   $("back").onclick = () => { if (step > 0 && !busy) { step--; showError(""); render(); } };
   $("next").onclick = async () => {

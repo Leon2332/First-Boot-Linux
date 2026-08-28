@@ -185,6 +185,17 @@ class PoTests(unittest.TestCase):
         apply_language("en-us")
         self.assertEqual(_("Popular and well-supported"), "Popular and well-supported")
 
+    def test_creator_strings(self) -> None:
+        apply_language("af")
+        self.assertEqual(_("USB creator"), "USB-skepper")
+        self.assertEqual(_("Shop details"), "Winkelbesonderhede")
+        self.assertEqual(_("Continue"), "Gaan voort")
+        self.assertEqual(_("Default language"), "Standaardtaal")
+        apply_language("en-us")
+        self.assertEqual(_("USB creator"), "USB creator")
+        apply_language("en-gb")
+        self.assertEqual(_("USB creator"), "USB creator")
+
     def test_parse_escapes(self) -> None:
         catalog = parse_po(
             'msgid "Say \\"hi\\"\\n"\nmsgstr "Sê \\"hallo\\"\\n"\n'
@@ -199,6 +210,10 @@ class LayoutTests(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(repo, "po", "en-gb.po")))
         self.assertTrue(os.path.isfile(os.path.join(repo, "po", "en-za.po")))
         self.assertTrue(os.path.isfile(os.path.join(repo, "po", "firstboot.pot")))
+        with open(os.path.join(repo, "po", "firstboot.pot"), encoding="utf-8") as fh:
+            pot = fh.read()
+        self.assertIn('msgid "USB creator"', pot)
+        self.assertIn('msgid "Shop details"', pot)
         self.assertTrue(os.path.isfile(os.path.join(repo, "po", "languages.json")))
         self.assertTrue(
             os.path.isfile(os.path.join(CHOOSER_DIR, "firstboot-set-language"))

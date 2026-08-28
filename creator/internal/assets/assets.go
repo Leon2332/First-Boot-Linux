@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -126,6 +127,40 @@ func sharePath(elem ...string) []string {
 		out = append(out, filepath.Join(append([]string{d, "usr", "bin"}, elem...)...))
 	}
 	return out
+}
+
+func CatalogPO(id string) (string, error) {
+	id = strings.ToLower(strings.TrimSpace(id))
+	id = strings.ReplaceAll(id, "_", "-")
+	if id == "" {
+		return "", fmt.Errorf("empty language id")
+	}
+	if env := os.Getenv("FIRSTBOOT_LOCALE"); env != "" {
+		if dirExists(env) {
+			p, err := FirstExisting(
+				filepath.Join(env, id+".po"),
+				filepath.Join(env, id, "LC_MESSAGES", "firstboot.po"),
+			)
+			if err != nil {
+				return "", fmt.Errorf("FIRSTBOOT_LOCALE: no catalog for %s", id)
+			}
+			return p, nil
+		}
+		return "", fmt.Errorf("FIRSTBOOT_LOCALE: %s not found", env)
+	}
+	exe := ExecutableDir()
+	candidates := sharePath("locale", id+".po")
+	candidates = append(candidates, sharePath("locale", id, "LC_MESSAGES", "firstboot.po")...)
+	candidates = append(candidates, sharePath(id+".po")...)
+	candidates = append(candidates,
+		filepath.Join(exe, "locale", id+".po"),
+		filepath.Join(exe, id+".po"),
+		filepath.Join(exe, "data", id+".po"),
+	)
+	if repo, err := RepoRoot(""); err == nil {
+		candidates = append(candidates, filepath.Join(repo, "po", id+".po"))
+	}
+	return FirstExisting(candidates...)
 }
 
 func LanguagesJSON() (string, error) {

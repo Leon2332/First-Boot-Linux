@@ -447,3 +447,198 @@ msgstr ""
 
 msgid "Not enough space for this image (need about {size} GB free)."
 msgstr ""
+
+msgid "USB creator"
+msgstr ""
+
+msgid "First Boot — USB creator"
+msgstr ""
+
+msgid "Shop"
+msgstr ""
+
+msgid "Look"
+msgstr ""
+
+msgid "Recommendations"
+msgstr ""
+
+msgid "Write"
+msgstr ""
+
+msgid "Shop details"
+msgstr ""
+
+msgid "Shop name"
+msgstr ""
+
+msgid "Support"
+msgstr ""
+
+msgid "Default language"
+msgstr ""
+
+msgid "Keyboard layout"
+msgstr ""
+
+msgid "Default time zone"
+msgstr ""
+
+msgid "Support password"
+msgstr ""
+
+msgid "Used on tty2 and for sudo"
+msgstr ""
+
+msgid "Same password again"
+msgstr ""
+
+msgid "Example Computers"
+msgstr ""
+
+msgid "VM / test image — leave the live user unlocked"
+msgstr ""
+
+msgid "Wallpapers"
+msgstr ""
+
+msgid "The live session switches between these with Dark Style. First Boot defaults are already selected."
+msgstr ""
+
+msgid "Dark"
+msgstr ""
+
+msgid "Light"
+msgstr ""
+
+msgid "Dark wallpaper"
+msgstr ""
+
+msgid "Light wallpaper"
+msgstr ""
+
+msgid "Choose image…"
+msgstr ""
+
+msgid "Reset to First Boot defaults"
+msgstr ""
+
+msgid "Recommended options"
+msgstr ""
+
+msgid "Tick up to 5 desktops to recommend and keep on the USB. Customers can download the rest."
+msgstr ""
+
+msgid "Selected desktops"
+msgstr ""
+
+msgid "The creator builds a partitioned disk image first. Writing a stick only needs permission for that last copy."
+msgstr ""
+
+msgid "Save a disk image (boot it in a VM, or write later)"
+msgstr ""
+
+msgid "Write a USB stick now"
+msgstr ""
+
+msgid "Disk image"
+msgstr ""
+
+msgid "USB stick"
+msgstr ""
+
+msgid "Refresh"
+msgstr ""
+
+msgid "Your disk will be formatted. All data will be permanently erased."
+msgstr ""
+
+msgid "Continue"
+msgstr ""
+
+msgid "Enter the shop name."
+msgstr ""
+
+msgid "Enter a support contact."
+msgstr ""
+
+msgid "Set a support password, or tick the VM option."
+msgstr ""
+
+msgid "Use at least 6 characters."
+msgstr ""
+
+msgid "Tick at least one desktop to keep on the USB."
+msgstr ""
+
+msgid "No First Boot seed on this computer."
+msgstr ""
+
+msgid "Choose a USB stick."
+msgstr ""
+
+msgid "Choose a USB stick"
+msgstr ""
+
+msgid "Choose where to save the disk image."
+msgstr ""
+
+msgid "{size} · on the USB"
+msgstr ""
+
+msgid "Install support is not ready"
+msgstr ""
+
+msgid "Building disk image"
+msgstr ""
+
+msgid "Writing to disk"
+msgstr ""
+
+msgid "Downloading image"
+msgstr ""
+
+msgid "Starting…"
+msgstr ""
+
+msgid "Waiting for permission…"
+msgstr ""
+
+msgid "Stopped."
+msgstr ""
+
+msgid "Cancelled."
+msgstr ""
+
+msgid "Done."
+msgstr ""
+
+msgid "Done. You can boot PCs from that stick."
+msgstr ""
+
+msgid "Done. Disk image saved to {path}"
+msgstr ""
+
+msgid "Working…"
+msgstr ""
+
+msgid "Ready."
+msgstr ""
+
+msgid "Formatting the system partition…"
+msgstr ""
+
+msgid "Formatting the data partition…"
+msgstr ""
+
+msgid "Formatting the boot partition…"
+msgstr ""
+
+msgid "This set needs {size} on the stick. Use a {stick} GB USB. The PC you install onto should have at least {disk} GB so the chosen OS can unpack."
+msgstr ""
+
+msgid "On this stick: {names}."
+msgstr ""
+
+msgid "Erase {device} ({label}) and write First Boot?"
+msgstr ""

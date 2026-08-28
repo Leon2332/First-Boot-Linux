@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-US">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,62 +13,73 @@
       <img src="/api/icon" alt="" width="36" height="36">
       <div>
         <strong>First Boot</strong>
-        <span>USB creator</span>
+        <span data-i18n="USB creator">USB creator</span>
       </div>
     </div>
     <nav id="steps"></nav>
   </aside>
   <main>
+    <div class="lang-wrap">
+      <button type="button" class="lang-btn" id="ui-lang-btn" title="Language" aria-label="Language" data-i18n-aria="Language" aria-haspopup="dialog" aria-expanded="false" aria-controls="ui-lang-pop">
+        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+          <path fill="currentColor" d="M5.292 2.295 L5.292 4.124 L0.901 4.124 L0.901 5.431 L2.505 5.431 C3.12 7.091 3.876 8.504 4.892 9.666 C3.754 10.548 2.36 11.193 0.7 11.645 C0.967 11.971 1.391 12.616 1.546 12.965 C3.253 12.423 4.701 11.688 5.918 10.695 C7.099 11.713 8.547 12.458 10.354 12.932 C10.556 12.548 10.989 11.903 11.312 11.577 C9.606 11.193 8.191 10.526 7.042 9.633 C8.079 8.49 8.893 7.113 9.494 5.431 L11.111 5.431 L11.111 4.124 L6.664 4.124 L6.664 2.295 Z M5.983 8.661 C5.126 7.744 4.467 6.65 3.999 5.431 L7.913 5.431 C7.445 6.707 6.797 7.78 5.983 8.661 Z M12.137 11.963 L8.177 11.963 L7.551 13.705 L5.006 13.705 L8.642 3.95 L11.664 3.95 L15.3 13.705 L12.755 13.705 Z M8.808 10.156 L11.498 10.156 L10.156 6.25 Z"/>
+        </svg>
+      </button>
+      <div id="ui-lang-pop" class="lang-pop" hidden role="dialog" aria-label="Language">
+        <p class="lang-pop-title" data-i18n="Language">Language</p>
+        <ul id="ui-lang-list" class="lang-list" role="listbox" aria-label="Language"></ul>
+      </div>
+    </div>
     <section id="page-0" class="page">
-      <h1>Shop details</h1>
-      <label>Shop name
-        <input id="name" type="text" maxlength="80" placeholder="Example Computers" autocomplete="organization">
+      <h1 data-i18n="Shop details">Shop details</h1>
+      <label><span data-i18n="Shop name">Shop name</span>
+        <input id="name" type="text" maxlength="80" placeholder="Example Computers" autocomplete="organization" data-i18n-placeholder="Example Computers">
       </label>
-      <label>Support
+      <label><span data-i18n="Support">Support</span>
         <input id="support" type="text" maxlength="160" placeholder="support@example.com  /  012 345 6789">
       </label>
       <div class="row">
-        <label>Default language
+        <label><span data-i18n="Default language">Default language</span>
           <select id="language"></select>
         </label>
-        <label>Keyboard layout
+        <label><span data-i18n="Keyboard layout">Keyboard layout</span>
           <select id="keyboard"></select>
         </label>
       </div>
       <div class="row">
-        <label>Default time zone
+        <label><span data-i18n="Default time zone">Default time zone</span>
           <select id="timezone"></select>
         </label>
       </div>
       <div class="row">
-        <label>Support password
-          <input id="pass" type="password" autocomplete="new-password" placeholder="Used on tty2 and for sudo">
+        <label><span data-i18n="Support password">Support password</span>
+          <input id="pass" type="password" autocomplete="new-password" placeholder="Used on tty2 and for sudo" data-i18n-placeholder="Used on tty2 and for sudo">
         </label>
-        <label>Confirm
-          <input id="pass2" type="password" autocomplete="new-password" placeholder="Same password again">
+        <label><span data-i18n="Confirm">Confirm</span>
+          <input id="pass2" type="password" autocomplete="new-password" placeholder="Same password again" data-i18n-placeholder="Same password again">
         </label>
       </div>
       <label class="check">
         <input id="empty-pw" type="checkbox">
-        <span>VM / test image — leave the live user unlocked</span>
+        <span data-i18n="VM / test image — leave the live user unlocked">VM / test image — leave the live user unlocked</span>
       </label>
     </section>
 
     <section id="page-1" class="page hidden">
-      <h1>Wallpapers</h1>
-      <p class="lead">The live session switches between these with Dark Style. First Boot defaults are already selected.</p>
+      <h1 data-i18n="Wallpapers">Wallpapers</h1>
+      <p class="lead" data-i18n="The live session switches between these with Dark Style. First Boot defaults are already selected.">The live session switches between these with Dark Style. First Boot defaults are already selected.</p>
       <div class="walls">
         <figure>
-          <figcaption>Dark</figcaption>
-          <img id="dark-preview" alt="Dark wallpaper">
-          <label class="btn ghost">Choose image…
+          <figcaption data-i18n="Dark">Dark</figcaption>
+          <img id="dark-preview" alt="Dark wallpaper" data-i18n-alt="Dark wallpaper">
+          <label class="btn ghost"><span data-i18n="Choose image…">Choose image…</span>
             <input id="dark-file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
           </label>
         </figure>
         <figure>
-          <figcaption>Light</figcaption>
-          <img id="light-preview" alt="Light wallpaper">
-          <label class="btn ghost">Choose image…
+          <figcaption data-i18n="Light">Light</figcaption>
+          <img id="light-preview" alt="Light wallpaper" data-i18n-alt="Light wallpaper">
+          <label class="btn ghost"><span data-i18n="Choose image…">Choose image…</span>
             <input id="light-file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
           </label>
         </figure>
@@ -77,44 +88,44 @@
         <svg class="btn-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
           <path fill="currentColor" d="m 7.40625 1 c -0.613281 0.007812 -1.234375 0.089844 -1.847656 0.253906 c -3.273438 0.878906 -5.558594 3.855469 -5.558594 7.246094 s 2.285156 6.367188 5.558594 7.242188 c 3.273437 0.878906 6.742187 -0.558594 8.4375 -3.492188 c 0.277344 -0.480469 0.109375 -1.089844 -0.367188 -1.367188 c -0.476562 -0.273437 -1.089844 -0.109374 -1.367187 0.367188 c -1.246094 2.160156 -3.777344 3.207031 -6.1875 2.5625 c -2.40625 -0.644531 -4.074219 -2.820312 -4.074219 -5.3125 c 0 -2.496094 1.667969 -4.667969 4.074219 -5.3125 c 2.410156 -0.644531 4.941406 0.402344 6.1875 2.5625 c 0.058593 0.085938 0.125 0.164062 0.203125 0.226562 l -0.019532 0.015626 l -0.007812 0.007812 h -1.4375 c -0.550781 0 -1 0.449219 -1 1 c 0 0 0 1 1 1 h 5 v -5 s 0.003906 -1 -1 -1 c -0.550781 0 -1 0.449219 -1 1 v 1.6875 l -0.015625 0.011719 l -0.011719 0.011719 c -1.277344 -2.179688 -3.53125 -3.519532 -5.953125 -3.691407 c -0.203125 -0.015625 -0.40625 -0.019531 -0.613281 -0.019531 z"/>
         </svg>
-        Reset to First Boot defaults
+        <span data-i18n="Reset to First Boot defaults">Reset to First Boot defaults</span>
       </button>
     </section>
 
     <section id="page-2" class="page hidden">
       <div class="page-2-head">
-        <h1>Recommended options</h1>
-        <p class="lead">Tick up to 5 desktops to recommend and keep on the USB. Customers can download the rest.</p>
-        <div id="picked" class="picked-grid" aria-label="Selected desktops"></div>
-        <label class="search-label">Search
-          <input id="distro-search" type="search" placeholder="Search" autocomplete="off" spellcheck="false">
+        <h1 data-i18n="Recommended options">Recommended options</h1>
+        <p class="lead" data-i18n="Tick up to 5 desktops to recommend and keep on the USB. Customers can download the rest.">Tick up to 5 desktops to recommend and keep on the USB. Customers can download the rest.</p>
+        <div id="picked" class="picked-grid" aria-label="Selected desktops" data-i18n-aria="Selected desktops"></div>
+        <label class="search-label"><span data-i18n="Search">Search</span>
+          <input id="distro-search" type="search" placeholder="Search" autocomplete="off" spellcheck="false" data-i18n-placeholder="Search">
         </label>
       </div>
       <div class="page-2-list">
-        <p id="distro-empty" class="note" hidden>No matching systems</p>
+        <p id="distro-empty" class="note" hidden data-i18n="No matching systems">No matching systems</p>
         <div id="ready" class="cards"></div>
       </div>
     </section>
 
     <section id="page-3" class="page hidden">
-      <h1>Write</h1>
-      <p class="lead">The creator builds a partitioned disk image first. Writing a stick only needs permission for that last copy.</p>
+      <h1 data-i18n="Write">Write</h1>
+      <p class="lead" data-i18n="The creator builds a partitioned disk image first. Writing a stick only needs permission for that last copy.">The creator builds a partitioned disk image first. Writing a stick only needs permission for that last copy.</p>
       <p id="size" class="size"></p>
       <p id="hint" class="note"></p>
       <fieldset>
-        <label class="check"><input type="radio" name="target" value="image" checked> Save a disk image (boot it in a VM, or write later)</label>
-        <label class="check"><input type="radio" name="target" value="usb"> Write a USB stick now</label>
+        <label class="check"><input type="radio" name="target" value="image" checked> <span data-i18n="Save a disk image (boot it in a VM, or write later)">Save a disk image (boot it in a VM, or write later)</span></label>
+        <label class="check"><input type="radio" name="target" value="usb"> <span data-i18n="Write a USB stick now">Write a USB stick now</span></label>
       </fieldset>
-      <label>Disk image
+      <label><span data-i18n="Disk image">Disk image</span>
         <input id="img-path" type="text" spellcheck="false">
       </label>
-      <label>USB stick
+      <label><span data-i18n="USB stick">USB stick</span>
         <span class="row">
           <select id="device"></select>
-          <button type="button" class="btn ghost" id="refresh-disks">Refresh</button>
+          <button type="button" class="btn ghost" id="refresh-disks" data-i18n="Refresh">Refresh</button>
         </span>
       </label>
-      <p class="warn" id="disk-warn" hidden>Your disk will be formatted. All data will be permanently erased.</p>
+      <p class="warn" id="disk-warn" hidden data-i18n="Your disk will be formatted. All data will be permanently erased.">Your disk will be formatted. All data will be permanently erased.</p>
       <ul class="task-list" id="task-list" hidden></ul>
       <div class="progress-wrap">
         <div class="bar"><span id="bar"></span></div>
@@ -125,7 +136,7 @@
     <footer>
       <p id="error"></p>
       <div class="actions">
-        <button type="button" class="btn ghost" id="back">Back</button>
+        <button type="button" class="btn ghost" id="back" data-i18n="Back">Back</button>
         <button type="button" class="btn primary" id="next">Continue</button>
       </div>
     </footer>
