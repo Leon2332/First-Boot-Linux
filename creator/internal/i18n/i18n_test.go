@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"unicode"
+
+	"github.com/Leon2332/First-Boot-Linux/creator/internal/assets"
 )
 
 func TestParsePOEscapes(t *testing.T) {
@@ -36,6 +38,17 @@ func TestCatalogAfrikaans(t *testing.T) {
 	}
 	if T("en-gb", "Maximize") != "Maximise" {
 		t.Fatalf("en-gb: %q", T("en-gb", "Maximize"))
+	}
+	gb := CatalogFor("en-gb")
+	za := CatalogFor("en-za")
+	if gb["USB creator"] != "USB creator" {
+		t.Fatalf("en-gb USB creator: %q", gb["USB creator"])
+	}
+	if za["Shop details"] != "Shop details" {
+		t.Fatalf("en-za Shop details: %q", za["Shop details"])
+	}
+	if gb["The catalog checksum is not valid."] != "The catalogue checksum is not valid." {
+		t.Fatal("en-gb catalogue spelling")
 	}
 	if Resolve("de") != DefaultLanguage {
 		t.Fatal("unknown language falls back to en-us")
@@ -113,6 +126,45 @@ func TestPersistUILanguage(t *testing.T) {
 	}
 	if Load() != "en-us" {
 		t.Fatal("en should persist as en-us")
+	}
+}
+
+func TestEnglishVariantsCoverPot(t *testing.T) {
+	root, err := assets.RepoRoot("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "po", "firstboot.pot"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "msgid ") {
+			continue
+		}
+		token := strings.TrimSpace(line[6:])
+		if token == `""` || token == "" {
+			continue
+		}
+		if strings.HasPrefix(token, `"`) && strings.HasSuffix(token, `"`) {
+			token = token[1 : len(token)-1]
+		}
+		ids = append(ids, token)
+	}
+	if len(ids) < 50 {
+		t.Fatalf("too few pot msgids: %d", len(ids))
+	}
+	gb := CatalogFor("en-gb")
+	za := CatalogFor("en-za")
+	for _, id := range ids {
+		if _, ok := gb[id]; !ok {
+			t.Errorf("en-gb missing %q", id)
+		}
+		if _, ok := za[id]; !ok {
+			t.Errorf("en-za missing %q", id)
+		}
 	}
 }
 

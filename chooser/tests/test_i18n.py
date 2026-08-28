@@ -23,6 +23,7 @@ from firstboot.i18n import (  # noqa: E402
     format_status,
     has_catalog,
     language_matches,
+    load_catalog,
     load_language,
     load_language_index,
     normalize_id,
@@ -33,6 +34,22 @@ from firstboot.i18n import (  # noqa: E402
     supported_languages,
     write_language_file,
 )
+
+
+def _pot_msgids(path: str) -> list[str]:
+    ids: list[str] = []
+    with open(path, encoding="utf-8") as fh:
+        for raw in fh:
+            line = raw.strip()
+            if not line.startswith("msgid "):
+                continue
+            token = line[6:].strip()
+            if token in {"", '""'}:
+                continue
+            if token.startswith('"') and token.endswith('"'):
+                token = token[1:-1]
+            ids.append(token)
+    return ids
 
 
 class IdTests(unittest.TestCase):
@@ -195,6 +212,28 @@ class PoTests(unittest.TestCase):
         self.assertEqual(_("USB creator"), "USB creator")
         apply_language("en-gb")
         self.assertEqual(_("USB creator"), "USB creator")
+        self.assertEqual(_("Shop details"), "Shop details")
+        self.assertEqual(_("Continue"), "Continue")
+        apply_language("en-za")
+        self.assertEqual(_("USB creator"), "USB creator")
+        self.assertEqual(_("Keyboard layout"), "Keyboard layout")
+
+    def test_english_variants_cover_pot(self) -> None:
+        repo = os.path.abspath(os.path.join(CHOOSER_DIR, ".."))
+        pot = os.path.join(repo, "po", "firstboot.pot")
+        ids = _pot_msgids(pot)
+        self.assertIn("USB creator", ids)
+        self.assertIn("Shop details", ids)
+        gb = load_catalog("en-gb")
+        za = load_catalog("en-za")
+        missing_gb = [msgid for msgid in ids if msgid not in gb]
+        missing_za = [msgid for msgid in ids if msgid not in za]
+        self.assertEqual(missing_gb, [])
+        self.assertEqual(missing_za, [])
+        self.assertEqual(gb["USB creator"], "USB creator")
+        self.assertEqual(za["USB creator"], "USB creator")
+        self.assertEqual(gb["The catalog checksum is not valid."], "The catalogue checksum is not valid.")
+        self.assertEqual(za["The catalog checksum is not valid."], "The catalogue checksum is not valid.")
 
     def test_parse_escapes(self) -> None:
         catalog = parse_po(

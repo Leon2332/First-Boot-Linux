@@ -465,3 +465,198 @@ msgstr "This image has no usable payload."
 
 msgid "No recommended distributions are listed on this image."
 msgstr "No recommended distributions are listed on this image."
+
+msgid "USB creator"
+msgstr "USB creator"
+
+msgid "First Boot — USB creator"
+msgstr "First Boot — USB creator"
+
+msgid "Shop"
+msgstr "Shop"
+
+msgid "Look"
+msgstr "Look"
+
+msgid "Recommendations"
+msgstr "Recommendations"
+
+msgid "Write"
+msgstr "Write"
+
+msgid "Shop details"
+msgstr "Shop details"
+
+msgid "Shop name"
+msgstr "Shop name"
+
+msgid "Support"
+msgstr "Support"
+
+msgid "Default language"
+msgstr "Default language"
+
+msgid "Keyboard layout"
+msgstr "Keyboard layout"
+
+msgid "Default time zone"
+msgstr "Default time zone"
+
+msgid "Support password"
+msgstr "Support password"
+
+msgid "Used on tty2 and for sudo"
+msgstr "Used on tty2 and for sudo"
+
+msgid "Same password again"
+msgstr "Same password again"
+
+msgid "Example Computers"
+msgstr "Example Computers"
+
+msgid "VM / test image — leave the live user unlocked"
+msgstr "VM / test image — leave the live user unlocked"
+
+msgid "Wallpapers"
+msgstr "Wallpapers"
+
+msgid "The live session switches between these with Dark Style. First Boot defaults are already selected."
+msgstr "The live session switches between these with Dark Style. First Boot defaults are already selected."
+
+msgid "Dark"
+msgstr "Dark"
+
+msgid "Light"
+msgstr "Light"
+
+msgid "Dark wallpaper"
+msgstr "Dark wallpaper"
+
+msgid "Light wallpaper"
+msgstr "Light wallpaper"
+
+msgid "Choose image…"
+msgstr "Choose image…"
+
+msgid "Reset to First Boot defaults"
+msgstr "Reset to First Boot defaults"
+
+msgid "Recommended options"
+msgstr "Recommended options"
+
+msgid "Tick up to 5 desktops to recommend and keep on the USB. Customers can download the rest."
+msgstr "Tick up to 5 desktops to recommend and keep on the USB. Customers can download the rest."
+
+msgid "Selected desktops"
+msgstr "Selected desktops"
+
+msgid "The creator builds a partitioned disk image first. Writing a stick only needs permission for that last copy."
+msgstr "The creator builds a partitioned disk image first. Writing a stick only needs permission for that last copy."
+
+msgid "Save a disk image (boot it in a VM, or write later)"
+msgstr "Save a disk image (boot it in a VM, or write later)"
+
+msgid "Write a USB stick now"
+msgstr "Write a USB stick now"
+
+msgid "Disk image"
+msgstr "Disk image"
+
+msgid "USB stick"
+msgstr "USB stick"
+
+msgid "Refresh"
+msgstr "Refresh"
+
+msgid "Your disk will be formatted. All data will be permanently erased."
+msgstr "Your disk will be formatted. All data will be permanently erased."
+
+msgid "Continue"
+msgstr "Continue"
+
+msgid "Enter the shop name."
+msgstr "Enter the shop name."
+
+msgid "Enter a support contact."
+msgstr "Enter a support contact."
+
+msgid "Set a support password, or tick the VM option."
+msgstr "Set a support password, or tick the VM option."
+
+msgid "Use at least 6 characters."
+msgstr "Use at least 6 characters."
+
+msgid "Tick at least one desktop to keep on the USB."
+msgstr "Tick at least one desktop to keep on the USB."
+
+msgid "No First Boot seed on this computer."
+msgstr "No First Boot seed on this computer."
+
+msgid "Choose a USB stick."
+msgstr "Choose a USB stick."
+
+msgid "Choose a USB stick"
+msgstr "Choose a USB stick"
+
+msgid "Choose where to save the disk image."
+msgstr "Choose where to save the disk image."
+
+msgid "{size} · on the USB"
+msgstr "{size} · on the USB"
+
+msgid "Install support is not ready"
+msgstr "Install support is not ready"
+
+msgid "Building disk image"
+msgstr "Building disk image"
+
+msgid "Writing to disk"
+msgstr "Writing to disk"
+
+msgid "Downloading image"
+msgstr "Downloading image"
+
+msgid "Starting…"
+msgstr "Starting…"
+
+msgid "Waiting for permission…"
+msgstr "Waiting for permission…"
+
+msgid "Stopped."
+msgstr "Stopped."
+
+msgid "Cancelled."
+msgstr "Cancelled."
+
+msgid "Done."
+msgstr "Done."
+
+msgid "Done. You can boot PCs from that stick."
+msgstr "Done. You can boot PCs from that stick."
+
+msgid "Done. Disk image saved to {path}"
+msgstr "Done. Disk image saved to {path}"
+
+msgid "Working…"
+msgstr "Working…"
+
+msgid "Ready."
+msgstr "Ready."
+
+msgid "Formatting the system partition…"
+msgstr "Formatting the system partition…"
+
+msgid "Formatting the data partition…"
+msgstr "Formatting the data partition…"
+
+msgid "Formatting the boot partition…"
+msgstr "Formatting the boot partition…"
+
+msgid "This set needs {size} on the stick. Use a {stick} GB USB. The PC you install onto should have at least {disk} GB so the chosen OS can unpack."
+msgstr "This set needs {size} on the stick. Use a {stick} GB USB. The PC you install onto should have at least {disk} GB so the chosen OS can unpack."
+
+msgid "On this stick: {names}."
+msgstr "On this stick: {names}."
+
+msgid "Erase {device} ({label}) and write First Boot?"
+msgstr "Erase {device} ({label}) and write First Boot?"
