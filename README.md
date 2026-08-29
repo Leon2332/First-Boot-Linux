@@ -1,3 +1,6 @@
+> [!Note]
+> A new license is currently being considered. View the [discussion](https://github.com/Leon2332/First-Boot-Linux/discussions/13) for more details.
+
 <img src="docs/Logo/First%20Boot%20Linux.png" alt="First Boot Linux" width="128" height="128" />
 
 # First Boot Linux
