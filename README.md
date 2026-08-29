@@ -63,3 +63,22 @@ However, it is good practice to:
 - not block or prevent consumers from choosing something different from what you recommend.
 - provide basic installation support for your recommendations.
 - pick recommended options that your support team is familiar with (If your support team is only familiar with MS Windows, it is perfectly fine to add Windows as the only recommended option).
+
+
+# OS support selections
+
+Currently, the selection process hasn't been determined yet. However it will come down to some or all of the following:
+- Target audience is the general consumer; and not a niche
+- Aims to have a GUI-only experience
+- Includes a desktop environment and app center
+- Well maintained and stable
+- Wide hardware compatibility
+- Easy GUI-based installation (outside of FBL)
+- Added benefit for consideration:
+  - Official support
+  - Established community (support)
+  - Open-source
+  - Large userbase (popularity)
+
+> [!Note]
+> In the future, it's possible that a "Add your own" option will be added in the USB Creator. This would be good for retailers who decide to create and maintain their own OS/distrobution (eg, Pop!_OS, TUXEDO OS, etc.) Although, this is currently still just an idea.
