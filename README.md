@@ -68,9 +68,10 @@ However, it is good practice to:
 - pick recommended options that your support team is familiar with (If your support team is only familiar with MS Windows, it is perfectly fine to add Windows as the only recommended option).
 
 
-# OS support selections
+# FBL OS/distrobution support
 
-Currently, the selection process hasn't been determined yet. However it will come down to some or all of the following:
+Selection is necessary as there are over 5,000 Linux distrobutions alone. Currently, the selection process for adding a new OS/distro hasn't been determined yet.
+However it will come down to some or all of the following:
 - Target audience is the general consumer; and not a niche
 - Aims to have a GUI-only experience
 - Includes a desktop environment and app center
