@@ -85,7 +85,7 @@ function tLabel(label) {
 }
 
 async function api(path, opts) {
-  const res = await fetch(path, opts);
+  const res = await fetch(path, { ...opts, cache: "no-store" });
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
@@ -159,27 +159,49 @@ function card(d) {
   const el = document.createElement("article");
   el.className = "card";
   el.dataset.id = d.id;
-  const src = d.logo ? `/api/logo/${encodeURIComponent(d.id)}` : "";
+  const src = d.logo ? `/api/logo/${encodeURIComponent(d.id)}?t=${Date.now()}` : "";
   const full = ticked.length >= PICKED_SLOTS;
   const editions = (d.editions || []).map((ed) => {
     const key = stagedKey(d.id, ed.id);
     const ready = !!ed.stageable;
     const checked = ticked.includes(key);
     const locked = !ready || (full && !checked);
-    const meta = ready
+    let meta = ready
       ? t("{size} · on the USB", { size: ed.size })
       : t("Install support is not ready");
-    return `<label class="edition">
-      <input type="checkbox" data-key="${escapeHtml(key)}" data-ready="${ready ? "1" : "0"}" ${checked ? "checked" : ""} ${locked ? "disabled" : ""}>
-      <span class="ed-name">${escapeHtml(ed.name)}</span>
-      <span class="ed-meta">${escapeHtml(meta)}</span>
-    </label>`;
+    if (d.custom && ed.need_iso) meta = t("This desktop needs an ISO");
+    const isoBtn = d.custom
+      ? `<button type="button" class="iso-btn" data-iso-key="${escapeHtml(key)}">${escapeHtml(ready ? t("Replace ISO…") : t("Choose ISO…"))}</button>`
+      : "";
+    return `<div class="edition">
+      <label class="ed-check">
+        <input type="checkbox" data-key="${escapeHtml(key)}" data-ready="${ready ? "1" : "0"}" ${checked ? "checked" : ""} ${locked ? "disabled" : ""}>
+        <span class="ed-name">${escapeHtml(ed.name)}</span>
+        <span class="ed-meta">${escapeHtml(meta)}</span>
+      </label>
+      ${isoBtn}
+    </div>`;
   }).join("");
+  const packId = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(d.id || "") ? d.id : "";
+  const remove = d.custom && packId
+    ? `<button type="button" class="pack-remove" data-pack-id="${packId}">${escapeHtml(t("Remove"))}</button>`
+    : "";
+  const pills = [];
+  if (d.custom) {
+    pills.push(`<span class="pill pack-pill">${escapeHtml(t("Retailer pack"))}</span>`);
+  }
+  if (d.secure_boot) {
+    pills.push(`<span class="pill sb-pill">${escapeHtml(t("Secure Boot"))}</span>`);
+  }
   el.innerHTML = `
     ${src ? `<img class="logo" src="${src}" alt="">` : "<span></span>"}
     <div>
-      <h3>${escapeHtml(d.name)}</h3>
+      <div class="card-head">
+        <h3>${escapeHtml(d.name)}</h3>
+        ${remove}
+      </div>
       <p class="meta">${escapeHtml(d.version)} · ${escapeHtml(t(d.tagline))}</p>
+      ${pills.length ? `<div class="pills">${pills.join("")}</div>` : ""}
       <p>${escapeHtml(t(d.description))}</p>
       <div class="editions">${editions}</div>
     </div>`;
@@ -190,6 +212,22 @@ function card(d) {
       syncEditionLocks();
     });
   });
+  return el;
+}
+
+function addCard() {
+  const el = document.createElement("article");
+  el.className = "card add";
+  el.innerHTML = `
+    <span></span>
+    <div>
+      <h3>${escapeHtml(t("Add your own"))}</h3>
+      <p>${escapeHtml(t("Choose a retailer pack (.zip) with a manifest, driver, and logo. Then choose an ISO for each desktop."))}</p>
+      <div class="add-actions">
+        <button type="button" class="iso-btn" id="choose-pack">${escapeHtml(t("Choose pack…"))}</button>
+      </div>
+    </div>`;
+  el.querySelector("#choose-pack").addEventListener("click", choosePack);
   return el;
 }
 
@@ -252,8 +290,129 @@ function renderDistros() {
       return a.id.localeCompare(b.id);
     });
   distros.forEach((d) => ready.appendChild(card(d)));
+  ready.appendChild(addCard());
   empty.hidden = distros.length > 0;
   renderPicked();
+}
+
+async function reloadDistros() {
+  const data = await api("/api/state");
+  if (state) {
+    state.distros = data.distros || [];
+    state.seed_ok = data.seed_ok;
+    state.seed_error = data.seed_error;
+  } else {
+    state = data;
+  }
+  if (data.catalog) catalog = data.catalog;
+  applyI18n();
+  renderDistros();
+}
+
+async function choosePack() {
+  const msg = t("This pack is not from First Boot Linux. A broken driver can wipe the disk. Continue?");
+  if (!confirm(msg)) return;
+  let path = "";
+  try {
+    const picked = await api("/api/pick-file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "zip", title: t("Choose pack…") }),
+    });
+    path = picked.path || "";
+  } catch (e) {
+    const err = String(e.message || e);
+    if (err === "cancelled") return;
+    $("pack-file").value = "";
+    $("pack-file").click();
+    return;
+  }
+  if (!path) return;
+  try {
+    await api("/api/custom-pack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+    await reloadDistros();
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+async function uploadPackFile(file) {
+  if (!file) return;
+  const fd = new FormData();
+  fd.append("file", file);
+  try {
+    await api("/api/custom-pack-upload", { method: "POST", body: fd });
+    await reloadDistros();
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+async function attachISO(key) {
+  const item = lookupStaged(key);
+  if (!item) return;
+  let path = "";
+  try {
+    const picked = await api("/api/pick-file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "iso",
+        title: t("Choose an ISO for {name}", { name: item.edition.name }),
+      }),
+    });
+    path = picked.path || "";
+  } catch (e) {
+    if (String(e.message || e) === "cancelled") return;
+    path = window.prompt(t("Choose an ISO for {name}", { name: item.edition.name }), "") || "";
+  }
+  if (!path) return;
+  try {
+    await api("/api/custom-iso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: item.distro.id, edition: item.edition.id, path }),
+    });
+    await reloadDistros();
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+async function removePack(id) {
+  if (id && typeof id === "object" && id instanceof Event) {
+    const btn = id.target && id.target.closest && id.target.closest(".pack-remove");
+    const card = btn && btn.closest("article.card");
+    id = (btn && btn.getAttribute("data-pack-id")) || (card && card.dataset.id) || "";
+  }
+  id = String(id || "").trim();
+  if (!id) {
+    showError("Could not remove that pack.");
+    return;
+  }
+  const prev = (state?.distros || []).slice();
+  for (let i = ticked.length - 1; i >= 0; i--) {
+    if (ticked[i] === id || ticked[i].startsWith(id + ":")) ticked.splice(i, 1);
+  }
+  if (state) {
+    state.distros = prev.filter((d) => d.id !== id);
+  }
+  renderDistros();
+  try {
+    await api("/api/custom-remove?id=" + encodeURIComponent(id), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+  } catch (e) {
+    if (state) state.distros = prev;
+    renderDistros();
+    showError(e.message);
+  }
 }
 
 function validate() {
@@ -572,6 +731,26 @@ async function init() {
   renderDistros();
   $("distro-search").addEventListener("input", renderDistros);
   $("distro-search").addEventListener("search", renderDistros);
+  $("pack-file").addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) uploadPackFile(file);
+  });
+  $("ready").addEventListener("click", (e) => {
+    const iso = e.target.closest("[data-iso-key]");
+    if (iso) {
+      e.preventDefault();
+      e.stopPropagation();
+      attachISO(iso.getAttribute("data-iso-key"));
+      return;
+    }
+    const rm = e.target.closest(".pack-remove");
+    if (rm) {
+      e.preventDefault();
+      e.stopPropagation();
+      const card = rm.closest("article.card");
+      removePack(rm.getAttribute("data-pack-id") || (card && card.dataset.id) || "");
+    }
+  }, true);
   await refreshDisks();
   render();
 

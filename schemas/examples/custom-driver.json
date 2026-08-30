@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "pop-os",
+  "name": "Pop!_OS",
+  "version": "22.04 / 24.04 LTS",
+  "tagline": "COSMIC and GNOME from System76",
+  "description": "A polished Ubuntu-based desktop from System76. GNOME on 22.04, COSMIC on 24.04. The shop stages the ISOs; this pack is not from First Boot Linux.",
+  "family": "other",
+  "install": "pop-os",
+  "secure_boot": false,
+  "logo": "logo.png",
+  "driver": "driver.py",
+  "editions": [
+    {
+      "id": "gnome",
+      "name": "GNOME",
+      "default": true,
+      "filename": "pop-os_22.04_amd64_intel.iso"
+    },
+    {
+      "id": "cosmic",
+      "name": "COSMIC",
+      "default": false,
+      "filename": "pop-os_24.04_amd64_intel.iso"
+    }
+  ]
+}

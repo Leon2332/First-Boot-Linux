@@ -9,7 +9,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 
 from firstboot.disk import Disk
@@ -21,7 +23,7 @@ MIN_TARGET_BYTES = 16 * 1024 * 1024 * 1024
 TORAM_HEADROOM = 2 * 1024 * 1024 * 1024
 USER_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 HOST_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
-ISO_REL_RE = re.compile(r"^/images/[A-Za-z0-9._+-]+\.iso$")
+ISO_REL_RE = re.compile(r"^/images/[A-Za-z0-9._+-]+\.(iso|img)$")
 ITOA64 = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 _SHA512_ROUNDS = 5000
 
@@ -150,3 +152,179 @@ def iso_relpath(file_rel: str) -> str:
     if not rel.startswith("/"):
         rel = "/" + rel
     return rel
+
+
+def secure_boot_enabled() -> bool | None:
+    """True / False when the firmware reports it; None if unknown.
+
+    Tests may set FIRSTBOOT_SECURE_BOOT=1 or 0.
+    """
+    forced = os.environ.get("FIRSTBOOT_SECURE_BOOT", "").strip().lower()
+    if forced in ("1", "true", "yes", "on"):
+        return True
+    if forced in ("0", "false", "no", "off"):
+        return False
+    if not os.path.isdir("/sys/firmware/efi"):
+        return False
+    efi = "/sys/firmware/efi/efivars"
+    if not os.path.isdir(efi):
+        return None
+    try:
+        names = os.listdir(efi)
+    except OSError:
+        return None
+    for name in names:
+        if not name.startswith("SecureBoot-"):
+            continue
+        try:
+            with open(os.path.join(efi, name), "rb") as fh:
+                data = fh.read()
+        except OSError:
+            return None
+        if len(data) >= 5:
+            return data[4] == 1
+        return None
+    return None
+
+
+VENDOR_SHIM_GRUB = """# First Boot Linux — vendor shim (Secure Boot)
+set default=0
+set timeout=2
+
+search --no-floppy --set=root --fs-uuid {sys_uuid}
+if [ ! -f /boot/osinstall/vmlinuz ]; then
+	search --no-floppy --set=root --label FBL-SYS
+fi
+
+menuentry "Install {name}" {{
+    linux /boot/osinstall/vmlinuz {linux_args} ---
+    initrd /boot/osinstall/initrd
+}}
+"""
+
+
+def find_iso_efi(iso_mnt: str) -> tuple[str, str, str]:
+    """Shim, GRUB, and optional MokManager on a live ISO. Empty strings if missing."""
+    dirs: list[str] = []
+    for a in ("EFI", "efi"):
+        for b in ("BOOT", "boot"):
+            path = os.path.join(iso_mnt, a, b)
+            if os.path.isdir(path):
+                dirs.append(path)
+    shim = grub = mm = ""
+    for folder in dirs:
+        try:
+            names = os.listdir(folder)
+        except OSError:
+            continue
+        by_lower = {n.lower(): os.path.join(folder, n) for n in names}
+        if not shim:
+            for key in ("bootx64.efi", "shimx64.efi"):
+                path = by_lower.get(key, "")
+                if path and os.path.isfile(path):
+                    shim = path
+                    break
+        if not grub:
+            path = by_lower.get("grubx64.efi", "")
+            if path and os.path.isfile(path):
+                grub = path
+        if not mm:
+            path = by_lower.get("mmx64.efi", "")
+            if path and os.path.isfile(path):
+                mm = path
+        if shim and grub:
+            return shim, grub, mm
+    return shim, grub, mm
+
+
+def install_vendor_shim(
+    iso_mnt: str,
+    plan: OsInstallPlan,
+    sys_uuid: str,
+    name: str,
+    linux_args: str,
+    *,
+    bootnext_label: str,
+) -> bool:
+    """Copy the ISO's Microsoft-signed shim to FBL-ESP and BootNext it.
+
+    Canonical GRUB will not load a non-Canonical kernel with Secure Boot on.
+    Returns True when the files were copied.
+    """
+    if plan.live is None:
+        return False
+    esp_part = plan.live.part_named("FBL-ESP")
+    if esp_part is None:
+        return False
+    src_shim, src_grub, src_mm = find_iso_efi(iso_mnt)
+    if not src_shim or not src_grub:
+        return False
+    mounted = False
+    esp_mp = ""
+    if esp_part.mountpoints:
+        esp_mp = esp_part.mountpoints[0]
+    else:
+        esp_mp = tempfile.mkdtemp(prefix="fbl-esp-")
+        run_checked(["mount", esp_part.path, esp_mp], what="mount the EFI partition")
+        mounted = True
+    try:
+        dest = os.path.join(esp_mp, "EFI", "osinstall")
+        os.makedirs(dest, exist_ok=True)
+        shutil.copy2(src_shim, os.path.join(dest, "shimx64.efi"))
+        shutil.copy2(src_grub, os.path.join(dest, "grubx64.efi"))
+        if src_mm:
+            shutil.copy2(src_mm, os.path.join(dest, "mmx64.efi"))
+        with open(os.path.join(dest, "grub.cfg"), "w", encoding="utf-8") as fh:
+            fh.write(
+                VENDOR_SHIM_GRUB.format(
+                    sys_uuid=sys_uuid, name=name, linux_args=linux_args
+                )
+            )
+    finally:
+        if mounted:
+            subprocess.run(["umount", esp_mp], check=False, capture_output=True)
+            shutil.rmtree(esp_mp, ignore_errors=True)
+    if not shutil.which("efibootmgr"):
+        return True
+    partnum = efi_part_number(esp_part.path)
+    from firstboot.install import efi_ids_for_label
+
+    def _efi_list() -> str:
+        proc = subprocess.run(
+            ["efibootmgr"], check=False, capture_output=True, text=True
+        )
+        return proc.stdout or ""
+
+    for bootnum in efi_ids_for_label(_efi_list(), bootnext_label):
+        subprocess.run(
+            ["efibootmgr", "--bootnum", bootnum, "--delete-bootnum"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    subprocess.run(
+        [
+            "efibootmgr",
+            "--create",
+            "--disk",
+            plan.live.path,
+            "--part",
+            partnum,
+            "--label",
+            bootnext_label,
+            "--loader",
+            r"\EFI\osinstall\shimx64.efi",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    created = efi_ids_for_label(_efi_list(), bootnext_label)
+    if created:
+        subprocess.run(
+            ["efibootmgr", "--bootnext", created[-1]],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    return True

@@ -30,6 +30,27 @@ INSTALL_DRIVERS = frozenset(
     }
 )
 ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_LAST_ROOT: str | None = None
+
+
+def last_payload_root() -> str | None:
+    return _LAST_ROOT
+
+
+def custom_driver_path(root: str, install_id: str) -> str | None:
+    if not isinstance(install_id, str) or not ID_RE.fullmatch(install_id):
+        return None
+    path = os.path.realpath(os.path.join(root, "custom", install_id, "driver.py"))
+    custom_root = os.path.realpath(os.path.join(root, "custom")) + os.sep
+    if not path.startswith(custom_root) or not os.path.isfile(path):
+        return None
+    return path
+
+
+def install_allowed(install: str, root: str) -> bool:
+    if install in INSTALL_DRIVERS:
+        return True
+    return custom_driver_path(root, install) is not None
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 FILE_RE = re.compile(r"^images/[^/\\]+\.(iso|img)$")
 
@@ -87,6 +108,7 @@ class Distro:
     install: str
     editions: tuple[Edition, ...]
     recommended: bool
+    secure_boot: bool = True
 
     @property
     def default_edition(self) -> Edition:
@@ -128,7 +150,9 @@ class Payload:
 
 
 def load_payload(root: str = DEFAULT_PAYLOAD) -> Payload:
+    global _LAST_ROOT
     payload = Payload(root=os.path.abspath(root))
+    _LAST_ROOT = payload.root
     if not os.path.isdir(payload.root):
         payload.errors.append(f"payload directory missing: {payload.root}")
         return payload
@@ -297,6 +321,7 @@ def _parse_distro(
         "description",
         "family",
         "install",
+        "secure_boot",
         "editions",
     }
     if extra:
@@ -321,7 +346,9 @@ def _parse_distro(
     seen.add(did)
     if raw["family"] not in FAMILIES:
         raise PayloadError(f"catalog.json: {where} unknown family")
-    if raw["install"] not in INSTALL_DRIVERS:
+    if not isinstance(raw["install"], str) or not ID_RE.fullmatch(raw["install"]):
+        raise PayloadError(f"catalog.json: {where} invalid install driver")
+    if not install_allowed(raw["install"], root):
         raise PayloadError(f"catalog.json: {where} unknown install driver")
     if not isinstance(raw["editions"], list) or not raw["editions"]:
         raise PayloadError(f"catalog.json: {where} editions must be a non-empty array")
@@ -344,6 +371,12 @@ def _parse_distro(
         if not isinstance(raw[key], str) or not raw[key].strip():
             raise PayloadError(f"catalog.json: {where} {key} must be a non-empty string")
 
+    secure_boot = True
+    if "secure_boot" in raw:
+        if not isinstance(raw["secure_boot"], bool):
+            raise PayloadError(f"catalog.json: {where} secure_boot must be a boolean")
+        secure_boot = raw["secure_boot"]
+
     return Distro(
         id=did,
         name=raw["name"].strip(),
@@ -354,6 +387,7 @@ def _parse_distro(
         install=raw["install"],
         editions=tuple(editions),
         recommended=recommended,
+        secure_boot=secure_boot,
     )
 
 
@@ -434,10 +468,25 @@ def recommended_offerings(distros: list[Distro]) -> list[tuple[Distro, Edition]]
 
 
 def _merge_others(recommended: list[Distro], catalog: list[Distro]) -> list[Distro]:
-    return sorted(
-        [*recommended, *catalog],
-        key=lambda d: (d.name.casefold(), d.id),
-    )
+    return other_options(recommended, catalog, secure_boot_on=False)
+
+
+def other_options(
+    recommended: list[Distro],
+    catalog: list[Distro],
+    *,
+    secure_boot_on: bool,
+) -> list[Distro]:
+    """Other options list: recommended first (always), then catalog.
+
+    When Secure Boot is on, catalog rows without secure_boot are omitted.
+    Recommended rows without support stay (chooser shows a warning).
+    """
+    rows = list(recommended)
+    for distro in catalog:
+        if not secure_boot_on or distro.secure_boot:
+            rows.append(distro)
+    return sorted(rows, key=lambda d: (d.name.casefold(), d.id))
 
 
 def _resolve_wallpaper(root: str, rel: str, _key: str) -> str | None:

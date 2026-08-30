@@ -12,7 +12,13 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from firstboot.assets import find_app_icon, find_status, symbolic_pixbuf
+from firstboot.assets import (
+    find_app_icon,
+    find_status,
+    symbolic_pixbuf,
+    symbolic_pixbuf_from_svg,
+)
+from firstboot.battery import BatteryState, battery_svg, read_battery
 from firstboot.net import (
     WIFI_LIST_LIMIT,
     NmError,
@@ -98,6 +104,16 @@ def set_symbolic(image: Gtk.Image, name: str, color: str, size: int = 16) -> Non
         image.set_from_paintable(tex)
     else:
         image.set_from_file(path)
+    image.set_pixel_size(size)
+
+
+def set_symbolic_svg(image: Gtk.Image, svg: str, color: str, size: int = 16) -> None:
+    from gi.repository import Gdk
+
+    pb = symbolic_pixbuf_from_svg(svg, color, size)
+    if pb is None:
+        return
+    image.set_from_paintable(Gdk.Texture.new_for_pixbuf(pb))
     image.set_pixel_size(size)
 
 
@@ -331,6 +347,7 @@ class Shell:
         self.volume: Volume = MemoryVolume()
         self._vol_gen = 0
         self.brightness = get_brightness_backend()
+        self.battery = BatteryState()
         self.net: NetSnapshot = empty_snapshot()
         self.open_menu: str | None = None
         self.allow_scan = True
@@ -398,6 +415,7 @@ class Shell:
             self.net = empty_snapshot(available=False)
         self._paint_net()
         self.refresh_volume()
+        self.refresh_battery()
         self.refresh_icons()
         return self.topbar, [
             self.backdrop,
@@ -423,6 +441,7 @@ class Shell:
 
     def tick_clock(self) -> bool:
         self.clock.set_label(format_clock(clock_in_offset(self.tz_minutes)))
+        self.refresh_battery()
         return True
 
     def refresh_net(self) -> bool:
@@ -506,6 +525,14 @@ class Shell:
             pass
         return True
 
+    def refresh_battery(self) -> bool:
+        try:
+            self.battery = read_battery()
+        except Exception:
+            self.battery = BatteryState()
+        self._paint_battery()
+        return True
+
     def handle_key(self, keyval: int) -> bool:
         from gi.repository import Gdk
 
@@ -577,6 +604,7 @@ class Shell:
         if name == "qs":
             self.refresh_volume()
             self.refresh_brightness()
+            self.refresh_battery()
             if self.allow_scan:
                 self._request_net(scan=False)
         if name is not None:
@@ -726,9 +754,21 @@ class Shell:
         self.net_img = Gtk.Image()
         self.vol_img = Gtk.Image()
         self.pwr_img = Gtk.Image()
-        for img in (self.net_img, self.vol_img, self.pwr_img):
+        self.bat_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        self.bat_box.add_css_class("panel-bat")
+        self.bat_img = Gtk.Image()
+        self.bat_img.set_pixel_size(16)
+        self.bat_pct = Gtk.Label(label="")
+        self.bat_pct.add_css_class("panel-bat-pct")
+        self.bat_box.append(self.bat_img)
+        self.bat_box.append(self.bat_pct)
+        self.bat_box.set_visible(False)
+        for img in (self.net_img, self.vol_img):
             img.set_pixel_size(16)
             icons.append(img)
+        icons.append(self.bat_box)
+        self.pwr_img.set_pixel_size(16)
+        icons.append(self.pwr_img)
         self.sys_btn.set_child(icons)
         self.sys_btn.connect("clicked", lambda *_: self.show_menu("qs"))
         right = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
@@ -1076,7 +1116,7 @@ class Shell:
             return
         from firstboot.i18n import apply_language
 
-        self.language = apply_language(lang_id)
+        self.language = apply_language(lang_id, payload_root=self.payload_root)
         if self.payload_root:
             persist_language(self.payload_root, self.language)
         self.retranslate()
@@ -1438,6 +1478,34 @@ class Shell:
         self.bri_scale.set_sensitive(st.available)
         set_symbolic(self.qs_bri_img, st.icon, self._fg(), 16)
 
+    def _paint_battery(self) -> None:
+        if not self._built:
+            return
+        st = self.battery
+        self.bat_box.set_visible(st.present)
+        if not st.present:
+            self.bat_box.set_tooltip_text("")
+            self.bat_pct.remove_css_class("low")
+            self.bat_pct.remove_css_class("critical")
+            return
+        color = st.color or PANEL_FG
+        set_symbolic_svg(
+            self.bat_img,
+            battery_svg(percent=st.percent, charging=st.charging),
+            color,
+            16,
+        )
+        self.bat_pct.set_label(st.label)
+        self.bat_pct.remove_css_class("low")
+        self.bat_pct.remove_css_class("critical")
+        if st.critical:
+            self.bat_pct.add_css_class("critical")
+        elif st.low:
+            self.bat_pct.add_css_class("low")
+        tip = st.tooltip()
+        self.bat_box.set_tooltip_text(tip)
+        self.bat_img.set_tooltip_text(tip)
+
     def _paint_net(self) -> None:
         if not self._built:
             return
@@ -1652,6 +1720,7 @@ class Shell:
         self._paint_tz_carets()
         self._paint_net()
         self.refresh_volume()
+        self._paint_battery()
         try:
             self._paint_brightness(self.brightness.get())
         except Exception:

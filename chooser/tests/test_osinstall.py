@@ -6,6 +6,7 @@ from __future__ import annotations
 import gzip as gzipmod
 import hashlib
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -221,6 +222,36 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(get_driver("mint-223").default_hostname, "mint")
         self.assertEqual(get_driver("fedora-44-plasma").default_hostname, "fedora")
         self.assertIsNone(get_driver("deepin-25"))
+
+    def test_custom_pack_driver(self) -> None:
+        root = tempfile.mkdtemp(prefix="fbl-pack-")
+        try:
+            drv = os.path.join(root, "custom", "pop-os", "driver.py")
+            os.makedirs(os.path.dirname(drv), exist_ok=True)
+            with open(drv, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "from firstboot.osinstall.common import OsInstallError\n"
+                    "ID = 'pop-os'\n"
+                    "class P:\n"
+                    "    id = ID\n"
+                    "    aliases = ()\n"
+                    "    default_hostname = 'pop-os'\n"
+                    "    def boot_files(self, iso_mnt):\n"
+                    "        return 'v', 'i'\n"
+                    "    def kernel_args(self, iso_rel, *, toram, iso_path=''):\n"
+                    "        return 'boot=casper'\n"
+                    "    def seed_files(self, identity, target_path, serial, locale=None):\n"
+                    "        return {}\n"
+                    "DRIVER = P()\n"
+                )
+            loaded = get_driver("pop-os", root)
+            self.assertIsNotNone(loaded)
+            self.assertEqual(loaded.id, "pop-os")
+            self.assertEqual(loaded.boot_files("/iso"), ("v", "i"))
+            self.assertIs(get_driver("pop-os", root), loaded)
+            self.assertIsNone(get_driver("no-such-pack", root))
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
 
 
 class HashTests(unittest.TestCase):
@@ -456,6 +487,8 @@ class YamlTests(unittest.TestCase):
         self.assertTrue(ISO_REL_RE.fullmatch("/images/linuxmint-22.3-mate-64bit.iso"))
         self.assertTrue(ISO_REL_RE.fullmatch("/images/linuxmint-22.3-xfce-64bit.iso"))
         self.assertTrue(ISO_REL_RE.fullmatch("/images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso"))
+        self.assertTrue(ISO_REL_RE.fullmatch("/images/pop-os_22.04_amd64_intel.iso"))
+        self.assertTrue(ISO_REL_RE.fullmatch("/images/shop-os.img"))
         self.assertFalse(ISO_REL_RE.fullmatch("/etc/passwd"))
         self.assertFalse(ISO_REL_RE.fullmatch("/images/../ubuntu.iso"))
 

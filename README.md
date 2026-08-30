@@ -70,19 +70,21 @@ However, it is good practice to:
 
 # FBL OS/distrobution support
 
-Selection is necessary as there are over 5,000 Linux distrobutions alone. Currently, the selection process for adding a new OS/distro hasn't been determined yet.
+Selection is necessary as there are over 5,000 Linux distrobutions alone. Currently, the selection process for adding a new OS/distro hasn't been finalized yet.
 However it will come down to some or all of the following:
 - Target audience is the general consumer; and not a niche
 - Aims to have a GUI-only experience
 - Includes a desktop environment and app center
-- Well maintained and stable
-- Wide hardware compatibility
 - Easy GUI-based installation (outside of FBL)
+- Well maintained
 - Added benefit for consideration:
   - Official support
-  - Established community (support)
+  - Established community (community support)
   - Open-source
-  - Large userbase (popularity)
+  - UEFI Secure Boot
+
+> [!Tip]
+> You can add your own OS/distrobution via the FBL USB Creator. See the [wiki](https://github.com/Leon2332/First-Boot-Linux/wiki) for instructions.
 
 > [!Note]
-> In the future, it's possible that a "Add your own" option will be added in the USB Creator. This would be good for retailers who decide to create and maintain their own OS/distrobution (eg, Pop!_OS, TUXEDO OS, etc.) Although, this is currently still just an idea.
+> First Boot Linux checks whether the device has Secure Boot enabled. If enabled, only OS/distrobution options with support for Secure Boot will be displayed.

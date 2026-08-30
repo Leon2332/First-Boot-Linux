@@ -9,6 +9,7 @@
       "description": "A polished desktop with excellent hardware support and a large software library. A safe default for most laptops.",
       "family": "ubuntu",
       "install": "ubuntu-2604",
+      "secure_boot": true,
       "editions": [
         {
           "id": "gnome",
@@ -29,6 +30,7 @@
       "description": "A stable desktop that feels at home for people coming from Windows. Multimedia and drivers work out of the box.",
       "family": "mint",
       "install": "mint-223",
+      "secure_boot": true,
       "editions": [
         {
           "id": "cinnamon",
@@ -69,6 +71,7 @@
       "description": "Current free software with a polished KDE Plasma experience.",
       "family": "fedora",
       "install": "fedora-44-plasma",
+      "secure_boot": true,
       "editions": [
         {
           "id": "plasma",

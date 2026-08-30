@@ -654,3 +654,54 @@ msgstr "Op hierdie stokkie: {names}."
 
 msgid "Erase {device} ({label}) and write First Boot?"
 msgstr "Vee {device} ({label}) uit en skryf First Boot?"
+
+msgid "Add your own"
+msgstr "Voeg jou eie by"
+
+msgid "Choose a retailer pack (.zip) with a manifest, driver, and logo. Then choose an ISO for each desktop."
+msgstr "Kies ’n handelaarspak (.zip) met ’n manifes, drywer en logo. Kies dan ’n ISO vir elke werkskerm."
+
+msgid "Choose pack…"
+msgstr "Kies pak…"
+
+msgid "Remove"
+msgstr "Verwyder"
+
+msgid "Choose ISO…"
+msgstr "Kies ISO…"
+
+msgid "Replace ISO…"
+msgstr "Vervang ISO…"
+
+msgid "This desktop needs an ISO"
+msgstr "Hierdie werkskerm benodig ’n ISO"
+
+msgid "Secure Boot"
+msgstr "Secure Boot"
+
+msgid "No Secure Boot"
+msgstr "Geen Secure Boot"
+
+msgid "This system cannot install while Secure Boot is on."
+msgstr "Hierdie stelsel kan nie installeer terwyl Secure Boot aan is nie."
+
+msgid "Battery {n}%"
+msgstr "Battery {n}%"
+
+msgid "Charging — {n}%"
+msgstr "Laai — {n}%"
+
+msgid "Fully charged"
+msgstr "Vol gelaai"
+
+msgid "Battery low — {n}%"
+msgstr "Battery laag — {n}%"
+
+msgid "Retailer pack"
+msgstr "Handelaarspak"
+
+msgid "This pack is not from First Boot Linux. A broken driver can wipe the disk. Continue?"
+msgstr "Hierdie pak kom nie van First Boot Linux nie. ’n Stukkende drywer kan die skyf uitvee. Gaan voort?"
+
+msgid "Choose an ISO for {name}"
+msgstr "Kies ’n ISO vir {name}"

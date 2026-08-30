@@ -660,3 +660,54 @@ msgstr "On this stick: {names}."
 
 msgid "Erase {device} ({label}) and write First Boot?"
 msgstr "Erase {device} ({label}) and write First Boot?"
+
+msgid "Add your own"
+msgstr "Add your own"
+
+msgid "Choose a retailer pack (.zip) with a manifest, driver, and logo. Then choose an ISO for each desktop."
+msgstr "Choose a retailer pack (.zip) with a manifest, driver, and logo. Then choose an ISO for each desktop."
+
+msgid "Choose pack…"
+msgstr "Choose pack…"
+
+msgid "Remove"
+msgstr "Remove"
+
+msgid "Choose ISO…"
+msgstr "Choose ISO…"
+
+msgid "Replace ISO…"
+msgstr "Replace ISO…"
+
+msgid "This desktop needs an ISO"
+msgstr "This desktop needs an ISO"
+
+msgid "Secure Boot"
+msgstr "Secure Boot"
+
+msgid "No Secure Boot"
+msgstr "No Secure Boot"
+
+msgid "This system cannot install while Secure Boot is on."
+msgstr "This system cannot install while Secure Boot is on."
+
+msgid "Battery {n}%"
+msgstr "Battery {n}%"
+
+msgid "Charging — {n}%"
+msgstr "Charging — {n}%"
+
+msgid "Fully charged"
+msgstr "Fully charged"
+
+msgid "Battery low — {n}%"
+msgstr "Battery low — {n}%"
+
+msgid "Retailer pack"
+msgstr "Retailer pack"
+
+msgid "This pack is not from First Boot Linux. A broken driver can wipe the disk. Continue?"
+msgstr "This pack is not from First Boot Linux. A broken driver can wipe the disk. Continue?"
+
+msgid "Choose an ISO for {name}"
+msgstr "Choose an ISO for {name}"

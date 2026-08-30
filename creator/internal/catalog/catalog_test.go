@@ -16,6 +16,9 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	if u == nil || !u.Redistributable || !u.Stageable() {
 		t.Fatalf("ubuntu should be redistributable and stageable")
 	}
+	if !u.SecureBoot {
+		t.Fatal("ubuntu must support Secure Boot")
+	}
 	if u.DefaultEdition() == nil || u.DefaultEdition().SHA256 == nil {
 		t.Fatalf("ubuntu default edition not pinned")
 	}
@@ -82,6 +85,9 @@ func TestBuildShop(t *testing.T) {
 		t.Fatalf("catalog fedora must be download-only: %+v", shop.Catalog[0].Editions)
 	}
 	ub := shop.Recommended[0]
+	if !ub.SecureBoot {
+		t.Fatal("shop ubuntu must keep secure_boot")
+	}
 	if !ub.Editions[0].Local || ub.Editions[0].File != "images/ubuntu-26.04-desktop-amd64.iso" {
 		t.Fatalf("ubuntu edition %+v", ub.Editions[0])
 	}

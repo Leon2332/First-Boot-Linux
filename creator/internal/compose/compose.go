@@ -27,8 +27,8 @@ import (
 )
 
 var (
-	ESPMiB       = 512
-	SYSMiB       = 2048
+	ESPMiB             = 512
+	SYSMiB             = 2048
 	minDataBytes int64 = 256 << 20
 )
 
@@ -38,6 +38,7 @@ type Request struct {
 	Retailer catalog.Retailer
 	Shop     *catalog.Shop
 	Official *catalog.Official
+	Packs    []*catalog.Pack
 	Seed     *seedpath.Seed
 	Cache    *cache.Store
 	Out      string
@@ -47,15 +48,15 @@ type Request struct {
 }
 
 type Estimate struct {
-	ESPBytes    int64
-	SYSBytes    int64
-	DataBytes   int64
-	ImageBytes  int64
-	ISOBytes    int64
-	StickGB     int
-	DiskGB      int
-	NeedHuman   string
-	Summary     string
+	ESPBytes   int64
+	SYSBytes   int64
+	DataBytes  int64
+	ImageBytes int64
+	ISOBytes   int64
+	StickGB    int
+	DiskGB     int
+	NeedHuman  string
+	Summary    string
 }
 
 func Plan(seed *seedpath.Seed, shop *catalog.Shop) Estimate {
@@ -120,12 +121,8 @@ func Write(ctx context.Context, req Request) error {
 	isoPaths := map[string]string{}
 	for _, ed := range locals {
 		base := filepath.Base(ed.File)
-		offEd := officialEdition(req.Official, base)
-		if offEd == nil {
-			return fmt.Errorf("compose: %s not in official catalog", base)
-		}
 		report(req, "download "+base, 0, ed.SizeBytes)
-		p, err := req.Cache.Ensure(ctx, *offEd, func(name string, got, total int64) {
+		p, err := localISO(ctx, req, ed, func(name string, got, total int64) {
 			report(req, "download "+name, got, total)
 		})
 		if err != nil {
@@ -202,6 +199,9 @@ func Write(ctx context.Context, req Request) error {
 }
 
 func officialEdition(off *catalog.Official, filename string) *catalog.Edition {
+	if off == nil {
+		return nil
+	}
 	for i := range off.Distros {
 		for j := range off.Distros[i].Editions {
 			if off.Distros[i].Editions[j].Filename == filename {
@@ -210,6 +210,64 @@ func officialEdition(off *catalog.Official, filename string) *catalog.Edition {
 		}
 	}
 	return nil
+}
+
+func packEdition(packs []*catalog.Pack, file string) *catalog.PackEdition {
+	base := filepath.Base(file)
+	for _, p := range packs {
+		if p == nil {
+			continue
+		}
+		for i := range p.Editions {
+			ed := &p.Editions[i]
+			if ed.Filename == base || p.File(*ed) == file {
+				return ed
+			}
+		}
+	}
+	return nil
+}
+
+func localISO(ctx context.Context, req Request, ed catalog.ShopEdition, progress cache.ProgressFunc) (string, error) {
+	base := filepath.Base(ed.File)
+	if offEd := officialEdition(req.Official, base); offEd != nil {
+		if req.Cache == nil {
+			return "", fmt.Errorf("compose: no ISO cache")
+		}
+		return req.Cache.Ensure(ctx, *offEd, progress)
+	}
+	pe := packEdition(req.Packs, ed.File)
+	if pe == nil || pe.ISOPath == "" {
+		return "", fmt.Errorf("compose: %s is not in the official catalog or a retailer pack", base)
+	}
+	st, err := os.Stat(pe.ISOPath)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", base, err)
+	}
+	if st.Size() != ed.SizeBytes {
+		return "", fmt.Errorf("%s: size mismatch", base)
+	}
+	if progress != nil {
+		progress(base, ed.SizeBytes, ed.SizeBytes)
+	}
+	return pe.ISOPath, nil
+}
+
+func packsOnStick(req Request) []*catalog.Pack {
+	if req.Shop == nil {
+		return nil
+	}
+	want := map[string]bool{}
+	for _, d := range req.Shop.Recommended {
+		want[d.ID] = true
+	}
+	var out []*catalog.Pack
+	for _, p := range req.Packs {
+		if p != nil && want[p.ID] {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func buildSYS(req Request, root, sysUUID string) error {
@@ -279,6 +337,8 @@ func buildDATA(req Request, root string, isos map[string]string) error {
 	for _, d := range []string{
 		filepath.Join(root, "wallpapers"),
 		filepath.Join(root, "images"),
+		filepath.Join(root, "custom"),
+		filepath.Join(root, "logos"),
 	} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			return err
@@ -338,13 +398,68 @@ func buildDATA(req Request, root string, isos map[string]string) error {
 			return fmt.Errorf("%s: sha256 mismatch after copy", ed.File)
 		}
 	}
+	for _, p := range packsOnStick(req) {
+		dest := filepath.Join(root, "custom", p.ID)
+		if err := os.MkdirAll(dest, 0o755); err != nil {
+			return err
+		}
+		if err := copyFile(p.Manifest, filepath.Join(dest, "manifest.json"), 0o644); err != nil {
+			return err
+		}
+		if err := copyFile(p.DriverPath, filepath.Join(dest, "driver.py"), 0o644); err != nil {
+			return err
+		}
+		logoExt := strings.ToLower(filepath.Ext(p.LogoPath))
+		if logoExt != ".png" && logoExt != ".svg" {
+			logoExt = ".png"
+		}
+		if err := copyFile(p.LogoPath, filepath.Join(dest, "logo"+logoExt), 0o644); err != nil {
+			return err
+		}
+		if err := copyFile(p.LogoPath, filepath.Join(root, "logos", p.ID+logoExt), 0o644); err != nil {
+			return err
+		}
+		if err := copyLocaleDir(p.LocaleDir(), filepath.Join(dest, "locale")); err != nil {
+			return err
+		}
+	}
 	return writePayloadChecksums(root)
+}
+
+func copyLocaleDir(src, dest string) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	copied := 0
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if strings.ToLower(filepath.Ext(name)) != ".po" {
+			continue
+		}
+		if copied == 0 {
+			if err := os.MkdirAll(dest, 0o755); err != nil {
+				return err
+			}
+		}
+		if err := copyFile(filepath.Join(src, name), filepath.Join(dest, name), 0o644); err != nil {
+			return err
+		}
+		copied++
+	}
+	return nil
 }
 
 func marshalShop(s *catalog.Shop) ([]byte, error) {
 	// encoding/json with indent; keep catalog key even when empty.
 	type wire struct {
-		SchemaVersion int                 `json:"schema_version"`
+		SchemaVersion int                  `json:"schema_version"`
 		Recommended   []catalog.ShopDistro `json:"recommended"`
 		Catalog       []catalog.ShopDistro `json:"catalog"`
 	}
@@ -682,6 +797,16 @@ func writePayloadChecksums(root string) error {
 		files = append(files, rel)
 		return nil
 	})
+	for _, dir := range []string{"custom", "logos"} {
+		_ = filepath.Walk(filepath.Join(root, dir), func(path string, info os.FileInfo, err error) error {
+			if err != nil || info.IsDir() {
+				return err
+			}
+			rel, _ := filepath.Rel(root, path)
+			files = append(files, rel)
+			return nil
+		})
+	}
 	sort.Strings(files)
 	var b strings.Builder
 	for _, rel := range files {

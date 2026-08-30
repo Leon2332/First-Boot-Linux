@@ -24,13 +24,19 @@ Older sticks may still say `ubuntu-autoinstall`, `mint`, or
 
 1. Copy `_template.py` to `<id>.py` (underscores in the filename).
 2. Set `ID` to the hyphenated catalog id. Implement `boot_files`,
-   `kernel_args`, `seed_files`. `after_prepare` is optional (Fedora shim).
+   `kernel_args`, `seed_files`. `after_prepare` is optional (vendor shim / BootNext).
 3. Append the module to `_DRIVER_MODULES` in `__init__.py`.
 4. Add a row to `schemas/official-catalog.json` with pinned ISO
    (`url`, `sha256`, `size_bytes`) and `"install": "<id>"`.
-5. Add `<id>` to the `install` enum in both JSON schemas and to
-   `INSTALL_DRIVERS` in `chooser/firstboot/payload.py`.
+5. Add `<id>` to `INSTALL_DRIVERS` in `chooser/firstboot/payload.py`
+   and to the official-catalog `install` enum. Shop `catalog.json` `install`
+   is an open kebab-case id (packs do not belong in that enum).
 6. Add `chooser/tests/test_osinstall_<id>.py`.
+
+A shop that will not merge into this tree ships a `.zip` pack instead
+(`schemas/custom-driver.schema.json`). Copy `_template.py` to `driver.py`
+in the zip. The live chooser loads `payload/custom/<id>/driver.py`. Do not
+register those modules here.
 
 The desktop environment is an **edition** in the catalog (which ISO),
 not a Python file, unless that desktop needs a different installer.

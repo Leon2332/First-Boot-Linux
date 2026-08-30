@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -25,6 +26,7 @@ from firstboot.i18n import (  # noqa: E402
     language_matches,
     load_catalog,
     load_language,
+    merge_pack_locales,
     load_language_index,
     normalize_id,
     parse_po,
@@ -240,6 +242,56 @@ class PoTests(unittest.TestCase):
             'msgid "Say \\"hi\\"\\n"\nmsgstr "Sê \\"hallo\\"\\n"\n'
         )
         self.assertEqual(catalog['Say "hi"\n'], 'Sê "hallo"\n')
+
+
+class PackLocaleTests(unittest.TestCase):
+    def test_merge_fills_missing_and_skips_chrome(self) -> None:
+        root = tempfile.mkdtemp(prefix="fbl-pack-po-")
+        try:
+            loc = os.path.join(root, "custom", "pop-os", "locale")
+            os.makedirs(loc)
+            with open(os.path.join(loc, "af.po"), "w", encoding="utf-8") as fh:
+                fh.write(
+                    'msgid "Back"\n'
+                    'msgstr "MOENIE"\n'
+                    "\n"
+                    'msgid "COSMIC and GNOME from System76"\n'
+                    'msgstr "COSMIC en GNOME van System76"\n'
+                )
+            apply_language("af", payload_root=root)
+            self.assertEqual(_("Back"), "Terug")
+            self.assertEqual(
+                _("COSMIC and GNOME from System76"),
+                "COSMIC en GNOME van System76",
+            )
+            merged = merge_pack_locales(load_catalog("af"), "af", root)
+            self.assertEqual(merged["Back"], "Terug")
+            self.assertEqual(
+                merged["COSMIC and GNOME from System76"],
+                "COSMIC en GNOME van System76",
+            )
+        finally:
+            apply_language("en-us")
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_english_us_does_not_merge(self) -> None:
+        root = tempfile.mkdtemp(prefix="fbl-pack-po-en-")
+        try:
+            loc = os.path.join(root, "custom", "pop-os", "locale")
+            os.makedirs(loc)
+            with open(os.path.join(loc, "af.po"), "w", encoding="utf-8") as fh:
+                fh.write(
+                    'msgid "COSMIC and GNOME from System76"\n'
+                    'msgstr "COSMIC en GNOME van System76"\n'
+                )
+            apply_language("en-us", payload_root=root)
+            self.assertEqual(
+                _("COSMIC and GNOME from System76"),
+                "COSMIC and GNOME from System76",
+            )
+        finally:
+            apply_language("en-us")
+            shutil.rmtree(root, ignore_errors=True)
 
 
 class LayoutTests(unittest.TestCase):

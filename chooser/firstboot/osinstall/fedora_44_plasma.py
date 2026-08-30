@@ -12,21 +12,17 @@ kickstart liveimg. Do not wrap liveinst, do not pkexec, do not start Plasma.
 from __future__ import annotations
 
 import os
-import shutil
-import subprocess
-import tempfile
 
 from firstboot.installlocale import InstallLocale
 from firstboot.osinstall.common import (
     OsIdentity,
     OsInstallError,
     OsInstallPlan,
-    efi_part_number,
+    install_vendor_shim,
     iso_volume_id,
     kernel_disk_path,
     kickstart_disk_id,
     kickstart_gecos,
-    run_checked,
 )
 
 ID = "fedora-44-plasma"
@@ -321,20 +317,7 @@ fi
 echo "ks=$(test -f "$root/ks.cfg" && echo yes || echo no) anaconda=$(test -x "$root/usr/libexec/fbl-anaconda" && echo yes || echo no) getty=$(test -f "$root/etc/systemd/system/getty@tty1.service" && echo yes || echo no) liveinst=$(test -x "$root/usr/bin/liveinst" && echo yes || echo no)" >> "$log"
 """
 
-SHIM_GRUB = """# First Boot Linux — Fedora shim (Secure Boot)
-set default=0
-set timeout=2
 
-search --no-floppy --set=root --fs-uuid {sys_uuid}
-if [ ! -f /boot/osinstall/vmlinuz ]; then
-	search --no-floppy --set=root --label FBL-SYS
-fi
-
-menuentry "Install {name}" {{
-    linux /boot/osinstall/vmlinuz {linux_args} ---
-    initrd /boot/osinstall/initrd
-}}
-"""
 
 
 # Chrooted on the installed system. Anaconda copies leftover live
@@ -561,84 +544,14 @@ def install_fedora_shim(
     linux_args: str,
 ) -> None:
     """Copy Fedora's Microsoft-signed shim to FBL-ESP and BootNext it."""
-    if plan.live is None:
-        return
-    esp_part = plan.live.part_named("FBL-ESP")
-    if esp_part is None:
-        return
-    src_shim = os.path.join(iso_mnt, "EFI", "BOOT", "BOOTX64.EFI")
-    src_grub = os.path.join(iso_mnt, "EFI", "BOOT", "grubx64.efi")
-    if not os.path.isfile(src_shim) or not os.path.isfile(src_grub):
-        return
-    mounted = False
-    esp_mp = ""
-    if esp_part.mountpoints:
-        esp_mp = esp_part.mountpoints[0]
-    else:
-        esp_mp = tempfile.mkdtemp(prefix="fbl-esp-")
-        run_checked(["mount", esp_part.path, esp_mp], what="mount the EFI partition")
-        mounted = True
-    try:
-        dest = os.path.join(esp_mp, "EFI", "osinstall")
-        os.makedirs(dest, exist_ok=True)
-        shutil.copy2(src_shim, os.path.join(dest, "shimx64.efi"))
-        shutil.copy2(src_grub, os.path.join(dest, "grubx64.efi"))
-        mm = os.path.join(iso_mnt, "EFI", "BOOT", "mmx64.efi")
-        if os.path.isfile(mm):
-            shutil.copy2(mm, os.path.join(dest, "mmx64.efi"))
-        with open(os.path.join(dest, "grub.cfg"), "w", encoding="utf-8") as fh:
-            fh.write(
-                SHIM_GRUB.format(
-                    sys_uuid=sys_uuid, name=name, linux_args=linux_args
-                )
-            )
-    finally:
-        if mounted:
-            subprocess.run(["umount", esp_mp], check=False, capture_output=True)
-            shutil.rmtree(esp_mp, ignore_errors=True)
-    if not shutil.which("efibootmgr"):
-        return
-    partnum = efi_part_number(esp_part.path)
-    from firstboot.install import efi_ids_for_label
-
-    def _efi_list() -> str:
-        proc = subprocess.run(
-            ["efibootmgr"], check=False, capture_output=True, text=True
-        )
-        return proc.stdout or ""
-
-    for bootnum in efi_ids_for_label(_efi_list(), BOOTNEXT_LABEL):
-        subprocess.run(
-            ["efibootmgr", "--bootnum", bootnum, "--delete-bootnum"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-    subprocess.run(
-        [
-            "efibootmgr",
-            "--create",
-            "--disk",
-            plan.live.path,
-            "--part",
-            partnum,
-            "--label",
-            BOOTNEXT_LABEL,
-            "--loader",
-            r"\EFI\osinstall\shimx64.efi",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
+    install_vendor_shim(
+        iso_mnt,
+        plan,
+        sys_uuid,
+        name,
+        linux_args,
+        bootnext_label=BOOTNEXT_LABEL,
     )
-    created = efi_ids_for_label(_efi_list(), BOOTNEXT_LABEL)
-    if created:
-        subprocess.run(
-            ["efibootmgr", "--bootnext", created[-1]],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
 
 
 class Fedora44Plasma:

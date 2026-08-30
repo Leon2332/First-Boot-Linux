@@ -4,15 +4,15 @@ Catalog ``install`` must equal ``ID`` (hyphens). Example: file
 ``deepin_25.py`` → ``ID = "deepin-25"`` → official-catalog.json
 ``"install": "deepin-25"``.
 
-Also add ``ID`` to the install enum in:
+For an official distro: add ``ID`` to the official-catalog install enum
+and to ``chooser/firstboot/payload.py`` ``INSTALL_DRIVERS``, pin the ISO
+on ``official-catalog.json``, add ``tests/test_osinstall_<id>.py``, and
+register the module in ``osinstall/__init__.py`` ``_DRIVER_MODULES``.
 
-- ``schemas/official-catalog.schema.json``
-- ``schemas/catalog.schema.json``
-- ``chooser/firstboot/payload.py`` ``INSTALL_DRIVERS``
-
-Pin ``url`` + ``sha256`` + ``size_bytes`` on the catalog edition.
-Add ``tests/test_osinstall_<id>.py``. Register the module in
-``osinstall/__init__.py`` ``_DRIVER_MODULES``.
+For a shop pack: put this file in a zip as ``driver.py`` with a
+``manifest.json`` (see ``schemas/custom-driver.schema.json``). Do not add
+it to the official catalog. ``ID`` must match the pack id. The live
+session loads it from ``payload/custom/<id>/driver.py``.
 
 A new ISO of the *same* installer (same YAML/preseed/kickstart) is
 catalog-only — do not copy this file. New file only when the installer

@@ -411,6 +411,19 @@ button:disabled {
   gap: 10px;
 }
 
+.status-bat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-bat-pct {
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--panel-fg);
+}
+
 .status-icon,
 .sym {
   display: block;

@@ -19,7 +19,6 @@ from firstboot.disk import HelperEvent, live_plan
 from firstboot.install import InstallError, run_apply
 from firstboot.osinstall import (
     DRIVER_UBUNTU,
-    DRIVERS_READY,
     OsIdentity,
     OsInstallError,
     canonical_driver_id,
@@ -44,14 +43,16 @@ from firstboot.catalog_search import (
 )
 from firstboot.isodownload import DownloadError, edition_dest
 from firstboot.i18n import _, apply_language, format_status, load_language
+from firstboot.osinstall.common import secure_boot_enabled
 from firstboot.payload import (
     Distro,
     Edition,
     Payload,
     load_payload,
+    other_options,
     recommended_offerings,
 )
-from firstboot.shell import Shell
+from firstboot.shell import Shell, set_symbolic
 from firstboot.floatlayer import FloatLayer
 from firstboot.browser import BrowserWindow
 from firstboot.kioskapp import launch_console, launch_sysinfo, launch_web
@@ -132,7 +133,7 @@ def run_window(
                 self.payload.retailer.language if self.payload.retailer else None
             )
             self.language = apply_language(
-                load_language(root, retailer_lang)
+                load_language(root, retailer_lang), payload_root=root
             )
             self.dark = not light
             self.screenshot = screenshot
@@ -142,6 +143,7 @@ def run_window(
             self.open_menu = open_menu
             self.shop = shop
             self.osinstall = osinstall
+            self.secure_boot_on = secure_boot_enabled() is True
             self._app_procs: list = []
             self._running_apps: dict[str, list] = {}
             self.shop_plan = live_plan(root)
@@ -536,6 +538,8 @@ def run_window(
             apply_session_theme(dark)
             self._apply_theme()
             self.shell.apply_theme(dark)
+            if getattr(self, "main_box", None) is not None:
+                self._render_main()
 
         def _apply_theme(self) -> None:
             mgr = Adw.StyleManager.get_default()
@@ -609,6 +613,8 @@ def run_window(
                 self._catalog_search.set_placeholder_text(_("Search"))
             if self._catalog_empty is not None:
                 self._catalog_empty.set_label(_("No matching systems"))
+            if self.overlay_mode == "catalog":
+                self._fill_catalog()
             if self.overlay_mode == "detail" and self.detail_distro is not None:
                 self._fill_detail(
                     self.detail_distro,
@@ -644,7 +650,7 @@ def run_window(
             cards: list[Gtk.Widget] = [
                 self._card(d, ed) for d, ed in recommended_offerings(p.recommended)
             ]
-            if p.others:
+            if self._other_options():
                 cards.append(self._other_card())
             if cards:
                 self.main_box.append(self._card_rows(cards))
@@ -706,6 +712,14 @@ def run_window(
             inner.append(name)
             inner.append(desk)
             inner.append(ver)
+            if self._needs_sb_warning(distro):
+                warn = Gtk.Image()
+                warn.add_css_class("card-warning")
+                warn.set_halign(Gtk.Align.CENTER)
+                warn.set_tooltip_text(_("No Secure Boot"))
+                color = "#f6d32d" if self.dark else "#9c6f00"
+                set_symbolic(warn, "info-symbolic.svg", color, 16)
+                inner.append(warn)
             btn.set_child(inner)
             btn.connect(
                 "clicked",
@@ -863,10 +877,7 @@ def run_window(
             self._catalog_search = search
             card.append(search)
 
-            distros = sorted(
-                self.payload.others,
-                key=lambda d: (d.catalog_name.casefold(), d.id),
-            )
+            distros = self._other_options()
             self._catalog_by_id = {d.id: d for d in distros}
             self._catalog_fields = {d.id: catalog_fields(d) for d in distros}
             self._catalog_query = ""
@@ -928,9 +939,13 @@ def run_window(
             name.set_hexpand(True)
             meta = Gtk.Label()
             meta.add_css_class("row-meta")
+            warn = Gtk.Label(xalign=1)
+            warn.add_css_class("row-warning")
+            warn.set_visible(False)
             row.append(logo)
             row.append(name)
             row.append(meta)
+            row.append(warn)
             btn.set_child(row)
             btn.connect("clicked", self._on_catalog_row_clicked)
             return btn
@@ -963,6 +978,14 @@ def run_window(
                 name.set_label(distro.catalog_name)
             if isinstance(meta, Gtk.Label):
                 meta.set_label(distro.version)
+            warn = meta.get_next_sibling() if meta is not None else None
+            if isinstance(warn, Gtk.Label):
+                if self._needs_sb_warning(distro):
+                    warn.set_label(_("No Secure Boot"))
+                    warn.set_visible(True)
+                else:
+                    warn.set_label("")
+                    warn.set_visible(False)
 
         def _catalog_match(self, item: object) -> bool:
             get_string = getattr(item, "get_string", None)
@@ -1098,6 +1121,18 @@ def run_window(
             hero.append(titles)
             card.append(hero)
 
+            if self._needs_sb_warning(distro):
+                warn = Gtk.Label(
+                    label=_(
+                        "This system cannot install while Secure Boot is on."
+                    ),
+                    xalign=0,
+                )
+                warn.set_wrap(True)
+                warn.set_max_width_chars(48)
+                warn.add_css_class("detail-warning")
+                card.append(warn)
+
             desc = Gtk.Label(label=_(distro.description), xalign=0)
             desc.set_wrap(True)
             desc.set_max_width_chars(48)
@@ -1148,8 +1183,23 @@ def run_window(
         def close_detail(self) -> None:
             self._hide_overlay()
 
+        def _other_options(self) -> list[Distro]:
+            return other_options(
+                self.payload.recommended,
+                self.payload.catalog,
+                secure_boot_on=self.secure_boot_on,
+            )
+
+        def _needs_sb_warning(self, distro: Distro) -> bool:
+            return self.secure_boot_on and not distro.secure_boot
+
         def _act(self, distro: Distro, ed: Edition) -> None:
-            if distro.install not in DRIVERS_READY:
+            if self._needs_sb_warning(distro) and ed.on_disk:
+                self._toast(
+                    _("This system cannot install while Secure Boot is on.")
+                )
+                return
+            if get_driver(distro.install) is None:
                 self._toast(
                     _("{name} install is not available yet.").format(name=distro.name)
                 )

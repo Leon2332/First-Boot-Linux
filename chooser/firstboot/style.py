@@ -142,6 +142,26 @@ window.firstboot.light .tz-spin-btn + .tz-spin-btn {
   padding: 0 2px;
 }
 
+.panel-bat {
+  min-height: 16px;
+}
+
+.panel-bat-pct {
+  font-size: 13px;
+  font-weight: 500;
+  color: #f6f5f4;
+  font-variant-numeric: tabular-nums;
+  padding: 0;
+}
+
+.panel-bat-pct.low {
+  color: #f6d32d;
+}
+
+.panel-bat-pct.critical {
+  color: #e01b24;
+}
+
 /* ===== Floating shell menus ===== */
 
 .shell-panel {
@@ -712,6 +732,25 @@ window.firstboot.light .card-name {
 window.firstboot.light .card-desktop,
 window.firstboot.light .card-version {
   color: #5e6772;
+}
+
+.card-warning,
+.row-warning,
+.detail-warning {
+  font-size: 11px;
+  font-weight: 600;
+  color: #f6d32d;
+}
+
+window.firstboot.light .card-warning,
+window.firstboot.light .row-warning,
+window.firstboot.light .detail-warning {
+  color: #9c6f00;
+}
+
+.detail-warning {
+  font-size: 13px;
+  margin-top: 4px;
 }
 
 .other-option-card .card-name {

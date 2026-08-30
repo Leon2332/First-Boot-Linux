@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -42,7 +43,14 @@ from firstboot.isodownload import DownloadError, dest_is_payload_image, download
 from firstboot.install import blkid_uuid
 from firstboot.i18n import _, apply_payload_language
 from firstboot.installlocale import payload_install_locale
-from firstboot.payload import Distro, Edition
+from firstboot.payload import (
+    DEFAULT_PAYLOAD,
+    Distro,
+    Edition,
+    ID_RE,
+    custom_driver_path,
+    last_payload_root,
+)
 
 from . import fedora_44_plasma, mint_223, ubuntu_2604
 from .common import (
@@ -98,11 +106,57 @@ DRIVER_MINT = mint_223.ID
 DRIVER_FEDORA = fedora_44_plasma.ID
 
 _casper_boot_files = casper_boot_files
+_CUSTOM_DRIVERS: dict[str, object] = {}
 
 
-def get_driver(driver_id: str):
-    """Return the driver object for a catalog install id or old alias."""
-    return DRIVERS.get(driver_id)
+def _payload_roots(payload_root: str | None) -> list[str]:
+    roots: list[str] = []
+    for item in (payload_root, last_payload_root(), os.environ.get("FIRSTBOOT_PAYLOAD"), DEFAULT_PAYLOAD):
+        if item and item not in roots:
+            roots.append(item)
+    return roots
+
+
+def get_driver(driver_id: str, payload_root: str | None = None):
+    """Return the driver object for a catalog install id, old alias, or shop pack."""
+    drv = DRIVERS.get(driver_id)
+    if drv is not None:
+        return drv
+    if not isinstance(driver_id, str) or not ID_RE.fullmatch(driver_id):
+        return None
+    for root in _payload_roots(payload_root):
+        path = custom_driver_path(root, driver_id)
+        if not path:
+            continue
+        cached = _CUSTOM_DRIVERS.get(path)
+        if cached is not None:
+            return cached
+        spec = importlib.util.spec_from_file_location(
+            f"firstboot_custom_{driver_id.replace('-', '_')}", path
+        )
+        if spec is None or spec.loader is None:
+            continue
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        try:
+            spec.loader.exec_module(mod)
+        except Exception:
+            sys.modules.pop(spec.name, None)
+            continue
+        loaded = getattr(mod, "DRIVER", None)
+        if loaded is None or getattr(loaded, "id", None) != driver_id:
+            sys.modules.pop(spec.name, None)
+            continue
+        for name in ("boot_files", "kernel_args", "seed_files"):
+            if not callable(getattr(loaded, name, None)):
+                sys.modules.pop(spec.name, None)
+                loaded = None
+                break
+        if loaded is None:
+            continue
+        _CUSTOM_DRIVERS[path] = loaded
+        return loaded
+    return None
 
 
 def canonical_driver_id(driver_id: str) -> str:
@@ -385,7 +439,7 @@ def plan_os_install(
 ) -> OsInstallPlan:
     if not edition.on_disk or not edition.file:
         return OsInstallPlan(False, "This edition is not on disk.")
-    if distro.install not in DRIVERS_READY:
+    if get_driver(distro.install, payload_root) is None:
         return OsInstallPlan(
             False,
             f"{distro.name} install is not available yet.",
@@ -807,7 +861,7 @@ def prepare_os(
         raise OsInstallError(plan.reason or _("Cannot install."))
     if os.geteuid() != 0:
         raise OsInstallError("must run as root")
-    drv = get_driver(plan.driver)
+    drv = get_driver(plan.driver, payload_root)
     if drv is None:
         raise OsInstallError(f"{plan.driver} is not available yet.")
 
@@ -911,7 +965,9 @@ def prepare_os(
         os.makedirs(os.path.dirname(grub_path), exist_ok=True)
         with open(grub_path, "w", encoding="utf-8") as fh:
             fh.write(grub)
-        drv.after_prepare(iso_mnt, plan, sys_uuid, label, linux_args)
+        after = getattr(drv, "after_prepare", None)
+        if callable(after):
+            after(iso_mnt, plan, sys_uuid, label, linux_args)
         os.sync()
         prog(100)
         emit("STEP", _("Restarting to install {name}…").format(name=plan.distro_name or label))
@@ -1174,7 +1230,7 @@ def main(argv: list[str] | None = None) -> int:
         if not getattr(args, key.replace("-", "_")):
             emit("ERROR", f"missing --{key.replace('_', '-')}")
             return 2
-    if args.driver not in DRIVERS_READY:
+    if get_driver(args.driver, args.payload) is None:
         emit("ERROR", f"{args.driver} is not available yet.")
         return 2
     if not ISO_REL_RE.fullmatch(args.iso_rel):

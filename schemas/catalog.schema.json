@@ -55,18 +55,12 @@
           "enum": ["ubuntu", "mint", "fedora", "debian", "suse", "windows", "bsd", "other"]
         },
         "install": {
-          "type": "string",
-          "enum": [
-            "ubuntu-2604",
-            "ubuntu-autoinstall",
-            "mint-223",
-            "mint",
-            "fedora-44-plasma",
-            "fedora-kickstart",
-            "debian-preseed",
-            "windows",
-            "freebsd"
-          ]
+          "$ref": "#/$defs/id",
+          "description": "Baked-in driver id (ubuntu-2604, mint-223, fedora-44-plasma, or an old alias), a reserved id with no driver yet (windows, freebsd, debian-preseed), or a shop pack folder payload/custom/<install>/."
+        },
+        "secure_boot": {
+          "type": "boolean",
+          "description": "Optional. Default true when omitted (old sticks). False: not signed for Secure Boot."
         },
         "editions": {
           "type": "array",

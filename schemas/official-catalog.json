@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-08-26",
+  "updated": "2026-08-30",
   "distros": [
     {
       "id": "ubuntu",
@@ -13,6 +13,7 @@
       "install": "ubuntu-2604",
       "can_stage": true,
       "suggested_default": false,
+      "secure_boot": true,
       "editions": [
         {
           "id": "gnome",
@@ -36,6 +37,7 @@
       "install": "mint-223",
       "can_stage": true,
       "suggested_default": false,
+      "secure_boot": true,
       "editions": [
         {
           "id": "cinnamon",
@@ -77,6 +79,7 @@
       "install": "fedora-44-plasma",
       "can_stage": true,
       "suggested_default": false,
+      "secure_boot": true,
       "editions": [
         {
           "id": "plasma",

@@ -17,17 +17,18 @@ type Official struct {
 }
 
 type Distro struct {
-	ID                string    `json:"id"`
-	Name              string    `json:"name"`
-	Version           string    `json:"version"`
-	Tagline           string    `json:"tagline"`
-	Description       string    `json:"description"`
-	Family            string    `json:"family"`
-	Redistributable   bool      `json:"redistributable"`
-	Install           *string   `json:"install"`
-	CanStage          bool      `json:"can_stage"`
-	SuggestedDefault  bool      `json:"suggested_default"`
-	Editions          []Edition `json:"editions"`
+	ID               string    `json:"id"`
+	Name             string    `json:"name"`
+	Version          string    `json:"version"`
+	Tagline          string    `json:"tagline"`
+	Description      string    `json:"description"`
+	Family           string    `json:"family"`
+	Redistributable  bool      `json:"redistributable"`
+	Install          *string   `json:"install"`
+	CanStage         bool      `json:"can_stage"`
+	SuggestedDefault bool      `json:"suggested_default"`
+	SecureBoot       bool      `json:"secure_boot"`
+	Editions         []Edition `json:"editions"`
 }
 
 type Edition struct {
@@ -54,6 +55,7 @@ type ShopDistro struct {
 	Description string        `json:"description"`
 	Family      string        `json:"family"`
 	Install     string        `json:"install"`
+	SecureBoot  bool          `json:"secure_boot"`
 	Editions    []ShopEdition `json:"editions"`
 }
 
@@ -584,7 +586,7 @@ func sanitizeValue(s string) string {
 // default if ticked, otherwise the first ticked desktop. Unticked
 // offerable distros go in catalog as download-only — Other options on
 // the chooser. Rows with install: null stay out.
-func BuildShop(off *Official, selected []string) (*Shop, error) {
+func BuildShop(off *Official, selected []string, packs ...*Pack) (*Shop, error) {
 	if len(selected) == 0 {
 		return nil, fmt.Errorf("tick at least one desktop to keep on the USB")
 	}
@@ -597,21 +599,42 @@ func BuildShop(off *Official, selected []string) (*Shop, error) {
 			return nil, err
 		}
 		d := off.Distro(did)
-		if d == nil {
+		p := PackByID(packs, did)
+		if d == nil && p == nil {
 			return nil, fmt.Errorf("unknown distro %s", did)
 		}
-		if !d.Offerable() {
-			return nil, fmt.Errorf("%s cannot be offered yet", d.Name)
+		if d != nil && p != nil {
+			return nil, fmt.Errorf("%s is an official id", did)
 		}
-		if eid == "" {
-			ed := d.DefaultEdition()
-			if ed == nil {
-				return nil, fmt.Errorf("%s has no default desktop", d.Name)
+		if d != nil {
+			if !d.Offerable() {
+				return nil, fmt.Errorf("%s cannot be offered yet", d.Name)
 			}
-			eid = ed.ID
-		}
-		if d.Edition(eid) == nil {
-			return nil, fmt.Errorf("unknown desktop %s for %s", eid, d.Name)
+			if eid == "" {
+				ed := d.DefaultEdition()
+				if ed == nil {
+					return nil, fmt.Errorf("%s has no default desktop", d.Name)
+				}
+				eid = ed.ID
+			}
+			if d.Edition(eid) == nil {
+				return nil, fmt.Errorf("unknown desktop %s for %s", eid, d.Name)
+			}
+		} else {
+			if eid == "" {
+				ed := p.DefaultEdition()
+				if ed == nil {
+					return nil, fmt.Errorf("%s has no default desktop", p.Name)
+				}
+				eid = ed.ID
+			}
+			ed := p.Edition(eid)
+			if ed == nil {
+				return nil, fmt.Errorf("unknown desktop %s for %s", eid, p.Name)
+			}
+			if !p.CanStageEdition(*ed) {
+				return nil, fmt.Errorf("choose an ISO for %s %s", p.Name, ed.Name)
+			}
 		}
 		key := StagedKey(did, eid)
 		if seen[key] {
@@ -625,8 +648,15 @@ func BuildShop(off *Official, selected []string) (*Shop, error) {
 	}
 	shop := &Shop{SchemaVersion: 1, Recommended: []ShopDistro{}, Catalog: []ShopDistro{}}
 	for _, did := range order {
-		d := off.Distro(did)
-		sd, err := shopDistro(d, picked[did])
+		if d := off.Distro(did); d != nil {
+			sd, err := shopDistro(d, picked[did])
+			if err != nil {
+				return nil, err
+			}
+			shop.Recommended = append(shop.Recommended, sd)
+			continue
+		}
+		sd, err := shopDistroFromPack(PackByID(packs, did), picked[did])
 		if err != nil {
 			return nil, err
 		}
@@ -649,6 +679,61 @@ func BuildShop(off *Official, selected []string) (*Shop, error) {
 	return shop, nil
 }
 
+func shopDistroFromPack(p *Pack, selected []string) (ShopDistro, error) {
+	if p == nil {
+		return ShopDistro{}, fmt.Errorf("missing pack")
+	}
+	if len(selected) == 0 {
+		return ShopDistro{}, fmt.Errorf("tick at least one desktop for %s", p.Name)
+	}
+	sd := ShopDistro{
+		ID:          p.ID,
+		Name:        p.Name,
+		Version:     p.Version,
+		Tagline:     p.Tagline,
+		Description: p.Description,
+		Family:      p.Family,
+		Install:     p.Install,
+		SecureBoot:  p.SecureBoot,
+	}
+	featured := ""
+	if def := p.DefaultEdition(); def != nil {
+		for _, id := range selected {
+			if id == def.ID {
+				featured = def.ID
+				break
+			}
+		}
+	}
+	if featured == "" {
+		featured = selected[0]
+	}
+	seen := map[string]bool{}
+	for _, eid := range selected {
+		if seen[eid] {
+			continue
+		}
+		seen[eid] = true
+		ed := p.Edition(eid)
+		if ed == nil {
+			return sd, fmt.Errorf("unknown desktop %s for %s", eid, p.Name)
+		}
+		if !p.CanStageEdition(*ed) {
+			return sd, fmt.Errorf("choose an ISO for %s %s", p.Name, ed.Name)
+		}
+		sd.Editions = append(sd.Editions, ShopEdition{
+			ID:        ed.ID,
+			Name:      ed.Name,
+			Default:   ed.ID == featured,
+			Local:     true,
+			File:      p.File(*ed),
+			SHA256:    ed.SHA256,
+			SizeBytes: ed.SizeBytes,
+		})
+	}
+	return sd, nil
+}
+
 func shopDistro(d *Distro, selected []string) (ShopDistro, error) {
 	sd := ShopDistro{
 		ID:          d.ID,
@@ -658,6 +743,7 @@ func shopDistro(d *Distro, selected []string) (ShopDistro, error) {
 		Description: d.Description,
 		Family:      d.Family,
 		Install:     *d.Install,
+		SecureBoot:  d.SecureBoot,
 	}
 	picked := map[string]bool{}
 	for _, id := range selected {

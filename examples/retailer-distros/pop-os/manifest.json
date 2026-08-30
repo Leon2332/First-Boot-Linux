@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "pop-os",
+  "name": "Pop!_OS",
+  "version": "24.04 LTS",
+  "tagline": "Developed by System76",
+  "description": "A polished Ubuntu-based desktop distrobution from System76.",
+  "family": "other",
+  "install": "pop-os",
+  "secure_boot": false,
+  "logo": "logo.png",
+  "driver": "driver.py",
+  "editions": [
+    {
+      "id": "cosmic",
+      "name": "COSMIC",
+      "default": true,
+      "filename": "pop-os_24.04_amd64_generic_27.iso",
+      "sha256": "8790eeb29088558d6dfafa5fb672c3650a9c20a64d0d79cbfc02e91ff5d7b559",
+      "size_bytes": 3523215360
+    },
+    {
+      "id": "cosmic-nvidia",
+      "name": "COSMIC (Nvidia)",
+      "default": false,
+      "filename": "pop-os_24.04_amd64_nvidia_27.iso",
+      "sha256": "2c68c26edb5d1c55472fe415086917b2deec8a09689944717b6a16a45bc88f10",
+      "size_bytes": 3931095040
+    }
+  ]
+}

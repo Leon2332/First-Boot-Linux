@@ -99,6 +99,41 @@ func CatalogFor(id string) map[string]string {
 	return cat
 }
 
+func CatalogWithPacks(id string, packs []*catalog.Pack) map[string]string {
+	return MergePackLocales(CatalogFor(id), packs, id)
+}
+
+func MergePackLocales(base map[string]string, packs []*catalog.Pack, lang string) map[string]string {
+	out := make(map[string]string, len(base)+8)
+	for k, v := range base {
+		out[k] = v
+	}
+	lang = catalog.CanonicalLanguage(lang)
+	if lang == "" || lang == DefaultLanguage || lang == "en" {
+		return out
+	}
+	for _, p := range packs {
+		path := p.LocaleFile(lang)
+		if path == "" {
+			continue
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		for k, v := range ParsePO(string(raw)) {
+			if k == "" || v == "" {
+				continue
+			}
+			if _, exists := out[k]; exists {
+				continue
+			}
+			out[k] = v
+		}
+	}
+	return out
+}
+
 func T(lang, msgid string) string {
 	if msgid == "" {
 		return msgid

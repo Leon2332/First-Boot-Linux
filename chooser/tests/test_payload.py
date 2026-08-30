@@ -20,6 +20,7 @@ from firstboot.payload import (  # noqa: E402
     parse_retailer_conf,
     PayloadError,
     edition_is_present,
+    other_options,
     recommended_offerings,
 )
 
@@ -445,6 +446,85 @@ class LoadPayloadTests(unittest.TestCase):
         self.assertFalse(edition_is_present(self.tmp, "../catalog.json"))
         self.assertFalse(edition_is_present(self.tmp, "/etc/passwd"))
         self.assertFalse(edition_is_present(self.tmp, None))
+
+    def test_custom_install_needs_pack(self) -> None:
+        pop = {
+            "id": "pop-os",
+            "name": "Pop!_OS",
+            "version": "22.04",
+            "tagline": "t",
+            "description": "d",
+            "family": "other",
+            "install": "pop-os",
+            "editions": [
+                {
+                    "id": "gnome",
+                    "name": "GNOME",
+                    "default": True,
+                    "local": True,
+                    "file": "images/pop-os_22.04_amd64_intel.iso",
+                    "sha256": ZERO,
+                    "size_bytes": 1,
+                }
+            ],
+        }
+        _write(
+            self.tmp,
+            "catalog.json",
+            json.dumps({"schema_version": 1, "recommended": [pop], "catalog": []}),
+        )
+        p = load_payload(self.tmp)
+        self.assertTrue(any("unknown install driver" in e for e in p.errors))
+        _write(self.tmp, "custom/pop-os/driver.py", "DRIVER = object()\n")
+        p = load_payload(self.tmp)
+        self.assertFalse(any("unknown install driver" in e for e in p.errors))
+        self.assertEqual(p.recommended[0].id, "pop-os")
+        self.assertEqual(p.recommended[0].install, "pop-os")
+        self.assertTrue(p.recommended[0].secure_boot)
+
+    def test_secure_boot_field(self) -> None:
+        pop = {
+            "id": "pop-os",
+            "name": "Pop!_OS",
+            "version": "24.04 LTS",
+            "tagline": "t",
+            "description": "d",
+            "family": "other",
+            "install": "pop-os",
+            "secure_boot": False,
+            "editions": [
+                {
+                    "id": "cosmic",
+                    "name": "COSMIC",
+                    "default": True,
+                    "local": True,
+                    "file": "images/pop-os_24.04_amd64_generic_27.iso",
+                    "sha256": ZERO,
+                    "size_bytes": 1,
+                }
+            ],
+        }
+        _write(self.tmp, "custom/pop-os/driver.py", "DRIVER = object()\n")
+        _write(
+            self.tmp,
+            "catalog.json",
+            json.dumps(
+                {"schema_version": 1, "recommended": [pop], "catalog": [UBUNTU]}
+            ),
+        )
+        p = load_payload(self.tmp)
+        self.assertFalse(p.recommended[0].secure_boot)
+        self.assertTrue(p.catalog[0].secure_boot)
+        hidden = other_options(p.recommended, p.catalog, secure_boot_on=True)
+        self.assertEqual([d.id for d in hidden], ["pop-os", "ubuntu"])
+        catalog_only = other_options([], p.catalog, secure_boot_on=True)
+        self.assertEqual([d.id for d in catalog_only], ["ubuntu"])
+        unsigned_catalog = other_options([], p.recommended, secure_boot_on=True)
+        self.assertEqual(unsigned_catalog, [])
+        kept = other_options(p.recommended, [], secure_boot_on=True)
+        self.assertEqual([d.id for d in kept], ["pop-os"])
+        shown = other_options(p.recommended, p.catalog, secure_boot_on=False)
+        self.assertEqual({d.id for d in shown}, {"pop-os", "ubuntu"})
 
 
 if __name__ == "__main__":

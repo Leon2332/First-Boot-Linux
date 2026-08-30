@@ -55,6 +55,7 @@
         "install",
         "can_stage",
         "suggested_default",
+        "secure_boot",
         "editions"
       ],
       "properties": {
@@ -98,6 +99,10 @@
         "suggested_default": {
           "type": "boolean",
           "description": "Reserved. Creator does not pre-tick. Requires install. May be true when redistributable is false."
+        },
+        "secure_boot": {
+          "type": "boolean",
+          "description": "Installer kernel and bootloader load with firmware Secure Boot on. False hides the row in Other options when Secure Boot is on; a recommended card still shows with a warning."
         },
         "editions": {
           "type": "array",

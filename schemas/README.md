@@ -7,6 +7,7 @@ Two files on every shop USB (`payload/`). One file in this repo for the creator.
 | `retailer.conf` | USB `payload/` | Creator, per shop | Name, support, wallpaper paths |
 | `catalog.json` | USB `payload/` | Creator, per shop | What this shop offers (self-contained) |
 | `official-catalog.json` | This repo / creator | Us | Menu of distros we support |
+| `custom-driver.schema.json` | This repo / pack zip | Distro team | `manifest.json` inside a retailer `.zip` |
 
 The live chooser reads only `/run/payload/retailer.conf` and `/run/payload/catalog.json`. It does not need `official-catalog.json`. That file is how the creator knows what may be ticked (recommended, ISO on disk), left as Other options (download), or hidden until an install driver exists.
 
@@ -46,6 +47,7 @@ Each distro:
 | `install` | Install driver id, or `null` if we cannot install it yet. `windows` and `freebsd` are reserved; no driver yet. |
 | `can_stage` | Creator may copy an edition ISO onto `payload/images/` |
 | `suggested_default` | Reserved. Creator does not pre-tick anything. |
+| `secure_boot` | Installer loads with firmware Secure Boot on |
 | `editions[]` | One ISO per desktop (or flavor) |
 
 Each edition:
@@ -67,6 +69,7 @@ Rules:
 - `suggested_default` requires `install`. The creator GUI does not pre-tick; shops tick desktops under each distro.
 - Official catalog is only distros with a working install driver: Ubuntu (`ubuntu-2604`), Linux Mint (`mint-223`, Cinnamon / MATE / Xfce editions), Fedora Plasma (`fedora-44-plasma`). Older sticks may still say `ubuntu-autoinstall` / `mint` / `fedora-kickstart` (aliases). `windows` and `freebsd` stay reserved in the schema. The mockup in `docs/` is the longer future list. Driver Python lives in `chooser/firstboot/osinstall/`.
 - Pin `url`, `sha256`, and `size_bytes` before the creator downloads that edition.
+- Shop-private distros (Pop!_OS, TUXEDO OS, a store’s own image) are **not** official-catalog rows. They are a `.zip` pack the creator copies to `payload/custom/<id>/`. See [Retailer driver packs](#retailer-driver-packs).
 
 ## `catalog.json` (on the USB)
 
@@ -82,7 +85,9 @@ Self-contained shop catalog. Schema: [`catalog.schema.json`](catalog.schema.json
 
 The chooser grid is `recommended`, one card per **local** edition (ticked desktop). The same distro id can appear on more than one card (Mint MATE and Mint Xfce). A recommended distro with no local edition (download-only, e.g. MS Windows) is still one card. **Other options** (the last card) opens `recommended` followed by `catalog`, sorted by name, one row per distro (do not duplicate ids in the JSON). `ms-windows` stays **MS Windows** on the card and **Microsoft Windows** in that list.
 
-Each distro copies display fields from the official catalog (`id`, `name`, `version`, `tagline`, `description`, `family`, `install`) plus `editions`. Do not copy official edition objects through: they have `filename` and nullable hashes, which this schema rejects (`additionalProperties: false`).
+Each distro copies display fields from the official catalog (`id`, `name`, `version`, `tagline`, `description`, `family`, `install`, `secure_boot`) plus `editions`. Do not copy official edition objects through: they have `filename` and nullable hashes, which this schema rejects (`additionalProperties: false`).
+
+`secure_boot` is optional on the stick (missing means true, for older payloads). The live chooser reads firmware Secure Boot. When it is on, Other options omits catalog rows with `secure_boot: false`. A **recommended** row without Secure Boot still appears, with a warning; Install is refused. Shop packs default to false unless the manifest sets `secure_boot: true`.
 
 Official edition → shop edition:
 
@@ -107,7 +112,7 @@ Each edition on the stick:
 
 The creator sets `local: true` and `file` only after the ISO is copied and verified. Recommended entries may be entirely download-only when the official row is not redistributable. Never set `local: true` on a non-redistributable edition.
 
-Logos are bundled in the chooser by `id` (`assets/distros/<id>.png` in the mockup). Not payload files.
+Official logos are bundled in the chooser by `id` (`assets/distros/<id>.png` in the mockup). Shop packs put `logo.png` at `payload/custom/<id>/logo.png` (and a copy at `payload/logos/<id>.png`). The chooser looks there first.
 
 ## Integrity
 
@@ -117,7 +122,30 @@ Logos are bundled in the chooser by `id` (`assets/distros/<id>.png` in the mocku
 
 1. `retailer.conf` has the required keys; wallpapers exist. `language`, `keyboard`, and `timezone` are optional.
 2. `catalog.json` matches `catalog.schema.json`.
-3. Every distro `id` / edition exists in `official-catalog.json`.
+3. Every distro `id` / edition exists in `official-catalog.json`, **or** it is a shop pack under `custom/<install>/` whose `install` equals the pack id and is not a reserved official id.
 4. Every `local` edition file exists under `images/` and matches `sha256`.
-5. No `local` edition unless official `can_stage`, `redistributable`, and `install` are set. Recommended may list a non-redistributable distro with every edition `local: false`.
+5. No `local` edition unless official `can_stage`, `redistributable`, and `install` are set, **or** the row is a shop pack with a staged ISO. Recommended may list a non-redistributable official distro with every edition `local: false`. Custom editions have no download URL; only ticked desktops are written.
 6. No `..` or absolute paths.
+
+## Retailer driver packs
+
+A shop that maintains its own OS ships a `.zip` (repeatable) instead of a pull request. Schema: [`custom-driver.schema.json`](custom-driver.schema.json). Example: [`examples/custom-driver.json`](examples/custom-driver.json). Source for the Pop!_OS test pack: [`../examples/retailer-distros/pop-os/`](../examples/retailer-distros/pop-os/).
+
+Zip layout (files at the root, or one top-level folder):
+
+```text
+manifest.json
+driver.py          # same API as chooser/firstboot/osinstall/_template.py
+logo.png
+locale/af.po       # optional; also locale/en-gb.po, locale/en-za.po, …
+```
+
+`editions[]` is one ISO per desktop (Pop!_OS GNOME and COSMIC are two editions, one driver). Optional `sha256` / `size_bytes` pin the ISO; the creator rejects a file that does not match. ISOs may sit in the zip, next to the zip (same `filename`), in `~/.cache/firstboot/images/`, or be chosen in the USB Creator. They are written to `payload/images/`; they do not stay under `custom/`.
+
+`id` = `install` = folder `payload/custom/<id>/` = `DRIVER.id` in `driver.py`. Must not collide with official catalog ids or baked-in driver ids (`ubuntu`, `linux-mint`, `fedora`, `ubuntu-2604`, `mint-223`, `fedora-44-plasma`, aliases, `windows`, `freebsd`).
+
+Optional `locale/<lang>.po` files (GNU gettext, same format as `po/af.po`) translate that pack’s **tagline and description**. `msgid` is the English string in `manifest.json`. Distro and desktop names stay untranslated. Compose copies them to `payload/custom/<id>/locale/`. The live chooser and the USB Creator GUI merge those entries **after** First Boot’s catalogues and never override chrome (`Install`, `Network`, `Back`, …). English (US) is the source; do not ship `en.po` / `en-us.po`. `en-gb.po` and `en-za.po` are spelling catalogues for that pack’s blurb.
+
+The live chooser loads `custom/<id>/driver.py` with `importlib` when `catalog.json` `install` is not a baked-in module. That code runs as root at customer install. The pack is not from First Boot Linux.
+
+Shop `catalog.json` `install` is an open kebab-case id (not a closed enum). Official-catalog.json stays a closed menu.

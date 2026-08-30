@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"github.com/Leon2332/First-Boot-Linux/creator/internal/assets"
+	"github.com/Leon2332/First-Boot-Linux/creator/internal/catalog"
 )
 
 func TestParsePOEscapes(t *testing.T) {
@@ -165,6 +166,30 @@ func TestEnglishVariantsCoverPot(t *testing.T) {
 		if _, ok := za[id]; !ok {
 			t.Errorf("en-za missing %q", id)
 		}
+	}
+}
+
+func TestMergePackLocalesSkipsChrome(t *testing.T) {
+	dir := t.TempDir()
+	loc := filepath.Join(dir, "locale")
+	if err := os.MkdirAll(loc, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	raw := "msgid \"Back\"\nmsgstr \"MOENIE\"\n\nmsgid \"COSMIC and GNOME from System76\"\nmsgstr \"COSMIC en GNOME van System76\"\n"
+	if err := os.WriteFile(filepath.Join(loc, "af.po"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p := &catalog.Pack{Dir: dir}
+	base := CatalogFor("af")
+	if base["Back"] == "" {
+		t.Fatal("need official Back")
+	}
+	merged := MergePackLocales(base, []*catalog.Pack{p}, "af")
+	if merged["Back"] != base["Back"] {
+		t.Fatalf("chrome overwritten: %q", merged["Back"])
+	}
+	if merged["COSMIC and GNOME from System76"] != "COSMIC en GNOME van System76" {
+		t.Fatalf("missing pack string: %#v", merged["COSMIC and GNOME from System76"])
 	}
 }
 

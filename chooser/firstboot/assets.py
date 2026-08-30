@@ -37,7 +37,39 @@ def find_asset(*relatives: str) -> str | None:
     return None
 
 
-def find_logo(distro_id: str) -> str | None:
+def find_logo(distro_id: str, payload_root: str | None = None) -> str | None:
+    if not distro_id or "/" in distro_id or "\\" in distro_id or ".." in distro_id:
+        return None
+    roots: list[str] = []
+    if payload_root:
+        roots.append(payload_root)
+    try:
+        from firstboot.payload import last_payload_root
+
+        last = last_payload_root()
+        if last:
+            roots.append(last)
+    except ImportError:
+        pass
+    env = os.environ.get("FIRSTBOOT_PAYLOAD")
+    if env:
+        roots.append(env)
+    if os.path.isdir("/run/payload"):
+        roots.append("/run/payload")
+    seen: set[str] = set()
+    for root in roots:
+        if not root or root in seen:
+            continue
+        seen.add(root)
+        for rel in (
+            os.path.join("custom", distro_id, "logo.png"),
+            os.path.join("custom", distro_id, "logo.svg"),
+            os.path.join("logos", f"{distro_id}.png"),
+            os.path.join("logos", f"{distro_id}.svg"),
+        ):
+            path = os.path.join(root, rel)
+            if os.path.isfile(path):
+                return path
     return find_asset(
         os.path.join("distros", f"{distro_id}.png"),
         os.path.join("assets", "distros", f"{distro_id}.png"),
@@ -97,18 +129,23 @@ def recolor_svg(text: str, color: str) -> str:
 def symbolic_pixbuf(path: str, color: str, size: int):
     """Load an SVG as a GdkPixbuf tinted to *color*. Returns None on failure."""
     try:
+        with open(path, encoding="utf-8") as fh:
+            raw = fh.read()
+    except OSError:
+        return None
+    return symbolic_pixbuf_from_svg(raw, color, size)
+
+
+def symbolic_pixbuf_from_svg(svg: str, color: str, size: int):
+    """Tint an SVG string and rasterize it. Returns None on failure."""
+    try:
         import gi
 
         gi.require_version("GdkPixbuf", "2.0")
         from gi.repository import GdkPixbuf
     except (ImportError, ValueError):
         return None
-    try:
-        with open(path, encoding="utf-8") as fh:
-            raw = fh.read()
-    except OSError:
-        return None
-    data = recolor_svg(raw, color).encode("utf-8")
+    data = recolor_svg(svg, color).encode("utf-8")
     try:
         loader = GdkPixbuf.PixbufLoader.new_with_type("svg")
         loader.set_size(size, size)

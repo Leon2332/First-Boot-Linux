@@ -67,7 +67,7 @@ def apply_payload_language(root: str | None = None) -> str:
         or os.environ.get("FBL_PAYLOAD")
         or "/run/payload"
     )
-    return apply_language(load_language(path))
+    return apply_language(load_language(path), payload_root=path)
 
 
 def current_language() -> str:
@@ -297,6 +297,82 @@ def _unquote_po(token: str) -> str:
     return "".join(out)
 
 
+_PACK_DIR_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def _payload_root(explicit: str | None) -> str | None:
+    if explicit:
+        return explicit
+    try:
+        from firstboot.payload import last_payload_root
+
+        last = last_payload_root()
+        if last:
+            return last
+    except ImportError:
+        pass
+    for cand in (
+        os.environ.get("FIRSTBOOT_PAYLOAD"),
+        os.environ.get("FBL_PAYLOAD"),
+        "/run/payload",
+    ):
+        if cand and os.path.isdir(cand):
+            return cand
+    return None
+
+
+def pack_locale_paths(payload_root: str | None, lang_id: str) -> list[str]:
+    """Shop-pack .po files for this live language under payload/custom/."""
+    lid = normalize_id(lang_id)
+    if not lid or lid == DEFAULT_LANGUAGE:
+        return []
+    root = _payload_root(payload_root)
+    if not root:
+        return []
+    custom = os.path.join(root, "custom")
+    custom_real = os.path.realpath(custom)
+    if not os.path.isdir(custom_real):
+        return []
+    out: list[str] = []
+    try:
+        names = sorted(os.listdir(custom_real))
+    except OSError:
+        return []
+    for name in names:
+        if not _PACK_DIR_RE.fullmatch(name):
+            continue
+        for rel in (
+            os.path.join("locale", f"{lid}.po"),
+            f"{lid}.po",
+            os.path.join("locale", lid, "LC_MESSAGES", f"{DOMAIN}.po"),
+        ):
+            path = os.path.realpath(os.path.join(custom_real, name, rel))
+            if not path.startswith(custom_real + os.sep):
+                continue
+            if os.path.isfile(path):
+                out.append(path)
+                break
+    return out
+
+
+def merge_pack_locales(
+    base: dict[str, str], lang_id: str, payload_root: str | None = None
+) -> dict[str, str]:
+    """Fill missing msgids from shop packs. Never override First Boot chrome."""
+    out = dict(base)
+    for path in pack_locale_paths(payload_root, lang_id):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                extra = parse_po(fh.read())
+        except OSError:
+            continue
+        for key, value in extra.items():
+            if not key or not value or key in out:
+                continue
+            out[key] = value
+    return out
+
+
 def load_catalog(lang_id: str) -> dict[str, str]:
     lid = resolve_language(lang_id)
     if lid == DEFAULT_LANGUAGE or lid == "en":
@@ -326,12 +402,12 @@ def load_catalog(lang_id: str) -> dict[str, str]:
     return parse_po(text)
 
 
-def apply_language(lang_id: str) -> str:
+def apply_language(lang_id: str, payload_root: str | None = None) -> str:
     """Install the catalog for this process. Returns the resolved id."""
     global _catalog, _current
     lid = resolve_language(lang_id)
     _current = lid
-    _catalog = load_catalog(lid)
+    _catalog = merge_pack_locales(load_catalog(lid), lid, payload_root)
     os.environ["LANGUAGE"] = lid
     return lid
 

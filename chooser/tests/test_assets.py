@@ -38,11 +38,32 @@ class AssetTests(unittest.TestCase):
         self.assertTrue(find_status("folder-download-symbolic.svg"))
         self.assertTrue(find_status("display-brightness-symbolic.svg"))
         self.assertTrue(find_status("languages-symbolic.svg"))
+        self.assertTrue(find_status("info-symbolic.svg"))
         self.assertTrue(find_status("object-select-symbolic.svg"))
+        self.assertTrue(find_status("battery-symbolic.svg"))
         self.assertTrue(find_brand_logo())
         self.assertTrue(find_brand_wordmark(True))
         self.assertTrue(find_brand_wordmark(False))
         self.assertNotEqual(find_brand_wordmark(True), find_brand_wordmark(False))
+
+    def test_payload_pack_logo(self) -> None:
+        import tempfile
+
+        from firstboot.payload import load_payload
+
+        root = tempfile.mkdtemp(prefix="fbl-logo-")
+        try:
+            os.makedirs(os.path.join(root, "custom", "pop-os"))
+            path = os.path.join(root, "custom", "pop-os", "logo.png")
+            with open(path, "wb") as fh:
+                fh.write(b"png")
+            load_payload(root)
+            self.assertEqual(find_logo("pop-os"), path)
+            self.assertTrue(find_logo("ubuntu"))
+        finally:
+            import shutil
+
+            shutil.rmtree(root, ignore_errors=True)
 
     def test_recolor_replaces_fill(self) -> None:
         src = '<svg><g fill="#808080"><circle /></g></svg>'

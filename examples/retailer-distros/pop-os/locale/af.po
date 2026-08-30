@@ -1,0 +1,11 @@
+# Pop!_OS shop pack — Afrikaans. msgid must match manifest.json English.
+msgid ""
+msgstr ""
+"Language: af\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Developed by System76"
+msgstr "Ontwikkel deur System76"
+
+msgid "A polished Ubuntu-based desktop distrobution from System76."
+msgstr "’n Afgewerkte Ubuntu-gebaseerde werkskerm van System76."

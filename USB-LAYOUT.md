@@ -71,12 +71,20 @@ USB
     ├── wallpapers
     │   ├── dark.jpg
     │   └── light.jpg
+    ├── logos                   optional; shop-pack PNG copies as <id>.png
+    ├── custom                  optional; one folder per retailer pack
+    │   └── pop-os
+    │       ├── manifest.json
+    │       ├── driver.py
+    │       ├── logo.png
+    │       └── locale
+    │           └── af.po
     └── images
         ├── ubuntu-26.04-desktop-amd64.iso
         └── linuxmint-22.3-cinnamon-64bit.iso
 ```
 
-`images/` only contains redistributable ISOs this retailer staged. Recommended can include a download-only row (official `redistributable: false`) with nothing under `images/`. Distros the shop did not tick, but that already have an install driver, go in `catalog.json` `catalog` (Other options, Download). v1 may stage only distros with official `can_stage`, `redistributable`, and `install` (Ubuntu, Linux Mint, Fedora Plasma). Basenames come from `schemas/official-catalog.json` `filename` fields.
+`images/` only contains redistributable ISOs this retailer staged (official downloads, plus shop-pack ISOs). Recommended can include a download-only row (official `redistributable: false`) with nothing under `images/`. Distros the shop did not tick, but that already have an install driver, go in `catalog.json` `catalog` (Other options, Download). Official ticks still require `can_stage`, `redistributable`, and `install` (Ubuntu, Linux Mint, Fedora Plasma). Shop packs are extra recommended rows; their driver lives under `custom/<id>/`, not in the squashfs. Basenames for official ISOs come from `schemas/official-catalog.json` `filename` fields; pack ISO basenames come from the pack `manifest.json` `editions[].filename`.
 
 ## What each payload file is
 
@@ -198,11 +206,19 @@ Two images from the creator: dark and light. The live session switches with the 
 
 ### `images/`
 
-Official upstream ISOs (or later, disk images) named as in the official catalog.
+Official upstream ISOs (or later, disk images) named as in the official catalog, plus ISOs from shop packs.
+
+### `custom/`
+
+One folder per retailer pack (`<id>/manifest.json`, `driver.py`, `logo.png`, optional `locale/<lang>.po`). The chooser loads `driver.py` when `catalog.json` `install` equals that id and it is not a baked-in driver. Pack `.po` files merge into the live language catalogue without replacing First Boot chrome. Empty when the shop used only the official list.
+
+### `logos/`
+
+Optional copies of shop-pack PNGs as `<id>.png`. Official logos stay in the squashfs.
 
 ### `checksums.sha256`
 
-SHA-256 of `retailer.conf`, `catalog.json`, wallpapers, and every file in `images/`. Verified when the creator writes the USB, and again before a customer install.
+SHA-256 of `retailer.conf`, `catalog.json`, wallpapers, every file in `images/`, `custom/`, and `logos/`. Verified when the creator writes the USB, and again before a customer install.
 
 ## Boot and mount
 

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -37,6 +38,7 @@ type session struct {
 	seedErr error
 	dark    string
 	light   string
+	packs   []*catalog.Pack
 	mu      sync.Mutex
 	busy    bool
 	stage   string
@@ -85,6 +87,12 @@ func Run() error {
 	mux.HandleFunc("/api/wallpaper/light", s.serveWallpaper("light"))
 	mux.HandleFunc("/api/logo/", s.logo)
 	mux.HandleFunc("/api/icon", s.icon)
+	mux.HandleFunc("/api/pick-file", s.pickFile)
+	mux.HandleFunc("/api/custom-pack", s.addPack)
+	mux.HandleFunc("/api/custom-pack-upload", s.uploadPack)
+	mux.HandleFunc("/api/custom-iso", s.attachISO)
+	mux.HandleFunc("POST /api/custom-remove", s.removePack)
+	mux.HandleFunc("/api/custom-remove", s.removePack)
 	mux.HandleFunc("/api/start", s.start)
 	mux.HandleFunc("/api/cancel", s.cancelJob)
 	mux.HandleFunc("/api/progress", s.progress)
@@ -99,6 +107,7 @@ func (s *session) state(w http.ResponseWriter, r *http.Request) {
 		Name      string `json:"name"`
 		Size      string `json:"size"`
 		Stageable bool   `json:"stageable"`
+		NeedISO   bool   `json:"need_iso"`
 	}
 	type distro struct {
 		ID          string    `json:"id"`
@@ -108,9 +117,14 @@ func (s *session) state(w http.ResponseWriter, r *http.Request) {
 		Description string    `json:"description"`
 		Stageable   bool      `json:"stageable"`
 		Logo        bool      `json:"logo"`
+		Custom      bool      `json:"custom"`
+		SecureBoot  bool      `json:"secure_boot"`
 		Editions    []edition `json:"editions"`
 	}
 	var list []distro
+	s.mu.Lock()
+	packs := append([]*catalog.Pack(nil), s.packs...)
+	s.mu.Unlock()
 	for _, d := range s.off.Distros {
 		if !d.Offerable() {
 			continue
@@ -118,8 +132,9 @@ func (s *session) state(w http.ResponseWriter, r *http.Request) {
 		item := distro{
 			ID: d.ID, Name: d.Name, Version: d.Version,
 			Tagline: d.Tagline, Description: d.Description,
-			Stageable: d.Stageable(),
-			Logo:      assets.DistroLogo(d.ID) != "",
+			Stageable:  d.Stageable(),
+			Logo:       assets.DistroLogo(d.ID) != "",
+			SecureBoot: d.SecureBoot,
 		}
 		for _, ed := range d.Editions {
 			if !ed.Pinned() {
@@ -139,6 +154,35 @@ func (s *session) state(w http.ResponseWriter, r *http.Request) {
 		}
 		list = append(list, item)
 	}
+	for _, p := range packs {
+		if p == nil {
+			continue
+		}
+		item := distro{
+			ID: p.ID, Name: p.Name, Version: p.Version,
+			Tagline: p.Tagline, Description: p.Description,
+			Logo:       p.LogoPath != "" && assets.FileExists(p.LogoPath),
+			Custom:     true,
+			SecureBoot: p.SecureBoot,
+		}
+		anyISO := false
+		for _, ed := range p.Editions {
+			row := edition{
+				ID: ed.ID, Name: ed.Name,
+				Stageable: p.CanStageEdition(ed),
+				NeedISO:   !p.CanStageEdition(ed),
+			}
+			if ed.SizeBytes > 0 {
+				row.Size = catalog.FormatBytes(ed.SizeBytes)
+			}
+			if row.Stageable {
+				anyISO = true
+			}
+			item.Editions = append(item.Editions, row)
+		}
+		item.Stageable = anyISO
+		list = append(list, item)
+	}
 	seedOK := s.seed != nil
 	seedErr := ""
 	if s.seedErr != nil {
@@ -152,7 +196,7 @@ func (s *session) state(w http.ResponseWriter, r *http.Request) {
 		"languages":     i18n.Supported(langs),
 		"keyboards":     boards,
 		"ui_language":   uiLang,
-		"catalog":       i18n.CatalogFor(uiLang),
+		"catalog":       i18n.CatalogWithPacks(uiLang, packs),
 		"seed_ok":       seedOK,
 		"seed_error":    seedErr,
 		"default_image": defaultImagePath(),
@@ -176,9 +220,12 @@ func (s *session) setUILanguage(w http.ResponseWriter, r *http.Request) {
 		httpError(w, 500, err)
 		return
 	}
+	s.mu.Lock()
+	packs := append([]*catalog.Pack(nil), s.packs...)
+	s.mu.Unlock()
 	writeJSON(w, map[string]any{
 		"language": lid,
-		"catalog":  i18n.CatalogFor(lid),
+		"catalog":  i18n.CatalogWithPacks(lid, packs),
 	})
 }
 
@@ -194,7 +241,10 @@ func (s *session) estimate(w http.ResponseWriter, r *http.Request) {
 		httpError(w, 400, s.seedErr)
 		return
 	}
-	shop, err := catalog.BuildShop(s.off, req.Staged)
+	s.mu.Lock()
+	packs := append([]*catalog.Pack(nil), s.packs...)
+	s.mu.Unlock()
+	shop, err := catalog.BuildShop(s.off, req.Staged, packs...)
 	if err != nil {
 		httpError(w, 400, err)
 		return
@@ -313,12 +363,198 @@ func (s *session) serveWallpaper(which string) http.HandlerFunc {
 
 func (s *session) logo(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/api/logo/")
+	s.mu.Lock()
+	for _, p := range s.packs {
+		if p != nil && p.ID == id && p.LogoPath != "" && assets.FileExists(p.LogoPath) {
+			path := p.LogoPath
+			s.mu.Unlock()
+			http.ServeFile(w, r, path)
+			return
+		}
+	}
+	s.mu.Unlock()
 	p := assets.DistroLogo(id)
 	if p == "" {
 		http.NotFound(w, r)
 		return
 	}
 	http.ServeFile(w, r, p)
+}
+
+func (s *session) pickFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Kind  string `json:"kind"`
+		Title string `json:"title"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, 400, err)
+		return
+	}
+	path, err := pickFile(req.Title, req.Kind)
+	if err != nil {
+		httpError(w, 400, err)
+		return
+	}
+	writeJSON(w, map[string]any{"path": path})
+}
+
+func (s *session) addPack(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, 400, err)
+		return
+	}
+	if err := s.loadPack(req.Path); err != nil {
+		httpError(w, 400, err)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+func (s *session) uploadPack(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		httpError(w, 400, err)
+		return
+	}
+	f, hdr, err := r.FormFile("file")
+	if err != nil {
+		httpError(w, 400, err)
+		return
+	}
+	defer f.Close()
+	if strings.ToLower(filepath.Ext(hdr.Filename)) != ".zip" {
+		httpError(w, 400, fmt.Errorf("use a .zip pack"))
+		return
+	}
+	dir, err := os.MkdirTemp("", "firstboot-pack-")
+	if err != nil {
+		httpError(w, 500, err)
+		return
+	}
+	dest := filepath.Join(dir, filepath.Base(hdr.Filename))
+	out, err := os.Create(dest)
+	if err != nil {
+		httpError(w, 500, err)
+		return
+	}
+	if _, err := io.Copy(out, f); err != nil {
+		out.Close()
+		httpError(w, 500, err)
+		return
+	}
+	out.Close()
+	if err := s.loadPack(dest); err != nil {
+		httpError(w, 400, err)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+func (s *session) loadPack(path string) error {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return fmt.Errorf("choose a pack zip")
+	}
+	pack, err := catalog.LoadZip(path, catalog.PackCacheDir(), assets.CacheDir(), s.off)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]*catalog.Pack, 0, len(s.packs)+1)
+	for _, p := range s.packs {
+		if p != nil && p.ID != pack.ID {
+			out = append(out, p)
+		}
+	}
+	s.packs = append(out, pack)
+	return nil
+}
+
+func (s *session) attachISO(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ID      string `json:"id"`
+		Edition string `json:"edition"`
+		Path    string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, 400, err)
+		return
+	}
+	s.mu.Lock()
+	p := catalog.PackByID(s.packs, req.ID)
+	if p == nil {
+		s.mu.Unlock()
+		httpError(w, 400, fmt.Errorf("unknown pack"))
+		return
+	}
+	err := catalog.AttachISO(p, req.Edition, req.Path)
+	var size int64
+	if err == nil {
+		if ed := p.Edition(req.Edition); ed != nil {
+			size = ed.SizeBytes
+		}
+	}
+	s.mu.Unlock()
+	if err != nil {
+		httpError(w, 400, err)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "size": catalog.FormatBytes(size)})
+}
+
+func (s *session) removePack(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ID string `json:"id"`
+	}
+	raw, _ := io.ReadAll(r.Body)
+	if len(bytes.TrimSpace(raw)) > 0 {
+		_ = json.Unmarshal(raw, &req)
+	}
+	id := strings.TrimSpace(req.ID)
+	if id == "" {
+		id = strings.TrimSpace(r.URL.Query().Get("id"))
+	}
+	if id == "" {
+		httpError(w, 400, fmt.Errorf("missing pack id"))
+		return
+	}
+	s.mu.Lock()
+	out := make([]*catalog.Pack, 0, len(s.packs))
+	for _, p := range s.packs {
+		if p == nil {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(p.ID), id) {
+			continue
+		}
+		out = append(out, p)
+	}
+	remaining := make([]string, 0, len(out))
+	for _, p := range out {
+		remaining = append(remaining, p.ID)
+	}
+	s.packs = out
+	s.mu.Unlock()
+	writeJSON(w, map[string]any{"ok": true, "removed": id, "remaining": remaining})
 }
 
 func (s *session) icon(w http.ResponseWriter, r *http.Request) {
@@ -386,7 +622,10 @@ func (s *session) start(w http.ResponseWriter, r *http.Request) {
 		httpError(w, 400, err)
 		return
 	}
-	shop, err := catalog.BuildShop(off, req.Staged)
+	s.mu.Lock()
+	packs := append([]*catalog.Pack(nil), s.packs...)
+	s.mu.Unlock()
+	shop, err := catalog.BuildShop(off, req.Staged, packs...)
 	if err != nil {
 		s.fail(err)
 		httpError(w, 400, err)
@@ -410,7 +649,7 @@ func (s *session) start(w http.ResponseWriter, r *http.Request) {
 	s.tasks = planTasks(shop, req.Device)
 	s.cancel = cancel
 	s.mu.Unlock()
-	go s.run(ctx, seed, off, shop, retailer, password, req.Image, req.Device)
+	go s.run(ctx, seed, off, shop, packs, retailer, password, req.Image, req.Device)
 	writeJSON(w, map[string]any{"ok": true})
 }
 
@@ -437,11 +676,12 @@ func (s *session) setProgress(stage string, got, total int64) {
 	applyTaskProgress(s.tasks, stage)
 }
 
-func (s *session) run(ctx context.Context, seed *seedpath.Seed, off *catalog.Official, shop *catalog.Shop, retailer catalog.Retailer, password, image, device string) {
+func (s *session) run(ctx context.Context, seed *seedpath.Seed, off *catalog.Official, shop *catalog.Shop, packs []*catalog.Pack, retailer catalog.Retailer, password, image, device string) {
 	err := compose.Write(ctx, compose.Request{
 		Retailer: retailer,
 		Shop:     shop,
 		Official: off,
+		Packs:    packs,
 		Seed:     seed,
 		Cache:    cache.New(assets.CacheDir()),
 		Out:      image,
@@ -594,6 +834,7 @@ func openBrowser(url string) {
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(w).Encode(v)
 }
 

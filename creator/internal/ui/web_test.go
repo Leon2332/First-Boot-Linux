@@ -3,6 +3,7 @@ package ui
 import (
 	"bytes"
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -25,14 +26,34 @@ func TestLanguageButtonInPage(t *testing.T) {
 		`id="ui-lang-list"`,
 		`data-i18n="Shop details"`,
 		`data-i18n="USB creator"`,
+		`id="pack-file"`,
 	} {
 		if !bytes.Contains(raw, []byte(want)) {
 			t.Fatalf("missing %s", want)
 		}
 	}
+	js, err := webFS.ReadFile("web/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(js, []byte("Add your own")) {
+		t.Fatal("missing Add your own")
+	}
 	css, err := webFS.ReadFile("web/styles.css")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !bytes.Contains(css, []byte(".pack-remove")) || !bytes.Contains(css, []byte(".card-head")) {
+		t.Fatal("missing pack remove styles")
+	}
+	if !bytes.Contains(js, []byte("sb-pill")) || !bytes.Contains(css, []byte(".sb-pill")) {
+		t.Fatal("missing Secure Boot pill")
+	}
+	if !bytes.Contains(js, []byte("pack-pill")) || !bytes.Contains(css, []byte(".pack-pill")) {
+		t.Fatal("missing Retailer pack pill")
+	}
+	if bytes.Contains(js, []byte("No Secure Boot")) {
+		t.Fatal("creator cards must not label missing Secure Boot")
 	}
 	if !bytes.Contains(css, []byte(".lang-pop")) || !bytes.Contains(css, []byte(".lang-btn")) {
 		t.Fatal("missing language popover styles")
@@ -61,6 +82,10 @@ func TestStateServesUICatalog(t *testing.T) {
 		UILanguage string             `json:"ui_language"`
 		Catalog    map[string]string  `json:"catalog"`
 		Languages  []catalog.Language `json:"languages"`
+		Distros    []struct {
+			ID         string `json:"id"`
+			SecureBoot bool   `json:"secure_boot"`
+		} `json:"distros"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
@@ -80,6 +105,18 @@ func TestStateServesUICatalog(t *testing.T) {
 	}
 	if !ids["en-us"] || !ids["af"] {
 		t.Fatalf("languages %#v", out.Languages)
+	}
+	found := false
+	for _, d := range out.Distros {
+		if d.ID == "ubuntu" {
+			found = true
+			if !d.SecureBoot {
+				t.Fatal("ubuntu must advertise Secure Boot")
+			}
+		}
+	}
+	if !found {
+		t.Fatal("ubuntu missing from state")
 	}
 }
 
@@ -124,4 +161,67 @@ func TestSetUILanguage(t *testing.T) {
 	if out.Language != "en-us" || len(out.Catalog) != 0 {
 		t.Fatalf("en-us should be source, got language=%s catalog entries=%d", out.Language, len(out.Catalog))
 	}
+}
+
+func TestRemoveCustomPack(t *testing.T) {
+	s := &session{
+		off: &catalog.Official{SchemaVersion: 1},
+		packs: []*catalog.Pack{
+			{ID: "pop-os", Name: "Pop!_OS"},
+			{ID: "tuxedo-os", Name: "TUXEDO OS"},
+		},
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/custom-remove?id=pop-os", strings.NewReader(`{"id":"pop-os"}`))
+	s.removePack(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("status %d %s", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("cache-control %q", rec.Header().Get("Cache-Control"))
+	}
+	if len(s.packs) != 1 || s.packs[0].ID != "tuxedo-os" {
+		t.Fatalf("packs after remove: %#v", s.packs)
+	}
+
+	s.packs = []*catalog.Pack{{ID: "pop-os", Name: "Pop!_OS"}}
+	mux := http.NewServeMux()
+	mux.Handle("/", http.FileServer(mustSubFS(t)))
+	mux.HandleFunc("POST /api/custom-remove", s.removePack)
+	mux.HandleFunc("/api/custom-remove", s.removePack)
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/custom-remove", strings.NewReader(`{"id":"pop-os"}`))
+	mux.ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("mux status %d %s", rec.Code, rec.Body.String())
+	}
+	if len(s.packs) != 0 {
+		t.Fatalf("mux packs after remove: %#v", s.packs)
+	}
+
+	js, err := webFS.ReadFile("web/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`function removePack(id)`,
+		`d.id !== id`,
+		`ticked.splice(i, 1)`,
+		`data-pack-id=`,
+		`cache: "no-store"`,
+		`e.target.closest(".pack-remove")`,
+	} {
+		if !bytes.Contains(js, []byte(want)) {
+			t.Fatalf("app.js missing %s", want)
+		}
+	}
+}
+
+func mustSubFS(t *testing.T) http.FileSystem {
+	t.Helper()
+	static, err := fs.Sub(webFS, "web")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return http.FS(static)
 }

@@ -1118,7 +1118,8 @@ def run_sysinfo(argv: list[str] | None = None) -> int:
     apply_language(
         load_language(
             payload_root, retailer.language if retailer is not None else None
-        )
+        ),
+        payload_root=payload_root,
     )
 
     class SysinfoApp(Adw.Application):
