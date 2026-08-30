@@ -52,10 +52,10 @@ The USB Creator provides a method for pre-installing First Boot Linux with its c
 > [!Note]
 > Currently, only an AppImage is available.
 
-![First Boot Creator screenshot](docs/screenshots/usb-creator_step-01.png)
-![First Boot Creator screenshot](docs/screenshots/usb-creator_step-02.png)
-![First Boot Creator screenshot](docs/screenshots/usb-creator_step-03.png)
-![First Boot Creator screenshot](docs/screenshots/usb-creator_step-04.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-1.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-2.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-3.png)
+![First Boot Creator screenshot](docs/screenshots/usb-creator_step-4.png)
 
 
 # Good practice for recommendations
