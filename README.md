@@ -68,9 +68,9 @@ However, it is good practice to:
 - pick recommended options that your support team is familiar with (If your support team is only familiar with MS Windows, it is perfectly fine to add Windows as the only recommended option).
 
 
-# FBL OS/distrobution support
+# FBL OS/distribution support
 
-Selection is necessary as there are over 5,000 Linux distrobutions alone. Currently, the selection process for adding a new OS/distro hasn't been finalized yet.
+Selection is necessary as there are over 5,000 Linux distributions alone. Currently, the selection process for adding a new OS/distro hasn't been finalized yet.
 However it will come down to some or all of the following:
 - Target audience is the general consumer; and not a niche
 - Aims to have a GUI-only experience
@@ -84,7 +84,7 @@ However it will come down to some or all of the following:
   - UEFI Secure Boot
 
 > [!Tip]
-> You can add your own OS/distrobution via the FBL USB Creator. See the [wiki](https://github.com/Leon2332/First-Boot-Linux/wiki) for instructions.
+> You can add your own OS/distribution via the FBL USB Creator. See the [wiki](https://github.com/Leon2332/First-Boot-Linux/wiki) for instructions.
 
 > [!Note]
-> First Boot Linux checks whether the device has Secure Boot enabled. If enabled, only OS/distrobution options with support for Secure Boot will be displayed.
+> First Boot Linux checks whether the device has Secure Boot enabled. If enabled, only OS/distribution options with support for Secure Boot will be displayed.
