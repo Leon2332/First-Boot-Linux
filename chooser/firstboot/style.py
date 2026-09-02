@@ -1013,6 +1013,47 @@ window.firstboot.light .done-msg {
   color: #5e6772;
 }
 
+.install-ticks {
+  margin-top: 14px;
+  min-width: 280px;
+}
+
+.install-tick {
+  font-size: 13px;
+  color: #9aa3b2;
+}
+
+.install-tick.current {
+  color: #f6f5f4;
+  font-weight: 600;
+}
+
+.install-tick.done {
+  color: #57e389;
+}
+
+.install-tick.failed {
+  color: #e01b24;
+}
+
+.install-tick.skip {
+  color: #6d7178;
+}
+
+window.firstboot.light .install-tick {
+  color: #5e6772;
+}
+
+window.firstboot.light .install-tick.current {
+  color: #1c1c1c;
+}
+
+.install-error {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #e01b24;
+}
+
 .progress-meta {
   font-size: 12px;
   font-weight: 500;

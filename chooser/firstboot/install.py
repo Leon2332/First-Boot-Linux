@@ -298,12 +298,18 @@ def copy_tree(
     except OSError as exc:
         raise InstallError(f"copy: {exc}") from exc
     assert proc.stderr is not None
+    errors: list[str] = []
     for line in proc.stderr:
         pct = rsync_percent(line)
         if pct is not None and on_percent is not None:
             on_percent(pct)
+            continue
+        text = line.strip()
+        if text:
+            errors.append(text)
     if proc.wait() != 0:
-        raise InstallError("copy failed")
+        tail = errors[-1] if errors else "copy failed"
+        raise InstallError(tail)
 
 
 def _progress(n: int) -> None:
@@ -448,6 +454,7 @@ STALE_EFI_LABELS = (
     "Fedora",
     "fedora",
     "Install Fedora",
+    "anaconda",
     "Windows Boot Manager",
     "debian",
     "Linux Mint",

@@ -1,6 +1,3 @@
-> [!Note]
-> A new license is currently being considered. View the [discussion](https://github.com/Leon2332/First-Boot-Linux/discussions/13) for more details.
-
 <img src="docs/Logo/First%20Boot%20Linux.png" alt="First Boot Linux" width="128" height="128" />
 
 # First Boot Linux
@@ -87,4 +84,4 @@ However it will come down to some or all of the following:
 > You can add your own OS/distribution via the FBL USB Creator. See the [wiki](https://github.com/Leon2332/First-Boot-Linux/wiki) for instructions.
 
 > [!Note]
-> First Boot Linux checks whether the device has Secure Boot enabled. If enabled, only OS/distribution options with support for Secure Boot will be displayed.
+> First Boot Linux checks whether the device has Secure Boot enabled. If enabled, only OS/distribution options that support Secure Boot will be displayed.

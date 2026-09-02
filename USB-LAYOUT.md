@@ -4,7 +4,7 @@ How a First Boot Linux **shop USB** is laid out after the creator writes it.
 
 This is a partitioned disk, not a single ISO9660 image. The UI may still say “write ISO.” On the stick it is GPT + three partitions. The same layout is copied onto the PC’s internal disk when the shop installs First Boot.
 
-The normative v1 example below is a shop that staged Ubuntu GNOME and Linux Mint Cinnamon. Official catalog is Ubuntu (GNOME), Linux Mint (Cinnamon / MATE / Xfce), and Fedora Plasma. The `docs/` mockup still shows a larger set; that is vision, not the creator menu.
+The normative v1 example below is a shop that staged Ubuntu GNOME. Official catalog is Ubuntu 26.04 GNOME only (FBL-native). Flavors, Mint, and Fedora stay out until they have native installers. The `docs/` mockup still shows a larger set; that is vision, not the creator menu.
 
 ## Partitions
 
@@ -108,7 +108,7 @@ timezone = UTC+0000
 
 ### `catalog.json`
 
-Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either local (`file` under `images/`) or download (`url`). Example (v1: Ubuntu + Mint staged) — same bytes as [`schemas/examples/catalog.json`](schemas/examples/catalog.json):
+Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either local (`file` under `images/`) or download (`url`). Example (v1: Ubuntu GNOME staged) — same bytes as [`schemas/examples/catalog.json`](schemas/examples/catalog.json):
 
 ```json
 {
@@ -121,7 +121,8 @@ Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either lo
       "tagline": "Popular and well-supported",
       "description": "A polished desktop with excellent hardware support and a large software library. A safe default for most laptops.",
       "family": "ubuntu",
-      "install": "ubuntu-2604",
+      "install": "ubuntu-2604-gnome",
+      "secure_boot": true,
       "editions": [
         {
           "id": "gnome",
@@ -133,68 +134,9 @@ Full contract and JSON Schema: [`schemas/`](schemas/). Each edition is either lo
           "size_bytes": 5900000000
         }
       ]
-    },
-    {
-      "id": "linux-mint",
-      "name": "Linux Mint",
-      "version": "22.3",
-      "tagline": "Familiar and easy",
-      "description": "A stable desktop that feels at home for people coming from Windows. Multimedia and drivers work out of the box.",
-      "family": "mint",
-      "install": "mint-223",
-      "editions": [
-        {
-          "id": "cinnamon",
-          "name": "Cinnamon",
-          "default": true,
-          "local": true,
-          "file": "images/linuxmint-22.3-cinnamon-64bit.iso",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "size_bytes": 2800000000
-        },
-        {
-          "id": "mate",
-          "name": "MATE",
-          "default": false,
-          "local": false,
-          "url": "https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-mate-64bit.iso",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "size_bytes": 2600000000
-        },
-        {
-          "id": "xfce",
-          "name": "Xfce",
-          "default": false,
-          "local": false,
-          "url": "https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-xfce-64bit.iso",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "size_bytes": 2500000000
-        }
-      ]
     }
   ],
-  "catalog": [
-    {
-      "id": "fedora",
-      "name": "Fedora",
-      "version": "44",
-      "tagline": "Modern Plasma desktop",
-      "description": "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults.",
-      "family": "fedora",
-      "install": "fedora-44-plasma",
-      "editions": [
-        {
-          "id": "plasma",
-          "name": "KDE Plasma",
-          "default": true,
-          "local": false,
-          "url": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/KDE/x86_64/iso/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso",
-          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "size_bytes": 2800000000
-        }
-      ]
-    }
-  ]
+  "catalog": []
 }
 ```
 

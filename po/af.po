@@ -310,6 +310,36 @@ msgstr "Moderne Plasma-werkskerm"
 msgid "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults."
 msgstr "Hedendaagse vrye sagteware met ’n afgewerkte KDE Plasma-ervaring. ’n Goeie keuse as jy onlangse pakkette en stewige standaardinstellings wil hê."
 
+msgid "Ubuntu with KDE Plasma"
+msgstr "Ubuntu met KDE Plasma"
+
+msgid "The power of Ubuntu with the highly customizable KDE Plasma desktop."
+msgstr "Die krag van Ubuntu met die hoogs aanpasbare KDE Plasma-werkskerm."
+
+msgid "Very lightweight"
+msgstr "Baie liggewig"
+
+msgid "Ubuntu with LXQt. Ideal for older machines or when you want maximum free memory."
+msgstr "Ubuntu met LXQt. Ideaal vir ouer masjiene of as jy soveel moontlik vrye geheue wil hê."
+
+msgid "Elegant and efficient"
+msgstr "Elegant en doeltreffend"
+
+msgid "The Budgie desktop on Ubuntu — modern, clean, and approachable."
+msgstr "Die Budgie-werkskerm op Ubuntu — modern, netjies en toeganklik."
+
+msgid "Classic desktop layout"
+msgstr "Klassieke werkskermuitleg"
+
+msgid "Traditional menus and panels with the stability of Ubuntu LTS."
+msgstr "Tradisionele spyskaarte en panele met die stabiliteit van Ubuntu LTS."
+
+msgid "Lightweight and fast"
+msgstr "Liggewig en vinnig"
+
+msgid "Ubuntu with the Xfce desktop — lower resource use, still fully featured."
+msgstr "Ubuntu met die Xfce-werkskerm — minder hulpbronne, steeds volledig."
+
 msgid "This will erase the internal disk and copy First Boot Linux onto it."
 msgstr "Dit sal die interne skyf uitvee en First Boot Linux daarop kopieer."
 
@@ -563,7 +593,7 @@ msgid "Refresh"
 msgstr "Verfris"
 
 msgid "Your disk will be formatted. All data will be permanently erased."
-msgstr "Jou skyf sal geformateer word. Alle data sal permanent uitgevee word."
+msgstr "Jou skyf word geformateer. Alle data sal permanent uitgevee word."
 
 msgid "Continue"
 msgstr "Gaan voort"
@@ -705,3 +735,42 @@ msgstr "Hierdie pak kom nie van First Boot Linux nie. ’n Stukkende drywer kan 
 
 msgid "Choose an ISO for {name}"
 msgstr "Kies ’n ISO vir {name}"
+
+msgid "Checking the image"
+msgstr "Kontroleer die beeld"
+
+msgid "Copying First Boot to memory"
+msgstr "Kopieer First Boot na geheue"
+
+msgid "Preparing the disk"
+msgstr "Berei die skyf voor"
+
+msgid "Installing the system"
+msgstr "Installeer die stelsel"
+
+msgid "Setting up the computer"
+msgstr "Stel die rekenaar op"
+
+msgid "Installing the bootloader"
+msgstr "Installeer die selflaaier"
+
+msgid "Checking the install"
+msgstr "Kontroleer die installasie"
+
+msgid "Removing First Boot"
+msgstr "Verwyder First Boot"
+
+msgid "Restarting"
+msgstr "Herbegin"
+
+msgid "The install could not be checked."
+msgstr "Die installasie kon nie gekontroleer word nie."
+
+msgid "{name} is ready. This computer will restart."
+msgstr "{name} is gereed. Hierdie rekenaar sal herbegin."
+
+msgid "Could not copy First Boot into memory. Plug in a First Boot USB and try again."
+msgstr "Kon First Boot nie na geheue kopieer nie. Prop ’n First Boot-USB in en probeer weer."
+
+msgid "This computer could not stop using the disk. Restart and try again."
+msgstr "Hierdie rekenaar kon nie ophou om die skyf te gebruik nie. Herbegin en probeer weer."

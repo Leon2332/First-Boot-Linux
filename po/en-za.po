@@ -310,6 +310,36 @@ msgstr "Modern Plasma desktop"
 msgid "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults."
 msgstr "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults."
 
+msgid "Ubuntu with KDE Plasma"
+msgstr "Ubuntu with KDE Plasma"
+
+msgid "The power of Ubuntu with the highly customizable KDE Plasma desktop."
+msgstr "The power of Ubuntu with the highly customisable KDE Plasma desktop."
+
+msgid "Very lightweight"
+msgstr "Very lightweight"
+
+msgid "Ubuntu with LXQt. Ideal for older machines or when you want maximum free memory."
+msgstr "Ubuntu with LXQt. Ideal for older machines or when you want maximum free memory."
+
+msgid "Elegant and efficient"
+msgstr "Elegant and efficient"
+
+msgid "The Budgie desktop on Ubuntu — modern, clean, and approachable."
+msgstr "The Budgie desktop on Ubuntu — modern, clean, and approachable."
+
+msgid "Classic desktop layout"
+msgstr "Classic desktop layout"
+
+msgid "Traditional menus and panels with the stability of Ubuntu LTS."
+msgstr "Traditional menus and panels with the stability of Ubuntu LTS."
+
+msgid "Lightweight and fast"
+msgstr "Lightweight and fast"
+
+msgid "Ubuntu with the Xfce desktop — lower resource use, still fully featured."
+msgstr "Ubuntu with the Xfce desktop — lower resource use, still fully featured."
+
 msgid "This will erase the internal disk and copy First Boot Linux onto it."
 msgstr "This will erase the internal disk and copy First Boot Linux onto it."
 
@@ -711,3 +741,42 @@ msgstr "This pack is not from First Boot Linux. A broken driver can wipe the dis
 
 msgid "Choose an ISO for {name}"
 msgstr "Choose an ISO for {name}"
+
+msgid "Checking the image"
+msgstr "Checking the image"
+
+msgid "Copying First Boot to memory"
+msgstr "Copying First Boot to memory"
+
+msgid "Preparing the disk"
+msgstr "Preparing the disk"
+
+msgid "Installing the system"
+msgstr "Installing the system"
+
+msgid "Setting up the computer"
+msgstr "Setting up the computer"
+
+msgid "Installing the bootloader"
+msgstr "Installing the bootloader"
+
+msgid "Checking the install"
+msgstr "Checking the install"
+
+msgid "Removing First Boot"
+msgstr "Removing First Boot"
+
+msgid "Restarting"
+msgstr "Restarting"
+
+msgid "The install could not be checked."
+msgstr "The install could not be checked."
+
+msgid "{name} is ready. This computer will restart."
+msgstr "{name} is ready. This computer will restart."
+
+msgid "Could not copy First Boot into memory. Plug in a First Boot USB and try again."
+msgstr "Could not copy First Boot into memory. Plug in a First Boot USB and try again."
+
+msgid "This computer could not stop using the disk. Restart and try again."
+msgstr "This computer could not stop using the disk. Restart and try again."

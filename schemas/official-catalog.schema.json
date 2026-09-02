@@ -78,12 +78,7 @@
             {
               "type": "string",
               "enum": [
-                "ubuntu-2604",
-                "ubuntu-autoinstall",
-                "mint-223",
-                "mint",
-                "fedora-44-plasma",
-                "fedora-kickstart",
+                "ubuntu-2604-gnome",
                 "debian-preseed",
                 "windows",
                 "freebsd"
@@ -152,6 +147,13 @@
         "default": {
           "type": "boolean",
           "description": "Featured on the recommended card. Exactly one true per distro."
+        },
+        "install": {
+          "description": "Optional. Overrides the distro install driver for this edition.",
+          "anyOf": [
+            { "$ref": "#/$defs/id" },
+            { "type": "null" }
+          ]
         },
         "filename": {
           "type": "string",

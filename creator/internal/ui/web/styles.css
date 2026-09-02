@@ -152,6 +152,8 @@ figcaption { font-weight: 650; color: var(--text); }
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
   padding-bottom: 8px;
 }
 .search-label,
@@ -503,11 +505,34 @@ footer {
 .lang-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 4px 0 0;
   max-height: 280px;
   overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Thin overlay scrollbar — Other options / language lists. */
+.page,
+.page-2-list,
+.lang-list {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+.page::-webkit-scrollbar,
+.page-2-list::-webkit-scrollbar,
+.lang-list::-webkit-scrollbar {
+  width: 8px;
+}
+.page::-webkit-scrollbar-track,
+.page-2-list::-webkit-scrollbar-track,
+.lang-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.page::-webkit-scrollbar-thumb,
+.page-2-list::-webkit-scrollbar-thumb,
+.lang-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
 }
 .lang-item {
   appearance: none;

@@ -1,12 +1,9 @@
 """Customer OS install from a staged ISO.
 
-The trampoline verifies the ISO, copies the installer kernel plus initrd
-onto FBL-SYS, injects the driver seed into the last initrd cpio, and
-rewrites GRUB. Distro-specific logic lives in sibling modules:
-
-    ubuntu_2604.py
-    mint_223.py
-    fedora_44_plasma.py
+Native drivers (``unpack_kind``) unpack the live filesystem in this
+session, health-check, then drop First Boot. Official catalog is Ubuntu
+26.04 GNOME only (``ubuntu_2604_gnome.py``). Shop packs still use the
+legacy ``boot_files`` / ``kernel_args`` / ``seed_files`` API.
 
 See README.md in this directory. kexec is not used (lockdown).
 """
@@ -24,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import traceback
 from collections.abc import Callable
 
 from firstboot.disk import (
@@ -52,7 +50,7 @@ from firstboot.payload import (
     last_payload_root,
 )
 
-from . import fedora_44_plasma, mint_223, ubuntu_2604
+from . import ubuntu_2604_gnome
 from .common import (
     HELPER,
     HOST_RE,
@@ -68,25 +66,13 @@ from .common import (
     _SHA512_ROUNDS,
     casper_boot_files,
     casper_kernel_args,
+    is_native_driver,
     iso_relpath,
     iso_volume_id,
     run_checked,
 )
-from .fedora_44_plasma import ANACONDA_SCRIPT as FEDORA_ANACONDA_SCRIPT
-from .fedora_44_plasma import ANACONDA_SERVICE as FEDORA_ANACONDA_SERVICE
-from .fedora_44_plasma import DRACUT_HOOK as FEDORA_DRACUT_HOOK
-from .fedora_44_plasma import LINK_SQUASH as FEDORA_LINK_SQUASH
-from .fedora_44_plasma import LINUX_FLAG as FEDORA_LINUX_FLAG
-from .fedora_44_plasma import LIVE_LABEL as FEDORA_LIVE_LABEL
-from .fedora_44_plasma import SQUASH_LINK as FEDORA_SQUASH_LINK
-from .fedora_44_plasma import fedora_boot_files as _fedora_boot_files
-from .fedora_44_plasma import fedora_kernel_args, fedora_kickstart
-from .mint_223 import LINUX_EXTRA as MINT_LINUX_EXTRA
-from .mint_223 import mint_preseed
-from .ubuntu_2604 import LINUX_EXTRA as UBUNTU_LINUX_EXTRA
-from .ubuntu_2604 import autoinstall_yaml, cloud_config_user_data
 
-_DRIVER_MODULES = (ubuntu_2604, mint_223, fedora_44_plasma)
+_DRIVER_MODULES = (ubuntu_2604_gnome,)
 
 
 def _register_drivers() -> dict[str, object]:
@@ -101,9 +87,7 @@ def _register_drivers() -> dict[str, object]:
 
 DRIVERS = _register_drivers()
 DRIVERS_READY = frozenset(DRIVERS)
-DRIVER_UBUNTU = ubuntu_2604.ID
-DRIVER_MINT = mint_223.ID
-DRIVER_FEDORA = fedora_44_plasma.ID
+DRIVER_UBUNTU_GNOME = ubuntu_2604_gnome.ID
 
 _casper_boot_files = casper_boot_files
 _CUSTOM_DRIVERS: dict[str, object] = {}
@@ -439,11 +423,12 @@ def plan_os_install(
 ) -> OsInstallPlan:
     if not edition.on_disk or not edition.file:
         return OsInstallPlan(False, "This edition is not on disk.")
-    if get_driver(distro.install, payload_root) is None:
+    driver_id = distro.install_for(edition)
+    if get_driver(driver_id, payload_root) is None:
         return OsInstallPlan(
             False,
             f"{distro.name} install is not available yet.",
-            driver=distro.install,
+            driver=driver_id,
         )
     iso_rel = iso_relpath(edition.file)
     if not ISO_REL_RE.fullmatch(iso_rel):
@@ -456,12 +441,12 @@ def plan_os_install(
         return OsInstallPlan(False, "Could not find the disk First Boot is running from.")
     target, reason = plan_os_target(disks, live)
     if target is None:
-        return OsInstallPlan(False, reason, driver=distro.install, live=live)
+        return OsInstallPlan(False, reason, driver=driver_id, live=live)
     same = live.path == target.path
     return OsInstallPlan(
         True,
         "",
-        driver=distro.install,
+        driver=driver_id,
         live=live,
         target=target,
         iso_path=os.path.abspath(iso_path),
@@ -474,8 +459,32 @@ def plan_os_install(
     )
 
 
+def _remount_payload(disks, payload_root: str) -> None:
+    """Put FBL-DATA back at /run/payload after a RAM pivot dropped it."""
+    os.makedirs(payload_root, exist_ok=True)
+    if os.path.ismount(payload_root):
+        return
+    for disk in disks:
+        part = disk.part_named("FBL-DATA")
+        if part is None:
+            continue
+        subprocess.run(
+            ["sudo", "-n", "mount", part.path, payload_root],
+            check=False,
+            capture_output=True,
+        )
+        return
+
+
 def live_os_plan(payload_root: str, distro: Distro, edition: Edition) -> OsInstallPlan:
-    return plan_os_install(live_lsblk(), live_mounts(), payload_root, distro, edition)
+    disks = live_lsblk()
+    mounts = live_mounts()
+    iso_path = os.path.join(payload_root, edition.file) if edition.file else ""
+    if iso_path and not os.path.isfile(iso_path):
+        _remount_payload(disks, payload_root)
+        disks = live_lsblk()
+        mounts = live_mounts()
+    return plan_os_install(disks, mounts, payload_root, distro, edition)
 
 
 def verify_iso(
@@ -557,7 +566,7 @@ def osinstall_grub(
     args = linux_args or casper_kernel_args(
         iso_rel,
         toram=toram,
-        extra=extra if extra is not None else UBUNTU_LINUX_EXTRA,
+        extra=extra if extra is not None else "",
     )
     return OSINSTALL_GRUB.format(
         sys_uuid=sys_uuid, name=name, linux_args=args
@@ -732,6 +741,8 @@ def _write_tree_files(root: str, files: dict[str, str | bytes]) -> None:
             or rel.endswith("fbl-anaconda")
             or rel.endswith("fbl-anaconda-gen")
             or rel.endswith("fbl-selinux")
+            or rel.endswith("fbl-calamares")
+            or rel.endswith("fbl-calamares-gen")
             or rel.endswith("/liveinst")
         )
         os.chmod(dest, 0o755 if executable else 0o644)
@@ -864,6 +875,13 @@ def prepare_os(
     drv = get_driver(plan.driver, payload_root)
     if drv is None:
         raise OsInstallError(f"{plan.driver} is not available yet.")
+    if is_native_driver(drv):
+        from .pipeline import install_native
+
+        install_native(
+            plan, identity, drv, payload_root=payload_root, on_progress=on_progress
+        )
+        return
 
     def prog(n: int) -> None:
         if on_progress:
@@ -1193,7 +1211,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--iso-rel")
     parser.add_argument("--sha256")
     parser.add_argument("--size", default="0")
-    parser.add_argument("--driver", default=DRIVER_UBUNTU)
+    parser.add_argument("--driver", default=DRIVER_UBUNTU_GNOME)
     parser.add_argument("--target")
     parser.add_argument("--live")
     parser.add_argument("--hostname")
@@ -1219,6 +1237,9 @@ def main(argv: list[str] | None = None) -> int:
             )
         except OsInstallError as exc:
             emit("ERROR", str(exc))
+            return 1
+        except Exception as exc:
+            emit("ERROR", str(exc) or type(exc).__name__)
             return 1
         return 0
     if args.plan and not args.apply:
@@ -1253,5 +1274,14 @@ def main(argv: list[str] | None = None) -> int:
         prepare_os(plan, identity, payload_root=args.payload)
     except OsInstallError as exc:
         emit("ERROR", str(exc))
+        return 1
+    except Exception as exc:
+        try:
+            os.makedirs("/run/firstboot", exist_ok=True)
+            with open("/run/firstboot/osinstall.log", "a", encoding="utf-8") as fh:
+                fh.write(traceback.format_exc())
+        except OSError:
+            pass
+        emit("ERROR", str(exc) or type(exc).__name__)
         return 1
     return 0

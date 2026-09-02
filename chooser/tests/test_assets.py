@@ -29,6 +29,11 @@ class AssetTests(unittest.TestCase):
     def test_repo_logos_and_status(self) -> None:
         self.assertTrue(find_logo("ubuntu"))
         self.assertTrue(find_logo("linux-mint"))
+        self.assertTrue(find_logo("kubuntu"))
+        self.assertTrue(find_logo("lubuntu"))
+        self.assertTrue(find_logo("ubuntu-budgie"))
+        self.assertTrue(find_logo("ubuntu-mate"))
+        self.assertTrue(find_logo("xubuntu"))
         self.assertTrue(find_status("network-wired-symbolic.svg"))
         self.assertTrue(find_status("view-app-grid-symbolic.svg"))
         self.assertTrue(find_app_icon("epiphany.png"))

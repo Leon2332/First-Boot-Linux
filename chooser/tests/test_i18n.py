@@ -178,6 +178,8 @@ class PoTests(unittest.TestCase):
         self.assertEqual(_("Preparing the disk…"), "Berei die skyf voor…")
         self.assertEqual(_("Copying First Boot…"), "Kopieer First Boot…")
         self.assertEqual(_("Checking the image…"), "Kontroleer die beeld…")
+        self.assertEqual(_("Installing the system"), "Installeer die stelsel")
+        self.assertEqual(_("Checking the install"), "Kontroleer die installasie")
         self.assertEqual(
             _("Installing {name}").format(name="Ubuntu (GNOME)"),
             "Installeer Ubuntu (GNOME)",
@@ -201,6 +203,8 @@ class PoTests(unittest.TestCase):
         apply_language("af")
         self.assertEqual(_("Popular and well-supported"), "Gewild en goed ondersteun")
         self.assertIn("Afgewerkte werkskerm", _("A polished desktop with excellent hardware support and a large software library. A safe default for most laptops."))
+        self.assertEqual(_("Ubuntu with KDE Plasma"), "Ubuntu met KDE Plasma")
+        self.assertEqual(_("Very lightweight"), "Baie liggewig")
         apply_language("en-us")
         self.assertEqual(_("Popular and well-supported"), "Popular and well-supported")
 

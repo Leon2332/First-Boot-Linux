@@ -65,6 +65,7 @@ systemd-cryptsetup
 btrfs-progs
 xfsprogs
 efibootmgr
+grub-efi-amd64-bin
 fuse3
 
 # --- GPU libraries ---

@@ -238,6 +238,7 @@ install_chooser() {
   rm -rf "$ROOTFS/usr/share/firstboot/python/firstboot"
   cp -a "$REPO_DIR/chooser/firstboot" "$ROOTFS/usr/share/firstboot/python/firstboot"
   find "$ROOTFS/usr/share/firstboot/python" -depth -type d -name __pycache__ -exec rm -rf {} +
+  install_signed_efi_into_rootfs
   local logo="$REPO_DIR/docs/Logo/First Boot Linux.png"
   local logo_dark="$REPO_DIR/docs/Logo/First Boot Linux - dark mode.png"
   local logo_light="$REPO_DIR/docs/Logo/First Boot Linux- light mode.png"
@@ -415,38 +416,62 @@ make_squashfs() {
   mksquashfs "${args[@]}"
 }
 
-export_efi() {
-  # Signed removable-media boot files for the ESP. Not installed in the live
-  # root: shim/grub live on FBL-ESP, not in the squashfs.
-  local tmp shim_src grub_src
+# Canonical signed EFI binaries. gcdx64 = live/removable (prefix /boot/grub).
+# grubx64.efi.signed = installed OS (prefix /EFI/ubuntu). Do not put gcdx64
+# on a customer ESP — shim loads it, then GRUB drops to grub> with no config.
+prepare_signed_efi_dirs() {
+  if [[ -e /usr/lib/shim/shimx64.efi.signed && -f /usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed ]]; then
+    SHIM_SRC=/usr/lib/shim
+    GRUB_SIGNED_SRC=/usr/lib/grub/x86_64-efi-signed
+    return 0
+  fi
+  local tmp
   tmp=$(mktemp -d)
+  log "download shim-signed grub-efi-amd64-signed"
+  apt-get update -qq
+  (cd "$tmp" && apt-get download shim-signed grub-efi-amd64-signed)
+  dpkg-deb -x "$tmp"/shim-signed_*.deb "$tmp/shim"
+  dpkg-deb -x "$tmp"/grub-efi-amd64-signed_*.deb "$tmp/grub"
+  SHIM_SRC=$tmp/shim/usr/lib/shim
+  GRUB_SIGNED_SRC=$tmp/grub/usr/lib/grub/x86_64-efi-signed
+  SIGNED_EFI_TMP=$tmp
+}
+
+install_signed_efi_into_rootfs() {
+  # Customer OS install copies these onto the target ESP. Not the live gcdx64.
+  prepare_signed_efi_dirs
+  [[ -e $SHIM_SRC/shimx64.efi.signed ]] || die "no shimx64.efi.signed"
+  [[ -f $GRUB_SIGNED_SRC/grubx64.efi.signed ]] || die "no grubx64.efi.signed"
+  [[ -f $SHIM_SRC/mmx64.efi ]] || die "no mmx64.efi"
+  install -d -m 0755 "$ROOTFS/usr/share/firstboot/signed-efi"
+  cp -L "$SHIM_SRC/shimx64.efi.signed" "$ROOTFS/usr/share/firstboot/signed-efi/shimx64.efi"
+  cp -a "$GRUB_SIGNED_SRC/grubx64.efi.signed" "$ROOTFS/usr/share/firstboot/signed-efi/grubx64.efi"
+  cp -a "$SHIM_SRC/mmx64.efi" "$ROOTFS/usr/share/firstboot/signed-efi/mmx64.efi"
+  chmod 644 "$ROOTFS/usr/share/firstboot/signed-efi"/*
+  log "signed EFI payload $(ls -1 "$ROOTFS/usr/share/firstboot/signed-efi" | tr '\n' ' ')"
+}
+
+export_efi() {
+  # Signed removable-media boot files for the FBL ESP (gcdx64).
+  local tmp=${SIGNED_EFI_TMP:-}
+  prepare_signed_efi_dirs
   mkdir -p "$OUT/efi"
 
-  if [[ -e /usr/lib/shim/shimx64.efi.signed ]]; then
-    shim_src=/usr/lib/shim
-    grub_src=/usr/lib/grub/x86_64-efi-signed
-  else
-    log "download shim-signed grub-efi-amd64-signed for ESP"
-    apt-get update -qq
-    (cd "$tmp" && apt-get download shim-signed grub-efi-amd64-signed)
-    dpkg-deb -x "$tmp"/shim-signed_*.deb "$tmp/shim"
-    dpkg-deb -x "$tmp"/grub-efi-amd64-signed_*.deb "$tmp/grub"
-    shim_src=$tmp/shim/usr/lib/shim
-    grub_src=$tmp/grub/usr/lib/grub/x86_64-efi-signed
-  fi
-
-  [[ -e $shim_src/shimx64.efi.signed ]] || die "no shimx64.efi.signed"
-  [[ -f $grub_src/gcdx64.efi.signed ]] || die "no gcdx64.efi.signed"
-  [[ -f $shim_src/mmx64.efi ]] || die "no mmx64.efi"
+  [[ -e $SHIM_SRC/shimx64.efi.signed ]] || die "no shimx64.efi.signed"
+  [[ -f $GRUB_SIGNED_SRC/gcdx64.efi.signed ]] || die "no gcdx64.efi.signed"
+  [[ -f $SHIM_SRC/mmx64.efi ]] || die "no mmx64.efi"
 
   # Follow the alternatives symlink (shimx64.efi.signed → signed.latest).
-  cp -L "$shim_src/shimx64.efi.signed" "$OUT/efi/BOOTX64.EFI"
-  cp -L "$shim_src/shimx64.efi.signed" "$OUT/efi/shimx64.efi"
-  cp -a "$shim_src/mmx64.efi" "$OUT/efi/mmx64.efi"
+  cp -L "$SHIM_SRC/shimx64.efi.signed" "$OUT/efi/BOOTX64.EFI"
+  cp -L "$SHIM_SRC/shimx64.efi.signed" "$OUT/efi/shimx64.efi"
+  cp -a "$SHIM_SRC/mmx64.efi" "$OUT/efi/mmx64.efi"
   # gcdx64 searches disks for /boot/grub/grub.cfg (live / removable).
-  cp -a "$grub_src/gcdx64.efi.signed" "$OUT/efi/grubx64.efi"
+  cp -a "$GRUB_SIGNED_SRC/gcdx64.efi.signed" "$OUT/efi/grubx64.efi"
   chmod 644 "$OUT/efi"/*
-  rm -rf "$tmp"
+  if [[ -n ${tmp:-} ]]; then
+    rm -rf "$tmp"
+    SIGNED_EFI_TMP=
+  fi
   log "efi $(ls -1 "$OUT/efi" | tr '\n' ' ')"
   if command -v sbverify >/dev/null; then
     bash "$SEED_DIR/check-secureboot.sh" --seed "$OUT"

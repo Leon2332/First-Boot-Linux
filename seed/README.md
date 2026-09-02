@@ -13,7 +13,7 @@ It is not a desktop and not a shop remaster. The squashfs is the live root on `F
 | NetworkManager, `wpasupplicant`, systemd-resolved | unattended-upgrades, update-notifier |
 | Mesa libraries | Ubuntu Pro / `cloud-init` / apport |
 | labwc + GTK4 chooser (tty1 autologin; GNOME-like panel / QS, not a desktop) + GNOME Console + GNOME Web + System details helper + First Boot Cursor | App Center, ubiquity |
-| Disk tools: parted, gdisk, ntfs-3g, lvm2, cryptsetup, rsync | |
+| Disk tools: parted, gdisk, ntfs-3g, lvm2, cryptsetup, rsync, `grub-efi-amd64-bin` (modules for native OS install) | |
 | `apt` / `dpkg` (hidden from the future UI) | |
 | OpenSSH server (field debug; key + live-user password) | |
 

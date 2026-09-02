@@ -23,17 +23,21 @@ const (
 )
 
 // ReservedInstallIDs are baked-in or reserved catalog install ids. A shop
-// pack must not reuse them.
+// pack must not reuse them. ubuntu-2604-gnome is the live native driver;
+// the other ubuntu/mint/fedora ids are retired trampolines kept reserved
+// so packs cannot claim them.
 var ReservedInstallIDs = map[string]bool{
-	"ubuntu-2604":        true,
-	"ubuntu-autoinstall": true,
-	"mint-223":           true,
-	"mint":               true,
-	"fedora-44-plasma":   true,
-	"fedora-kickstart":   true,
-	"debian-preseed":     true,
-	"windows":            true,
-	"freebsd":            true,
+	"ubuntu-2604-gnome":     true,
+	"ubuntu-2604":           true,
+	"ubuntu-autoinstall":    true,
+	"ubuntu-calamares-2604": true,
+	"mint-223":              true,
+	"mint":                  true,
+	"fedora-44-plasma":      true,
+	"fedora-kickstart":      true,
+	"debian-preseed":        true,
+	"windows":               true,
+	"freebsd":               true,
 }
 
 type Pack struct {

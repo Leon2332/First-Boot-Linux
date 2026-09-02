@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CHOOSER_DIR = os.path.dirname(HERE)
@@ -19,29 +20,16 @@ if CHOOSER_DIR not in sys.path:
 
 from firstboot.disk import Disk, Partition, parse_helper_line, part_path  # noqa: E402
 from firstboot.osinstall import (  # noqa: E402
-    DRIVER_FEDORA,
-    DRIVER_MINT,
-    DRIVER_UBUNTU,
+    DRIVER_UBUNTU_GNOME,
     canonical_driver_id,
     get_driver,
-    FEDORA_ANACONDA_SCRIPT,
-    FEDORA_ANACONDA_SERVICE,
-    FEDORA_DRACUT_HOOK,
-    FEDORA_LINK_SQUASH,
-    FEDORA_LINUX_FLAG,
-    FEDORA_LIVE_LABEL,
-    FEDORA_SQUASH_LINK,
+    is_native_driver,
     ISO_REL_RE,
-    MINT_LINUX_EXTRA,
-    OsIdentity,
-    autoinstall_yaml,
-    fedora_kernel_args,
-    fedora_kickstart,
     inject_into_initrd,
     iso_relpath,
     iso_volume_id,
-    mint_preseed,
     osinstall_grub,
+    live_os_plan,
     plan_os_install,
     sha512_crypt,
     split_initrd,
@@ -51,7 +39,6 @@ from firstboot.osinstall import (  # noqa: E402
     verify_iso,
     write_cpio,
     _casper_boot_files,
-    _fedora_boot_files,
 )
 from firstboot.payload import Distro, Edition  # noqa: E402
 
@@ -130,80 +117,7 @@ def ubuntu_distro(root: str, *, present: bool = True) -> Distro:
         tagline="t",
         description="d",
         family="ubuntu",
-        install=DRIVER_UBUNTU,
-        editions=(ed,),
-        recommended=True,
-    )
-
-
-def mint_distro(
-    root: str,
-    *,
-    present: bool = True,
-    distro_id: str = "linux-mint",
-    name: str = "Linux Mint",
-    edition_id: str = "cinnamon",
-    edition_name: str = "Cinnamon",
-    iso_name: str = "linuxmint-22.3-cinnamon-64bit.iso",
-) -> Distro:
-    iso_rel = f"images/{iso_name}"
-    path = os.path.join(root, iso_rel)
-    if present:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "wb") as fh:
-            fh.write(b"iso-bytes")
-    sha = hashlib.sha256(b"iso-bytes").hexdigest() if present else ZERO
-    ed = Edition(
-        id=edition_id,
-        name=edition_name,
-        default=True,
-        claimed_local=True,
-        file=iso_rel,
-        url=None,
-        sha256=sha,
-        size_bytes=9 if present else 2800000000,
-        available=present and os.path.isfile(path),
-    )
-    return Distro(
-        id=distro_id,
-        name=name,
-        version="22.3",
-        tagline="t",
-        description="d",
-        family="mint",
-        install=DRIVER_MINT,
-        editions=(ed,),
-        recommended=True,
-    )
-
-
-def fedora_distro(root: str, *, present: bool = True) -> Distro:
-    iso_rel = "images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso"
-    path = os.path.join(root, iso_rel)
-    if present:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "wb") as fh:
-            fh.write(b"iso-bytes")
-    sha = hashlib.sha256(b"iso-bytes").hexdigest() if present else ZERO
-    ed = Edition(
-        id="plasma",
-        name="KDE Plasma",
-        default=True,
-        claimed_local=True,
-        file=iso_rel,
-        url=None,
-        sha256=sha,
-        size_bytes=9 if present else 3368683520,
-        available=present and os.path.isfile(path),
-    )
-    return Distro(
-        id="fedora",
-        name="Fedora",
-        version="44",
-        tagline="t",
-        description="d",
-        family="fedora",
-        install=DRIVER_FEDORA,
+        install=DRIVER_UBUNTU_GNOME,
         editions=(ed,),
         recommended=True,
     )
@@ -211,16 +125,17 @@ def fedora_distro(root: str, *, present: bool = True) -> Distro:
 
 class RegistryTests(unittest.TestCase):
     def test_catalog_ids_and_old_aliases(self) -> None:
-        self.assertEqual(DRIVER_UBUNTU, "ubuntu-2604")
-        self.assertEqual(DRIVER_MINT, "mint-223")
-        self.assertEqual(DRIVER_FEDORA, "fedora-44-plasma")
-        self.assertIs(get_driver("ubuntu-autoinstall"), get_driver("ubuntu-2604"))
-        self.assertIs(get_driver("mint"), get_driver("mint-223"))
-        self.assertIs(get_driver("fedora-kickstart"), get_driver("fedora-44-plasma"))
-        self.assertEqual(canonical_driver_id("ubuntu-autoinstall"), "ubuntu-2604")
-        self.assertEqual(get_driver("ubuntu-2604").default_hostname, "ubuntu")
-        self.assertEqual(get_driver("mint-223").default_hostname, "mint")
-        self.assertEqual(get_driver("fedora-44-plasma").default_hostname, "fedora")
+        self.assertEqual(DRIVER_UBUNTU_GNOME, "ubuntu-2604-gnome")
+        self.assertEqual(get_driver("ubuntu-2604-gnome").default_hostname, "ubuntu")
+        self.assertTrue(is_native_driver(get_driver("ubuntu-2604-gnome")))
+        self.assertIsNone(get_driver("ubuntu-2604"))
+        self.assertIsNone(get_driver("ubuntu-autoinstall"))
+        self.assertIsNone(get_driver("ubuntu-calamares-2604"))
+        self.assertIsNone(get_driver("mint-223"))
+        self.assertIsNone(get_driver("mint"))
+        self.assertIsNone(get_driver("fedora-44-plasma"))
+        self.assertIsNone(get_driver("fedora-kickstart"))
+        self.assertEqual(canonical_driver_id("ubuntu-autoinstall"), "ubuntu-autoinstall")
         self.assertIsNone(get_driver("deepin-25"))
 
     def test_custom_pack_driver(self) -> None:
@@ -283,129 +198,6 @@ class IdentityTests(unittest.TestCase):
 
 
 class YamlTests(unittest.TestCase):
-    def test_autoinstall_pins_target_and_identity(self) -> None:
-        ident = OsIdentity("shop-pc", "leon", "Leon", UBUNTU_HASH)
-        text = autoinstall_yaml(ident, "/dev/sda")
-        self.assertIn("autoinstall:", text)
-        self.assertIn('hostname: "shop-pc"', text)
-        self.assertIn('username: "leon"', text)
-        self.assertIn("name: direct", text)
-        self.assertRegex(text, r'path: "/dev/sda"')
-        self.assertNotIn("/dev/disk/by-id/", text)
-        self.assertNotIn("updates:", text)
-        self.assertIn("offline-install", text)
-        self.assertIn("shutdown: reboot", text)
-        self.assertIn("/isodevice", text)
-        self.assertIn("losetup", text)
-        self.assertIn("/media/filesystem", text)
-        self.assertIn("/run/fbl-casper", text)
-        self.assertNotIn("FBL-SYS", text)
-        self.assertIn("early-commands:", text)
-        self.assertIn("late-commands:", text)
-        self.assertIn("First Boot Linux", text)
-        self.assertIn("efibootmgr", text)
-        self.assertIn(UBUNTU_HASH, text)
-        self.assertIn("locale: en_US.UTF-8", text)
-        self.assertIn("layout: us", text)
-
-    def test_mint_preseed_is_not_autoinstall(self) -> None:
-        ident = OsIdentity("shop-pc", "leon", "Leon", UBUNTU_HASH)
-        text = mint_preseed(ident, "/dev/sda")
-        self.assertNotIn("autoinstall:", text)
-        self.assertNotIn("subiquity", text)
-        self.assertIn("d-i passwd/username string leon", text)
-        self.assertIn("d-i passwd/user-fullname string Leon", text)
-        self.assertIn("d-i netcfg/get_hostname string shop-pc", text)
-        self.assertIn(UBUNTU_HASH, text)
-        self.assertIn("d-i partman-auto/disk string /dev/sda", text)
-        self.assertIn("d-i partman-auto/method string regular", text)
-        self.assertIn("d-i partman-auto/choose_recipe select atomic", text)
-        self.assertIn("ubiquity ubiquity/reboot boolean true", text)
-        self.assertIn("ubiquity ubiquity/download_updates boolean false", text)
-        self.assertIn("ubiquity ubiquity/reboot_on_failure boolean false", text)
-        self.assertIn("localechooser/languagelist string en", text)
-        self.assertIn("debian-installer/locale string en_US.UTF-8", text)
-        self.assertIn("keyboard-configuration/layoutcode string us", text)
-        self.assertIn("partman-auto/init_automatically_partition select regular", text)
-        self.assertIn("/usr/lib/firstboot-efi-cleanup", text)
-        self.assertNotIn("grub-installer/bootdev", text)
-        self.assertIn("username=mint", MINT_LINUX_EXTRA)
-        self.assertIn("hostname=mint", MINT_LINUX_EXTRA)
-        self.assertIn("automatic-ubiquity", MINT_LINUX_EXTRA)
-        self.assertNotIn("only-ubiquity", MINT_LINUX_EXTRA)
-        self.assertNotIn("/dev/disk/by-id/", text)
-
-    def test_fedora_kickstart_is_not_casper(self) -> None:
-        ident = OsIdentity("shop-pc", "leon", "Leon", UBUNTU_HASH)
-        text = fedora_kickstart(ident, "/dev/sda")
-        self.assertNotIn("autoinstall:", text)
-        self.assertNotIn("subiquity", text)
-        self.assertNotIn("d-i ", text)
-        self.assertNotIn("boot=casper", text)
-        self.assertIn("cmdline\n", text)
-        self.assertNotIn("graphical\n", text)
-        self.assertIn(f"liveimg --url=file://{FEDORA_SQUASH_LINK}", text)
-        self.assertNotIn("%packages", text)
-        self.assertIn("ignoredisk --only-use=sda", text)
-        self.assertIn("clearpart --all --initlabel --disklabel=gpt --drives=sda", text)
-        self.assertIn("autopart --type=btrfs", text)
-        self.assertIn('user --name=leon --gecos="Leon"', text)
-        self.assertIn(UBUNTU_HASH, text)
-        self.assertIn("network --hostname=shop-pc", text)
-        self.assertIn("rootpw --lock", text)
-        self.assertIn("--kickstart=/ks.cfg --cmdline", FEDORA_ANACONDA_SCRIPT)
-        self.assertNotIn("pkexec /", FEDORA_ANACONDA_SCRIPT)
-        self.assertNotIn("--liveinst", FEDORA_ANACONDA_SCRIPT)
-        self.assertIn("ExecStart=/usr/libexec/fbl-anaconda", FEDORA_ANACONDA_SERVICE)
-        self.assertIn("WantedBy=getty.target", FEDORA_ANACONDA_SERVICE)
-        self.assertNotIn("Conflicts=getty@tty1.service", FEDORA_ANACONDA_SERVICE)
-        self.assertIn("exec /bin/bash", FEDORA_ANACONDA_SCRIPT)
-        self.assertIn("squashfs.img", FEDORA_LINK_SQUASH)
-        self.assertIn("squashed.img", FEDORA_LINK_SQUASH)
-        self.assertIn(FEDORA_SQUASH_LINK, FEDORA_LINK_SQUASH)
-        self.assertNotIn("symlinked", FEDORA_LINK_SQUASH)
-        self.assertIn("FBL_LIVE_LOG=", FEDORA_DRACUT_HOOK)
-        self.assertIn("getty@tty1.service", FEDORA_DRACUT_HOOK)
-        self.assertNotIn("\nexit ", FEDORA_DRACUT_HOOK)
-        self.assertNotIn("liveinst.real", FEDORA_DRACUT_HOOK)
-        self.assertNotIn('ln -sfn ../sbin/liveinst "', FEDORA_DRACUT_HOOK)
-        self.assertIn("%pre", text)
-        self.assertIn("%post", text)
-        self.assertIn("First Boot Linux", text)
-        self.assertIn("Install Fedora", text)
-        self.assertIn("plasma-setup", text)
-        self.assertIn("graphical.target", text)
-        self.assertIn('--append="rhgb quiet"', text)
-        self.assertIn("sddm", text)
-        self.assertNotIn("inst.ks", text)
-        args = fedora_kernel_args(
-            "/images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso",
-            FEDORA_LIVE_LABEL,
-            toram=True,
-        )
-        self.assertIn("root=live:CDLABEL=Fedora-KDE-Live-44", args)
-        self.assertIn("rd.live.image", args)
-        self.assertIn("rd.live.ram=1", args)
-        self.assertIn("iso-scan/filename=/images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso", args)
-        self.assertIn(FEDORA_LINUX_FLAG, args)
-        self.assertNotIn("liveinst", args.split())
-        self.assertNotIn("inst.ks", args.split())
-        self.assertIn("systemd.unit=multi-user.target", args)
-        self.assertIn("enforcing=0", args.split())
-        self.assertIn("systemd.mask=display-manager.service", args)
-        self.assertIn("inst.cmdline", args.split())
-        self.assertNotIn("boot=casper", args)
-        self.assertNotIn("autoinstall", args)
-
-    def test_autoinstall_prefers_serial_match(self) -> None:
-        ident = OsIdentity("shop-pc", "leon", "Leon", UBUNTU_HASH)
-        text = autoinstall_yaml(
-            ident, "/dev/sda", serial="ST1000LM035-1RK172_Z123"
-        )
-        self.assertIn('serial: "ST1000LM035-1RK172_Z123"', text)
-        self.assertIn('path: "/dev/sda"', text)
-        self.assertIn("- serial:", text)
-
     def test_grub_one_shot(self) -> None:
         cfg = osinstall_grub(
             "abc-uuid",
@@ -415,70 +207,26 @@ class YamlTests(unittest.TestCase):
         )
         self.assertIn("set default=0", cfg)
         self.assertIn("iso-scan/filename=/images/ubuntu-26.04-desktop-amd64.iso", cfg)
-        self.assertIn("toram autoinstall", cfg)
-        self.assertIn("subiquity.autoinstallpath=/autoinstall.yaml", cfg)
+        self.assertIn("toram", cfg)
+        self.assertNotIn("autoinstall", cfg)
+        self.assertNotIn("subiquity", cfg)
         self.assertIn("/boot/osinstall/vmlinuz", cfg)
         self.assertIn("initrd /boot/osinstall/initrd", cfg)
         self.assertNotIn("seed.cpio", cfg)
         self.assertIn("First Boot Linux", cfg)
         cfg2 = osinstall_grub("abc-uuid", "/images/ubuntu-26.04-desktop-amd64.iso", "Ubuntu", toram=False)
         self.assertNotIn("toram", cfg2)
-        self.assertIn("autoinstall", cfg2)
 
-    def test_mint_grub_uses_ubiquity_not_subiquity(self) -> None:
+    def test_grub_passes_extra(self) -> None:
         cfg = osinstall_grub(
             "abc-uuid",
-            "/images/linuxmint-22.3-cinnamon-64bit.iso",
-            "Linux Mint (Cinnamon)",
+            "/images/shop-os.iso",
+            "Shop OS",
             toram=True,
-            extra=MINT_LINUX_EXTRA,
+            extra="custom-flag",
         )
-        self.assertIn("set default=0", cfg)
-        self.assertIn("iso-scan/filename=/images/linuxmint-22.3-cinnamon-64bit.iso", cfg)
-        self.assertIn("toram username=mint hostname=mint automatic-ubiquity", cfg)
-        self.assertNotIn("only-ubiquity", cfg)
-        self.assertNotIn("autoinstall", cfg)
-        self.assertNotIn("subiquity", cfg)
-        self.assertIn("/boot/osinstall/vmlinuz", cfg)
-        self.assertIn("initrd /boot/osinstall/initrd", cfg)
-        self.assertIn("First Boot Linux", cfg)
-
-    def test_fedora_grub_is_dracut_not_casper(self) -> None:
-        iso = "/images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso"
-        args = fedora_kernel_args(iso, FEDORA_LIVE_LABEL, toram=True)
-        cfg = osinstall_grub(
-            "abc-uuid",
-            iso,
-            "Fedora (KDE Plasma)",
-            toram=True,
-            linux_args=args,
-        )
-        self.assertIn("set default=0", cfg)
-        self.assertIn("iso-scan/filename=/images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso", cfg)
-        self.assertIn("rd.live.image", cfg)
-        self.assertIn("rd.live.ram=1", cfg)
-        self.assertIn("root=live:CDLABEL=Fedora-KDE-Live-44", cfg)
-        self.assertIn(FEDORA_LINUX_FLAG, cfg)
-        install_line = [
-            line
-            for line in cfg.splitlines()
-            if "linux /boot/osinstall/vmlinuz" in line
-        ][0]
-        self.assertNotIn("boot=casper", install_line)
-        self.assertNotIn("live-media-path=casper", install_line)
-        self.assertNotIn("autoinstall", install_line)
-        self.assertNotIn("subiquity", install_line)
-        self.assertNotIn("inst.ks", install_line)
-        self.assertNotIn("liveinst", install_line.split())
-        self.assertIn("systemd.unit=multi-user.target", install_line)
-        self.assertIn("inst.cmdline", install_line)
-        self.assertIn("/boot/osinstall/vmlinuz", cfg)
-        self.assertIn("initrd /boot/osinstall/initrd", cfg)
-        self.assertIn("First Boot Linux", cfg)
-        cfg2 = osinstall_grub(
-            "abc-uuid", iso, "Fedora", toram=False, linux_args=fedora_kernel_args(iso, FEDORA_LIVE_LABEL, toram=False)
-        )
-        self.assertNotIn("rd.live.ram", cfg2)
+        self.assertIn("toram custom-flag", cfg)
+        self.assertIn("iso-scan/filename=/images/shop-os.iso", cfg)
 
     def test_iso_rel(self) -> None:
         self.assertEqual(iso_relpath("images/ubuntu-26.04-desktop-amd64.iso"), "/images/ubuntu-26.04-desktop-amd64.iso")
@@ -503,7 +251,7 @@ class PlanTests(unittest.TestCase):
             self.assertTrue(plan.available, plan.reason)
             self.assertTrue(plan.same_disk)
             self.assertEqual(plan.target.path, "/dev/sda")
-            self.assertEqual(plan.driver, DRIVER_UBUNTU)
+            self.assertEqual(plan.driver, DRIVER_UBUNTU_GNOME)
 
     def test_internal_boot_ignores_plugged_usb(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -541,67 +289,32 @@ class PlanTests(unittest.TestCase):
             self.assertEqual(plan.live.path, "/dev/sdb")
             self.assertEqual(plan.target.path, "/dev/sda")
 
-    def test_mint_same_disk_is_ready(self) -> None:
+    def test_live_os_plan_remounts_missing_payload(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            distro = mint_distro(tmp)
+            distro = ubuntu_distro(tmp)
             sda = disk("/dev/sda", 512 * 1024**3, parts=fbl_parts("/dev/sda"))
-            mounts = {"/cdrom": "/dev/sda2", "/run/payload": "/dev/sda3"}
-            plan = plan_os_install([sda], mounts, tmp, distro, distro.default_edition)
-            self.assertTrue(plan.available, plan.reason)
-            self.assertTrue(plan.same_disk)
-            self.assertEqual(plan.driver, DRIVER_MINT)
-            self.assertEqual(plan.iso_rel, "/images/linuxmint-22.3-cinnamon-64bit.iso")
+            with mock.patch("firstboot.osinstall.live_lsblk", return_value=[sda]), mock.patch(
+                "firstboot.osinstall.live_mounts",
+                side_effect=[{}, {"/run/payload": "/dev/sda3"}],
+            ), mock.patch("firstboot.osinstall._remount_payload") as remount, mock.patch(
+                "os.path.isfile",
+                side_effect=lambda p: p.endswith(".iso") and os.path.exists(p),
+            ):
+                # first isfile for the iso is False until remount copies... the iso
+                # already exists under tmp. Force a miss then a hit via exists.
+                iso = os.path.join(tmp, distro.default_edition.file)
+                calls = {"n": 0}
 
-    def test_mint_mate_and_xfce_share_driver(self) -> None:
-        rows = (
-            (
-                "linux-mint",
-                "Linux Mint",
-                "mate",
-                "MATE",
-                "linuxmint-22.3-mate-64bit.iso",
-            ),
-            (
-                "linux-mint",
-                "Linux Mint",
-                "xfce",
-                "Xfce",
-                "linuxmint-22.3-xfce-64bit.iso",
-            ),
-        )
-        with tempfile.TemporaryDirectory() as tmp:
-            sda = disk("/dev/sda", 512 * 1024**3, parts=fbl_parts("/dev/sda"))
-            mounts = {"/cdrom": "/dev/sda2", "/run/payload": "/dev/sda3"}
-            for distro_id, name, eid, ename, iso in rows:
-                distro = mint_distro(
-                    tmp,
-                    distro_id=distro_id,
-                    name=name,
-                    edition_id=eid,
-                    edition_name=ename,
-                    iso_name=iso,
-                )
-                plan = plan_os_install(
-                    [sda], mounts, tmp, distro, distro.default_edition
-                )
-                self.assertTrue(plan.available, plan.reason)
-                self.assertEqual(plan.driver, DRIVER_MINT)
-                self.assertEqual(plan.iso_rel, f"/images/{iso}")
-                self.assertEqual(plan.distro_name, name)
-                self.assertEqual(plan.edition_name, ename)
+                def isfile(path: str) -> bool:
+                    if path == iso:
+                        calls["n"] += 1
+                        return calls["n"] > 1
+                    return os.path.isfile(path)
 
-    def test_fedora_same_disk_is_ready(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            distro = fedora_distro(tmp)
-            sda = disk("/dev/sda", 512 * 1024**3, parts=fbl_parts("/dev/sda"))
-            mounts = {"/cdrom": "/dev/sda2", "/run/payload": "/dev/sda3"}
-            plan = plan_os_install([sda], mounts, tmp, distro, distro.default_edition)
+                with mock.patch("os.path.isfile", side_effect=isfile):
+                    plan = live_os_plan(tmp, distro, distro.default_edition)
+            remount.assert_called_once()
             self.assertTrue(plan.available, plan.reason)
-            self.assertTrue(plan.same_disk)
-            self.assertEqual(plan.driver, DRIVER_FEDORA)
-            self.assertEqual(
-                plan.iso_rel, "/images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso"
-            )
 
     def test_unknown_driver_is_not_ready(self) -> None:
         sda = disk("/dev/sda", 512 * 1024**3, parts=fbl_parts("/dev/sda"))
@@ -636,6 +349,40 @@ class PlanTests(unittest.TestCase):
         )
         self.assertFalse(plan.available)
         self.assertIn("not available", plan.reason)
+
+    def test_edition_install_overrides_distro(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            distro = ubuntu_distro(tmp)
+            ed = distro.editions[0]
+            ed = Edition(
+                id=ed.id,
+                name=ed.name,
+                default=ed.default,
+                claimed_local=ed.claimed_local,
+                file=ed.file,
+                url=ed.url,
+                sha256=ed.sha256,
+                size_bytes=ed.size_bytes,
+                available=ed.available,
+                install=DRIVER_UBUNTU_GNOME,
+            )
+            distro = Distro(
+                id=distro.id,
+                name=distro.name,
+                version=distro.version,
+                tagline=distro.tagline,
+                description=distro.description,
+                family=distro.family,
+                install="ubuntu-2604",
+                editions=(ed,),
+                recommended=True,
+            )
+            self.assertEqual(distro.install_for(ed), DRIVER_UBUNTU_GNOME)
+            sda = disk("/dev/sda", 512 * 1024**3, parts=fbl_parts("/dev/sda"))
+            mounts = {"/cdrom": "/dev/sda2", "/run/payload": "/dev/sda3"}
+            plan = plan_os_install([sda], mounts, tmp, distro, ed)
+            self.assertTrue(plan.available, plan.reason)
+            self.assertEqual(plan.driver, DRIVER_UBUNTU_GNOME)
 
     def test_missing_iso(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -890,34 +637,6 @@ class CasperBootTests(unittest.TestCase):
             self.assertEqual(initrd, plain)
             self.assertTrue(vmlinuz.endswith("vmlinuz"))
 
-    def test_fedora_f44_loader_preferred(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            loader = os.path.join(tmp, "boot", "x86_64", "loader")
-            pxe = os.path.join(tmp, "images", "pxeboot")
-            os.makedirs(loader)
-            os.makedirs(pxe)
-            linux = os.path.join(loader, "linux")
-            initrd = os.path.join(loader, "initrd")
-            open(linux, "wb").close()
-            open(initrd, "wb").close()
-            open(os.path.join(pxe, "vmlinuz"), "wb").close()
-            open(os.path.join(pxe, "initrd.img"), "wb").close()
-            got_v, got_i = _fedora_boot_files(tmp)
-            self.assertEqual(got_v, linux)
-            self.assertEqual(got_i, initrd)
-
-    def test_fedora_pxeboot_fallback(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            pxe = os.path.join(tmp, "images", "pxeboot")
-            os.makedirs(pxe)
-            vmlinuz = os.path.join(pxe, "vmlinuz")
-            initrd = os.path.join(pxe, "initrd.img")
-            open(vmlinuz, "wb").close()
-            open(initrd, "wb").close()
-            got_v, got_i = _fedora_boot_files(tmp)
-            self.assertEqual(got_v, vmlinuz)
-            self.assertEqual(got_i, initrd)
-
     def test_iso_volume_id(self) -> None:
         with tempfile.NamedTemporaryFile(delete=False) as fh:
             fh.write(b"\x00" * 32768)
@@ -939,6 +658,20 @@ class ProtocolTests(unittest.TestCase):
         self.assertIsNotNone(ev)
         self.assertEqual(ev.kind, "reboot")
         self.assertEqual(ev.progress, 100)
+
+    def test_tick_lines(self) -> None:
+        ticks = parse_helper_line("TICKS Checking the image|Preparing the disk|Restarting")
+        self.assertIsNotNone(ticks)
+        self.assertEqual(ticks.kind, "ticks")
+        self.assertEqual(
+            ticks.ticks, ("Checking the image", "Preparing the disk", "Restarting")
+        )
+        current = parse_helper_line("TICK 4 current")
+        self.assertEqual(current.kind, "tick")
+        self.assertEqual(current.tick, 4)
+        self.assertEqual(current.tick_status, "current")
+        done = parse_helper_line("TICK 2 skip")
+        self.assertEqual(done.tick_status, "skip")
 
 
 if __name__ == "__main__":

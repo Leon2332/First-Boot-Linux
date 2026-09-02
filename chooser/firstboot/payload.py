@@ -16,10 +16,14 @@ DEFAULT_PAYLOAD = "/run/payload"
 FAMILIES = frozenset(
     {"ubuntu", "mint", "fedora", "debian", "suse", "windows", "bsd", "other"}
 )
+# Baked-in native driver plus reserved ids (old trampolines, windows/bsd).
+# Reserved ids parse in catalog.json but have no Python driver.
 INSTALL_DRIVERS = frozenset(
     {
+        "ubuntu-2604-gnome",
         "ubuntu-2604",
         "ubuntu-autoinstall",
+        "ubuntu-calamares-2604",
         "mint-223",
         "mint",
         "fedora-44-plasma",
@@ -81,6 +85,7 @@ class Edition:
     sha256: str
     size_bytes: int
     available: bool
+    install: str | None = None
 
     @property
     def on_disk(self) -> bool:
@@ -129,6 +134,11 @@ class Distro:
 
     def local_editions(self) -> tuple[Edition, ...]:
         return tuple(ed for ed in self.editions if ed.claimed_local)
+
+    def install_for(self, edition: Edition | None = None) -> str:
+        if edition is not None and edition.install:
+            return edition.install
+        return self.install
 
 
 @dataclass
@@ -403,6 +413,7 @@ def _parse_edition(root: str, raw: object, where: str) -> Edition:
         "url",
         "sha256",
         "size_bytes",
+        "install",
     }
     if extra:
         raise PayloadError(f"catalog.json: {where} unknown keys: {', '.join(sorted(extra))}")
@@ -437,6 +448,12 @@ def _parse_edition(root: str, raw: object, where: str) -> Edition:
             raise PayloadError(f"catalog.json: {where} file must look like images/name.iso")
 
     available = edition_is_present(root, file_rel if isinstance(file_rel, str) else None)
+    ed_install = raw.get("install")
+    if ed_install is not None:
+        if not isinstance(ed_install, str) or not ID_RE.fullmatch(ed_install):
+            raise PayloadError(f"catalog.json: {where} invalid install driver")
+        if not install_allowed(ed_install, root):
+            raise PayloadError(f"catalog.json: {where} unknown install driver")
     return Edition(
         id=eid,
         name=raw["name"].strip(),
@@ -447,6 +464,7 @@ def _parse_edition(root: str, raw: object, where: str) -> Edition:
         sha256=raw["sha256"],
         size_bytes=raw["size_bytes"],
         available=available,
+        install=ed_install if isinstance(ed_install, str) else None,
     )
 
 

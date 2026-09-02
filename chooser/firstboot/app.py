@@ -18,11 +18,12 @@ from firstboot.assets import (
 from firstboot.disk import HelperEvent, live_plan
 from firstboot.install import InstallError, run_apply
 from firstboot.osinstall import (
-    DRIVER_UBUNTU,
+    DRIVER_UBUNTU_GNOME,
     OsIdentity,
     OsInstallError,
     canonical_driver_id,
     get_driver,
+    is_native_driver,
     live_os_plan,
     run_iso_fetch,
     run_os_install,
@@ -31,6 +32,7 @@ from firstboot.osinstall import (
     suggest_username,
     validate_identity,
 )
+from firstboot.osinstall.pipeline import PIPELINE_TICKS
 from firstboot.catalog_search import (
     DIFFERENT,
     LESS_STRICT,
@@ -158,6 +160,9 @@ def run_window(
             self._install_distro: Distro | None = None
             self._install_ed: Edition | None = None
             self._install_step_raw = ""
+            self._native_install = False
+            self._tick_labels: list[str] = []
+            self._tick_rows: list = []
             self._done_msgid = (
                 "First Boot Linux is on this computer. Remove the USB stick and restart."
             )
@@ -1199,7 +1204,7 @@ def run_window(
                     _("This system cannot install while Secure Boot is on.")
                 )
                 return
-            if get_driver(distro.install) is None:
+            if get_driver(distro.install_for(ed)) is None:
                 self._toast(
                     _("{name} install is not available yet.").format(name=distro.name)
                 )
@@ -1334,6 +1339,27 @@ def run_window(
             meta.append(self.install_step)
             panel.append(meta)
 
+            self.install_ticks = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            self.install_ticks.add_css_class("install-ticks")
+            self.install_ticks.set_visible(False)
+            panel.append(self.install_ticks)
+
+            self.install_error = Gtk.Label(label="")
+            self.install_error.add_css_class("install-error")
+            self.install_error.set_wrap(True)
+            self.install_error.set_justify(Gtk.Justification.CENTER)
+            self.install_error.set_max_width_chars(36)
+            self.install_error.set_visible(False)
+            panel.append(self.install_error)
+
+            self.install_close = Gtk.Button(label=_("Close"))
+            self.install_close.add_css_class("btn-primary")
+            self.install_close.set_halign(Gtk.Align.CENTER)
+            self.install_close.set_margin_top(8)
+            self.install_close.set_visible(False)
+            self.install_close.connect("clicked", lambda *_: self._hide_shop_overlays())
+            panel.append(self.install_close)
+
             host.append(panel)
             return host
 
@@ -1427,6 +1453,52 @@ def run_window(
             if step is not None:
                 self._paint_step(step)
 
+        def _clear_ticks(self) -> None:
+            self._tick_labels = []
+            self._tick_rows = []
+            ticks = getattr(self, "install_ticks", None)
+            if ticks is not None:
+                child = ticks.get_first_child()
+                while child is not None:
+                    nxt = child.get_next_sibling()
+                    ticks.remove(child)
+                    child = nxt
+                ticks.set_visible(False)
+            err = getattr(self, "install_error", None)
+            if err is not None:
+                err.set_visible(False)
+                err.set_label("")
+            close = getattr(self, "install_close", None)
+            if close is not None:
+                close.set_visible(False)
+
+        def _set_tick_labels(self, labels: tuple[str, ...] | list[str]) -> None:
+            self._clear_ticks()
+            self._tick_labels = [_(lab) if lab in PIPELINE_TICKS else lab for lab in labels]
+            for i, lab in enumerate(self._tick_labels, 1):
+                row = Gtk.Label(label=f"  {lab}", xalign=0)
+                row.add_css_class("install-tick")
+                row.add_css_class("pending")
+                self.install_ticks.append(row)
+                self._tick_rows.append(row)
+            self.install_ticks.set_visible(bool(self._tick_labels))
+
+        def _set_tick_status(self, index: int, status: str) -> None:
+            if index < 1 or index > len(self._tick_rows):
+                return
+            row = self._tick_rows[index - 1]
+            label = self._tick_labels[index - 1]
+            for cls in ("pending", "current", "done", "failed", "skip"):
+                row.remove_css_class(cls)
+            row.add_css_class(status)
+            mark = {
+                "done": "✓",
+                "current": "●",
+                "failed": "✕",
+                "skip": "–",
+            }.get(status, " ")
+            row.set_label(f"{mark} {label}")
+
         def _show_install_overlay(self) -> None:
             self.close_detail()
             self.shell.close_menus()
@@ -1439,6 +1511,7 @@ def run_window(
             self._set_dimmed(True)
             self.done_host.set_visible(False)
             self.install_host.set_visible(True)
+            self._clear_ticks()
             self._set_shop_progress(0, "")
 
         def _set_os_brand(
@@ -1459,6 +1532,7 @@ def run_window(
         def _hide_shop_overlays(self) -> None:
             self._installing = False
             self._os_logo = False
+            self._native_install = False
             self.shell.locked = False
             self.install_host.set_visible(False)
             self.done_host.set_visible(False)
@@ -1467,6 +1541,7 @@ def run_window(
             self._install_title_kind = "shop"
             self._install_distro = None
             self._install_ed = None
+            self._clear_ticks()
             self._done_msgid = (
                 "First Boot Linux is on this computer. Remove the USB stick and restart."
             )
@@ -1541,6 +1616,10 @@ def run_window(
                         self._paint_step(event.text)
                 elif event.kind == "progress" and event.progress is not None:
                     self._set_shop_progress(event.progress)
+                elif event.kind == "ticks" and event.ticks:
+                    self._set_tick_labels(event.ticks)
+                elif event.kind == "tick" and event.tick is not None and event.tick_status:
+                    self._set_tick_status(event.tick, event.tick_status)
                 return False
 
             from gi.repository import GLib
@@ -1593,7 +1672,8 @@ def run_window(
 
         def _preview_os_distro(self) -> Distro | None:
             for distro in self.payload.recommended:
-                if canonical_driver_id(distro.install) == DRIVER_UBUNTU:
+                drv_id = canonical_driver_id(distro.install_for(distro.default_edition))
+                if drv_id == DRIVER_UBUNTU_GNOME:
                     return distro
             return None
 
@@ -1609,7 +1689,20 @@ def run_window(
             self._show_install_overlay()
             if distro is not None:
                 self._set_os_brand(distro, distro.default_edition)
-            self._set_shop_progress(58, "Checking the image…")
+            native = True
+            if distro is not None:
+                native = is_native_driver(
+                    get_driver(distro.install_for(distro.default_edition))
+                )
+            if native:
+                self._set_tick_labels(PIPELINE_TICKS)
+                self._set_tick_status(1, "done")
+                self._set_tick_status(2, "skip")
+                self._set_tick_status(3, "done")
+                self._set_tick_status(4, "current")
+                self._set_shop_progress(58, _("Installing the system"))
+            else:
+                self._set_shop_progress(58, "Checking the image…")
             return False
 
         def _preview_os_done(self) -> bool:
@@ -1618,9 +1711,7 @@ def run_window(
             de = ""
             if distro is not None:
                 de = f" ({distro.default_edition.name})"
-            self._done_msgid = (
-                "{name} will install after restart. This computer will be erased."
-            )
+            self._done_msgid = "{name} is ready. This computer will restart."
             self._done_name = f"{name}{de}"
             self._paint_done_msg()
             self._show_shop_done()
@@ -1658,7 +1749,7 @@ def run_window(
             user_e = Gtk.Entry()
             user_e.set_placeholder_text(_("username"))
             host_e = Gtk.Entry()
-            drv = get_driver(distro.install)
+            drv = get_driver(distro.install_for(ed))
             host_e.set_text(drv.default_hostname if drv is not None else "ubuntu")
             pw_e = Gtk.Entry()
             pw_e.set_visibility(False)
@@ -1724,8 +1815,11 @@ def run_window(
             dialog.choose(self.win, None, done)
 
         def _start_os_install(self, distro: Distro, ed: Edition, ident: OsIdentity) -> None:
+            self._native_install = is_native_driver(get_driver(distro.install_for(ed)))
             self._show_install_overlay()
             self._set_os_brand(distro, ed)
+            if self._native_install:
+                self._set_tick_labels(PIPELINE_TICKS)
             if self.osinstall or self.screenshot:
                 self._preview_os_progress()
                 return
@@ -1758,19 +1852,32 @@ def run_window(
             self, err: str | None, reboot: bool, distro: Distro, ed: Edition
         ) -> bool:
             if err:
+                if self._native_install:
+                    self.install_error.set_label(err)
+                    self.install_error.set_visible(True)
+                    self.install_close.set_visible(True)
+                    self.shell.locked = False
+                    self._installing = False
+                    return False
                 self._hide_shop_overlays()
                 self._toast(err)
                 return False
             de = f" ({ed.name})" if ed.name else ""
-            self._done_msgid = (
-                "{name} will install after restart. This computer will be erased."
-            )
+            if self._native_install:
+                self._done_msgid = "{name} is ready. This computer will restart."
+            else:
+                self._done_msgid = (
+                    "{name} will install after restart. This computer will be erased."
+                )
             self._done_name = f"{distro.name}{de}"
             self._paint_done_msg()
             if reboot and not self.screenshot:
-                self._set_shop_progress(
-                    100, "Restarting to install {name}…\t" + distro.name
-                )
+                if self._native_install:
+                    self._set_shop_progress(100, _("Restarting"))
+                else:
+                    self._set_shop_progress(
+                        100, "Restarting to install {name}…\t" + distro.name
+                    )
                 GLib.timeout_add(1200, self._reboot_now)
                 return False
             self._show_shop_done()

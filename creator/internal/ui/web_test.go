@@ -58,6 +58,12 @@ func TestLanguageButtonInPage(t *testing.T) {
 	if !bytes.Contains(css, []byte(".lang-pop")) || !bytes.Contains(css, []byte(".lang-btn")) {
 		t.Fatal("missing language popover styles")
 	}
+	if !bytes.Contains(css, []byte(".page-2-list::-webkit-scrollbar")) {
+		t.Fatal("Recommendations must use the overlay scrollbar")
+	}
+	if !bytes.Contains(css, []byte("scrollbar-width: thin")) {
+		t.Fatal("missing thin overlay scrollbar")
+	}
 }
 
 func TestStateServesUICatalog(t *testing.T) {

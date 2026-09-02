@@ -17,17 +17,7 @@ from firstboot.installlocale import (  # noqa: E402
     payload_install_locale,
     resolve_install_locale,
 )
-from firstboot.osinstall.fedora_44_plasma import fedora_kickstart  # noqa: E402
-from firstboot.osinstall.mint_223 import mint_preseed  # noqa: E402
-from firstboot.osinstall.ubuntu_2604 import autoinstall_yaml  # noqa: E402
-from firstboot.osinstall.common import OsIdentity  # noqa: E402
-
-HASH = (
-    "$6$exDY1mhS4KUYCE/2$"
-    "zmn9ToZwTKLhCw.b4/b.ZRTIZM30JZ4QrOQ2aOXJ8yk96xpcCof0kxKwuX1kqLG/"
-    "ygbJ1f8wxED22bTL4F46P0"
-)
-IDENT = OsIdentity("shop-pc", "leon", "Leon", HASH)
+from firstboot.osinstall.casper import write_locale  # noqa: E402
 
 
 class ResolveTests(unittest.TestCase):
@@ -74,40 +64,35 @@ class ResolveTests(unittest.TestCase):
 class SeedTests(unittest.TestCase):
     def test_ubuntu_uk_locale_us_keyboard(self) -> None:
         loc = resolve_install_locale("en-gb", "us")
-        text = autoinstall_yaml(IDENT, "/dev/sda", locale=loc)
-        self.assertIn("locale: en_GB.UTF-8", text)
-        self.assertIn("layout: us", text)
-        self.assertNotIn("language-pack-af", text)
+        with tempfile.TemporaryDirectory() as tmp:
+            write_locale(tmp, loc)
+            with open(os.path.join(tmp, "etc", "default", "locale"), encoding="utf-8") as fh:
+                self.assertIn("LANG=en_GB.UTF-8", fh.read())
+            with open(os.path.join(tmp, "etc", "default", "keyboard"), encoding="utf-8") as fh:
+                self.assertIn('XKBLAYOUT="us"', fh.read())
+            with open(os.path.join(tmp, "etc", "locale.gen"), encoding="utf-8") as fh:
+                self.assertIn("en_GB.UTF-8 UTF-8", fh.read())
 
     def test_ubuntu_south_african_english(self) -> None:
         loc = resolve_install_locale("en-za", "za")
-        text = autoinstall_yaml(IDENT, "/dev/sda", locale=loc)
-        self.assertIn("locale: en_ZA.UTF-8", text)
-        self.assertIn("layout: za", text)
-        self.assertNotIn("language-pack-af", text)
+        with tempfile.TemporaryDirectory() as tmp:
+            write_locale(tmp, loc)
+            with open(os.path.join(tmp, "etc", "default", "locale"), encoding="utf-8") as fh:
+                self.assertIn("LANG=en_ZA.UTF-8", fh.read())
+            with open(os.path.join(tmp, "etc", "default", "keyboard"), encoding="utf-8") as fh:
+                self.assertIn('XKBLAYOUT="za"', fh.read())
 
     def test_ubuntu_afrikaans_language_pack(self) -> None:
         loc = resolve_install_locale("af", "gb")
-        text = autoinstall_yaml(IDENT, "/dev/sda", locale=loc)
-        self.assertIn("locale: af_ZA.UTF-8", text)
-        self.assertIn("layout: gb", text)
-        self.assertIn("language-pack-af", text)
-        self.assertIn("language-pack-gnome-af", text)
-
-    def test_mint_uk(self) -> None:
-        loc = resolve_install_locale("en-gb", "gb")
-        text = mint_preseed(IDENT, "/dev/sda", locale=loc)
-        self.assertIn("debian-installer/locale string en_GB.UTF-8", text)
-        self.assertIn("countrychooser/shortlist select GB", text)
-        self.assertIn("keyboard-configuration/layoutcode string gb", text)
-        self.assertIn("pkgsel/install-language-support boolean true", text)
-
-    def test_fedora_afrikaans_us_keyboard(self) -> None:
-        loc = resolve_install_locale("af", "us")
-        text = fedora_kickstart(IDENT, "/dev/sda", locale=loc)
-        self.assertIn("lang af_ZA.UTF-8", text)
-        self.assertIn("keyboard --vckeymap=us --xlayouts='us'", text)
-        self.assertNotIn("%packages", text)
+        self.assertEqual(loc.glibc, "af_ZA.UTF-8")
+        self.assertEqual(loc.keyboard, "gb")
+        self.assertEqual(loc.langpack, "af")
+        with tempfile.TemporaryDirectory() as tmp:
+            write_locale(tmp, loc)
+            with open(os.path.join(tmp, "etc", "default", "locale"), encoding="utf-8") as fh:
+                self.assertIn("LANG=af_ZA.UTF-8", fh.read())
+            with open(os.path.join(tmp, "etc", "default", "keyboard"), encoding="utf-8") as fh:
+                self.assertIn('XKBLAYOUT="gb"', fh.read())
 
 
 if __name__ == "__main__":

@@ -35,6 +35,7 @@ type Edition struct {
 	ID        string  `json:"id"`
 	Name      string  `json:"name"`
 	Default   bool    `json:"default"`
+	Install   *string `json:"install,omitempty"`
 	Filename  string  `json:"filename"`
 	URL       *string `json:"url"`
 	SHA256    *string `json:"sha256"`
@@ -64,6 +65,7 @@ type ShopEdition struct {
 	Name      string `json:"name"`
 	Default   bool   `json:"default"`
 	Local     bool   `json:"local"`
+	Install   string `json:"install,omitempty"`
 	File      string `json:"file,omitempty"`
 	URL       string `json:"url,omitempty"`
 	SHA256    string `json:"sha256"`
@@ -764,6 +766,9 @@ func shopDistro(d *Distro, selected []string) (ShopDistro, error) {
 			Default:   featured != "" && ed.ID == featured,
 			SHA256:    *ed.SHA256,
 			SizeBytes: *ed.SizeBytes,
+		}
+		if ed.Install != nil && *ed.Install != "" && *ed.Install != *d.Install {
+			se.Install = *ed.Install
 		}
 		if picked[ed.ID] && d.CanStageEdition(ed) {
 			se.Local = true

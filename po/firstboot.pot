@@ -298,6 +298,36 @@ msgstr ""
 msgid "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults."
 msgstr ""
 
+msgid "Ubuntu with KDE Plasma"
+msgstr ""
+
+msgid "The power of Ubuntu with the highly customizable KDE Plasma desktop."
+msgstr ""
+
+msgid "Very lightweight"
+msgstr ""
+
+msgid "Ubuntu with LXQt. Ideal for older machines or when you want maximum free memory."
+msgstr ""
+
+msgid "Elegant and efficient"
+msgstr ""
+
+msgid "The Budgie desktop on Ubuntu — modern, clean, and approachable."
+msgstr ""
+
+msgid "Classic desktop layout"
+msgstr ""
+
+msgid "Traditional menus and panels with the stability of Ubuntu LTS."
+msgstr ""
+
+msgid "Lightweight and fast"
+msgstr ""
+
+msgid "Ubuntu with the Xfce desktop — lower resource use, still fully featured."
+msgstr ""
+
 msgid "This will erase the internal disk and copy First Boot Linux onto it."
 msgstr ""
 
@@ -692,4 +722,43 @@ msgid "This pack is not from First Boot Linux. A broken driver can wipe the disk
 msgstr ""
 
 msgid "Choose an ISO for {name}"
+msgstr ""
+
+msgid "Checking the image"
+msgstr ""
+
+msgid "Copying First Boot to memory"
+msgstr ""
+
+msgid "Preparing the disk"
+msgstr ""
+
+msgid "Installing the system"
+msgstr ""
+
+msgid "Setting up the computer"
+msgstr ""
+
+msgid "Installing the bootloader"
+msgstr ""
+
+msgid "Checking the install"
+msgstr ""
+
+msgid "Removing First Boot"
+msgstr ""
+
+msgid "Restarting"
+msgstr ""
+
+msgid "The install could not be checked."
+msgstr ""
+
+msgid "{name} is ready. This computer will restart."
+msgstr ""
+
+msgid "Could not copy First Boot into memory. Plug in a First Boot USB and try again."
+msgstr ""
+
+msgid "This computer could not stop using the disk. Restart and try again."
 msgstr ""

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import re
@@ -475,6 +476,9 @@ class HelperEvent:
     kind: str
     text: str = ""
     progress: int | None = None
+    tick: int | None = None
+    tick_status: str | None = None
+    ticks: tuple[str, ...] | None = None
 
 
 def parse_helper_line(line: str) -> HelperEvent | None:
@@ -496,11 +500,31 @@ def parse_helper_line(line: str) -> HelperEvent | None:
             return HelperEvent("progress", progress=int(rest.split()[0]))
         except (ValueError, IndexError):
             return None
+    if text.startswith("TICKS"):
+        rest = text[5:].lstrip(" :")
+        labels = tuple(part for part in rest.split("|") if part)
+        return HelperEvent("ticks", ticks=labels)
+    if text.startswith("TICK"):
+        parts = text.split()
+        if len(parts) >= 3:
+            try:
+                return HelperEvent(
+                    "tick", tick=int(parts[1]), tick_status=parts[2].lower()
+                )
+            except ValueError:
+                return None
+        return None
     return None
 
 
 def emit(kind: str, *parts: object) -> None:
-    if parts:
-        print(kind, *parts, flush=True)
-    else:
-        print(kind, flush=True)
+    try:
+        if parts:
+            print(kind, *parts, flush=True)
+        else:
+            print(kind, flush=True)
+    except BrokenPipeError:
+        pass
+    except OSError as exc:
+        if exc.errno != errno.EPIPE:
+            raise

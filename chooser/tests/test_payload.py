@@ -292,7 +292,8 @@ class LoadPayloadTests(unittest.TestCase):
         example = os.path.join(repo, "schemas", "examples")
         p = load_payload(example)
         self.assertIsNotNone(p.retailer)
-        self.assertEqual([d.id for d in p.recommended], ["ubuntu", "linux-mint"])
+        self.assertEqual([d.id for d in p.recommended], ["ubuntu"])
+        self.assertEqual(p.catalog, [])
         self.assertTrue(all(not d.default_edition.available for d in p.recommended))
 
     def test_dummy_payload_catalog(self) -> None:
@@ -300,12 +301,11 @@ class LoadPayloadTests(unittest.TestCase):
         dummy = os.path.join(repo, "image", "dummy-payload")
         p = load_payload(dummy)
         self.assertIsNotNone(p.retailer)
-        self.assertEqual([d.id for d in p.recommended], ["ubuntu", "linux-mint"])
-        mint = next(d for d in p.recommended if d.id == "linux-mint")
-        self.assertEqual([e.id for e in mint.editions], ["cinnamon", "mate", "xfce"])
-        self.assertTrue(all(not e.available for e in mint.editions))
-        self.assertEqual(mint.editions[0].action, "download")
-        self.assertEqual(mint.editions[1].action, "download")
+        self.assertEqual([d.id for d in p.recommended], ["ubuntu"])
+        self.assertEqual(p.catalog, [])
+        ubuntu = p.recommended[0]
+        self.assertEqual(ubuntu.install, "ubuntu-2604-gnome")
+        self.assertEqual([e.id for e in ubuntu.editions], ["gnome"])
 
     def test_recommended_download_only_is_ok(self) -> None:
         windows = {
