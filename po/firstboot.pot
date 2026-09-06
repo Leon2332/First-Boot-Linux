@@ -145,6 +145,9 @@ msgstr ""
 msgid "Other options"
 msgstr ""
 
+msgid "Unknown"
+msgstr ""
+
 msgid "Configured by {name}"
 msgstr ""
 

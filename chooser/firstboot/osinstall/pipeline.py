@@ -813,6 +813,7 @@ def install_native(
         boot_id = getattr(drv, "bootloader_id", None) or "ubuntu"
         loader = efi_loader_path(disk.esp_mp, boot_id)
         register_os_efi(disk, label, loader, log=log)
+        log.copy_to(os.path.join(disk.root_mp, TARGET_LOG_REL))
         emit_tick(8, "done")
         prog(98)
 

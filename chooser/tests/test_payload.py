@@ -19,6 +19,7 @@ from firstboot.payload import (  # noqa: E402
     load_payload,
     parse_retailer_conf,
     PayloadError,
+    UNKNOWN_LOGO_ID,
     edition_is_present,
     other_options,
     recommended_offerings,
@@ -442,6 +443,122 @@ class LoadPayloadTests(unittest.TestCase):
         self.assertEqual(by_id["mate"].action, "install")
         self.assertEqual(by_id["xfce"].action, "install")
 
+    def test_shop_mint_mate_xfce_edition_drivers(self) -> None:
+        """Creator BuildShop(mate+xfce) pins per-ISO install ids on editions."""
+        mint = {
+            "id": "linux-mint",
+            "name": "Linux Mint",
+            "version": "22.3",
+            "tagline": "Familiar and easy",
+            "description": "A stable desktop.",
+            "family": "mint",
+            "install": "mint-223-cinnamon",
+            "editions": [
+                {
+                    "id": "mate",
+                    "name": "MATE",
+                    "default": True,
+                    "local": True,
+                    "install": "mint-223-mate",
+                    "file": "images/linuxmint-22.3-mate-64bit.iso",
+                    "sha256": ZERO,
+                    "size_bytes": 3134275584,
+                },
+                {
+                    "id": "xfce",
+                    "name": "Xfce",
+                    "default": False,
+                    "local": True,
+                    "install": "mint-223-xfce",
+                    "file": "images/linuxmint-22.3-xfce-64bit.iso",
+                    "sha256": ZERO,
+                    "size_bytes": 3033710592,
+                },
+                {
+                    "id": "cinnamon",
+                    "name": "Cinnamon",
+                    "default": False,
+                    "local": False,
+                    "url": "https://example.invalid/cinnamon.iso",
+                    "sha256": ZERO,
+                    "size_bytes": 3091660800,
+                },
+            ],
+        }
+        _write(
+            self.tmp,
+            "catalog.json",
+            json.dumps({"schema_version": 1, "recommended": [mint], "catalog": []}),
+        )
+        p = load_payload(self.tmp)
+        self.assertFalse(
+            any("unknown install driver" in e for e in p.errors), p.errors
+        )
+        self.assertEqual([d.id for d in p.recommended], ["linux-mint"])
+        eds = {e.id: e for e in p.recommended[0].editions}
+        self.assertEqual(eds["mate"].install, "mint-223-mate")
+        self.assertEqual(eds["xfce"].install, "mint-223-xfce")
+        self.assertIsNone(eds["cinnamon"].install)
+        cards = recommended_offerings(p.recommended)
+        self.assertEqual(
+            [(d.id, e.id) for d, e in cards],
+            [("linux-mint", "mate"), ("linux-mint", "xfce")],
+        )
+        self.assertFalse(p.recommended[0].unknown_install)
+        self.assertFalse(eds["mate"].unknown_install)
+        self.assertFalse(eds["xfce"].unknown_install)
+
+    def test_unknown_edition_driver_still_lists_a_card(self) -> None:
+        mint = {
+            "id": "linux-mint",
+            "name": "Linux Mint",
+            "version": "22.3",
+            "tagline": "Familiar and easy",
+            "description": "A stable desktop.",
+            "family": "mint",
+            "install": "mint-223-cinnamon",
+            "editions": [
+                {
+                    "id": "mate",
+                    "name": "MATE",
+                    "default": True,
+                    "local": True,
+                    "install": "mint-future-mate",
+                    "file": "images/linuxmint-22.3-mate-64bit.iso",
+                    "sha256": ZERO,
+                    "size_bytes": 1,
+                },
+                {
+                    "id": "cinnamon",
+                    "name": "Cinnamon",
+                    "default": False,
+                    "local": False,
+                    "url": "https://example.invalid/cinnamon.iso",
+                    "sha256": ZERO,
+                    "size_bytes": 1,
+                },
+            ],
+        }
+        _write(
+            self.tmp,
+            "catalog.json",
+            json.dumps({"schema_version": 1, "recommended": [mint], "catalog": []}),
+        )
+        p = load_payload(self.tmp)
+        self.assertFalse(any("unknown install driver" in e for e in p.errors), p.errors)
+        self.assertEqual([d.id for d in p.recommended], ["linux-mint"])
+        mint_d = p.recommended[0]
+        self.assertFalse(mint_d.unknown_install)
+        eds = {e.id: e for e in mint_d.editions}
+        self.assertTrue(eds["mate"].unknown_install)
+        self.assertFalse(eds["cinnamon"].unknown_install)
+        self.assertEqual(mint_d.logo_id_for(eds["mate"]), UNKNOWN_LOGO_ID)
+        self.assertEqual(mint_d.logo_id_for(eds["cinnamon"]), "linux-mint")
+        self.assertEqual(
+            [(d.id, e.id) for d, e in recommended_offerings(p.recommended)],
+            [("linux-mint", "mate")],
+        )
+
     def test_edition_is_present_rejects_unsafe(self) -> None:
         self.assertFalse(edition_is_present(self.tmp, "../catalog.json"))
         self.assertFalse(edition_is_present(self.tmp, "/etc/passwd"))
@@ -474,12 +591,24 @@ class LoadPayloadTests(unittest.TestCase):
             json.dumps({"schema_version": 1, "recommended": [pop], "catalog": []}),
         )
         p = load_payload(self.tmp)
-        self.assertTrue(any("unknown install driver" in e for e in p.errors))
+        self.assertFalse(any("unknown install driver" in e for e in p.errors), p.errors)
+        self.assertEqual([d.id for d in p.recommended], ["pop-os"])
+        pop = p.recommended[0]
+        self.assertTrue(pop.unknown_install)
+        self.assertTrue(pop.editions[0].unknown_install)
+        self.assertEqual(pop.logo_id_for(pop.editions[0]), UNKNOWN_LOGO_ID)
+        self.assertEqual(
+            [(d.id, e.id) for d, e in recommended_offerings(p.recommended)],
+            [("pop-os", "gnome")],
+        )
         _write(self.tmp, "custom/pop-os/driver.py", "DRIVER = object()\n")
         p = load_payload(self.tmp)
         self.assertFalse(any("unknown install driver" in e for e in p.errors))
         self.assertEqual(p.recommended[0].id, "pop-os")
         self.assertEqual(p.recommended[0].install, "pop-os")
+        self.assertFalse(p.recommended[0].unknown_install)
+        self.assertFalse(p.recommended[0].editions[0].unknown_install)
+        self.assertEqual(p.recommended[0].logo_id_for(p.recommended[0].editions[0]), "pop-os")
         self.assertTrue(p.recommended[0].secure_boot)
 
     def test_secure_boot_field(self) -> None:

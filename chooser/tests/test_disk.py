@@ -36,6 +36,7 @@ from firstboot.install import (  # noqa: E402
     ESP_GRUB,
     SYS_GRUB,
     efi_ids_for_label,
+    efi_ids_for_unshimmed_loaders,
     rewrite_grub,
     unmount_error,
 )
@@ -332,6 +333,19 @@ Boot0007* Windows Boot Manager\tHD(1,GPT,eee,0x800,0x100000)/File(\\EFI\\Microso
         self.assertEqual(efi_ids_for_label(self.SAMPLE, "Fedora"), ["0005"])
         self.assertEqual(efi_ids_for_label(self.SAMPLE, "Windows Boot Manager"), ["0007"])
         self.assertEqual(efi_ids_for_label(self.SAMPLE, "missing"), [])
+
+    def test_unshimmed_loaders_not_shim(self) -> None:
+        text = (
+            "Boot0000* Linux Mint\tHD(1,GPT,aaa,0x800,0x100000)/"
+            "File(\\EFI\\ubuntu\\shimx64.efi)\n"
+            "Boot0003* ubuntu\tHD(1,GPT,aaa,0x800,0x100000)/"
+            "File(\\EFI\\ubuntu\\grubx64.efi)RC\n"
+            "Boot0004* ubuntu\tHD(1,GPT,aaa,0x800,0x100000)/"
+            "File(\\EFI\\ubuntu\\mmx64.efi)RC\n"
+            "Boot0014* NVMe:\tVenMsg(bc7838d2-0f82-4d60-8316-c068ee79d25b,001c)\n"
+        )
+        self.assertEqual(efi_ids_for_unshimmed_loaders(text), ["0003", "0004"])
+        self.assertEqual(efi_ids_for_unshimmed_loaders(self.SAMPLE), [])
 
 
 class ProtocolTests(unittest.TestCase):

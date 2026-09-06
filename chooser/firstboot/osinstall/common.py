@@ -1272,21 +1272,28 @@ def register_os_efi(disk: InstalledDisk, label: str, loader: str, log: InstallLo
         return
     from firstboot.install import STALE_EFI_LABELS
 
-    proc = subprocess.run(["efibootmgr"], check=False, capture_output=True, text=True)
+    proc = subprocess.run(
+        ["efibootmgr", "-v"], check=False, capture_output=True, text=True
+    )
     text = proc.stdout or ""
+    from firstboot.install import efi_ids_for_unshimmed_loaders
+
     labels = list(STALE_EFI_LABELS) + [label]
     seen: set[str] = set()
+    drop = []
     for name in labels:
-        for bootnum in efi_ids_for_label(text, name):
-            if bootnum in seen:
-                continue
-            seen.add(bootnum)
-            subprocess.run(
-                ["efibootmgr", "--bootnum", bootnum, "--delete-bootnum"],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+        drop.extend(efi_ids_for_label(text, name))
+    drop.extend(efi_ids_for_unshimmed_loaders(text))
+    for bootnum in drop:
+        if bootnum in seen:
+            continue
+        seen.add(bootnum)
+        subprocess.run(
+            ["efibootmgr", "--bootnum", bootnum, "--delete-bootnum"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
     partnum = "1"
     base = os.path.basename(disk.esp_dev)
     if "p" in base and base.rsplit("p", 1)[-1].isdigit():

@@ -476,6 +476,37 @@ def efi_ids_for_label(text: str, label: str) -> list[str]:
     return found
 
 
+_UNSHIMMED_EFI = ("grubx64.efi", "mmx64.efi")
+
+
+def efi_ids_for_unshimmed_loaders(text: str) -> list[str]:
+    """Boot#### ids whose File() path is Canonical GRUB or MokManager.
+
+    Lenovo/Phoenix firmware auto-discovers ``.efi`` files on the ESP and
+    adds recovered (RC) entries that launch ``grubx64.efi`` / ``mmx64.efi``
+    as first-stage loaders. Those binaries are Canonical-signed; the
+    firmware db only has Microsoft. Result: ``Error: Prohibited by secure
+    boot policy.`` then the real shim entry boots. Needs ``efibootmgr -v``.
+    """
+    found: list[str] = []
+    seen: set[str] = set()
+    for line in text.splitlines():
+        match = EFI_BOOT_RE.match(line)
+        if not match:
+            continue
+        rest = match.group(2).replace("\\", "/").lower()
+        if not any(name in rest for name in _UNSHIMMED_EFI):
+            continue
+        if "shimx64.efi" in rest:
+            continue
+        bootnum = match.group(1).upper()
+        if bootnum in seen:
+            continue
+        seen.add(bootnum)
+        found.append(bootnum)
+    return found
+
+
 def _efibootmgr_output() -> str:
     proc = subprocess.run(
         ["efibootmgr"],

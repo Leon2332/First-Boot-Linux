@@ -145,6 +145,9 @@ msgstr "Install to this device"
 msgid "Other options"
 msgstr "Other options"
 
+msgid "Unknown"
+msgstr "Unknown"
+
 msgid "Configured by {name}"
 msgstr "Configured by {name}"
 

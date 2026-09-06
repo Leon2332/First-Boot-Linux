@@ -81,7 +81,9 @@ USB
     │           └── af.po
     └── images
         ├── ubuntu-26.04-desktop-amd64.iso
-        └── linuxmint-22.3-cinnamon-64bit.iso
+        ├── linuxmint-22.3-cinnamon-64bit.iso
+        ├── linuxmint-22.3-mate-64bit.iso
+        └── linuxmint-22.3-xfce-64bit.iso
 ```
 
 `images/` only contains redistributable ISOs this retailer staged (official downloads, plus shop-pack ISOs). Recommended can include a download-only row (official `redistributable: false`) with nothing under `images/`. Distros the shop did not tick, but that already have an install driver, go in `catalog.json` `catalog` (Other options, Download). Official ticks still require `can_stage`, `redistributable`, and `install` (Ubuntu, Linux Mint, Fedora Plasma). Shop packs are extra recommended rows; their driver lives under `custom/<id>/`, not in the squashfs. Basenames for official ISOs come from `schemas/official-catalog.json` `filename` fields; pack ISO basenames come from the pack `manifest.json` `editions[].filename`.

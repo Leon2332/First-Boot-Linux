@@ -24,6 +24,9 @@ INSTALL_DRIVERS = frozenset(
         "ubuntu-2604",
         "ubuntu-autoinstall",
         "ubuntu-calamares-2604",
+        "mint-223-cinnamon",
+        "mint-223-mate",
+        "mint-223-xfce",
         "mint-223",
         "mint",
         "fedora-44-plasma",
@@ -34,6 +37,7 @@ INSTALL_DRIVERS = frozenset(
     }
 )
 ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+UNKNOWN_LOGO_ID = "unknown"
 _LAST_ROOT: str | None = None
 
 
@@ -86,6 +90,7 @@ class Edition:
     size_bytes: int
     available: bool
     install: str | None = None
+    unknown_install: bool = False
 
     @property
     def on_disk(self) -> bool:
@@ -114,6 +119,7 @@ class Distro:
     editions: tuple[Edition, ...]
     recommended: bool
     secure_boot: bool = True
+    unknown_install: bool = False
 
     @property
     def default_edition(self) -> Edition:
@@ -139,6 +145,17 @@ class Distro:
         if edition is not None and edition.install:
             return edition.install
         return self.install
+
+    def unknown_for(self, edition: Edition | None = None) -> bool:
+        """True when this card's install id is not a baked-in or shop-pack driver."""
+        if edition is not None:
+            return edition.unknown_install
+        return self.unknown_install
+
+    def logo_id_for(self, edition: Edition | None = None) -> str:
+        if self.unknown_for(edition):
+            return UNKNOWN_LOGO_ID
+        return self.id
 
 
 @dataclass
@@ -358,8 +375,7 @@ def _parse_distro(
         raise PayloadError(f"catalog.json: {where} unknown family")
     if not isinstance(raw["install"], str) or not ID_RE.fullmatch(raw["install"]):
         raise PayloadError(f"catalog.json: {where} invalid install driver")
-    if not install_allowed(raw["install"], root):
-        raise PayloadError(f"catalog.json: {where} unknown install driver")
+    distro_unknown = not install_allowed(raw["install"], root)
     if not isinstance(raw["editions"], list) or not raw["editions"]:
         raise PayloadError(f"catalog.json: {where} editions must be a non-empty array")
 
@@ -367,7 +383,12 @@ def _parse_distro(
     defaults = 0
     edition_ids: set[str] = set()
     for j, eraw in enumerate(raw["editions"]):
-        ed = _parse_edition(root, eraw, f"{where}.editions[{j}]")
+        ed = _parse_edition(
+            root,
+            eraw,
+            f"{where}.editions[{j}]",
+            distro_unknown=distro_unknown,
+        )
         if ed.id in edition_ids:
             raise PayloadError(f"catalog.json: {where} duplicate edition id {ed.id}")
         edition_ids.add(ed.id)
@@ -398,10 +419,13 @@ def _parse_distro(
         editions=tuple(editions),
         recommended=recommended,
         secure_boot=secure_boot,
+        unknown_install=distro_unknown,
     )
 
 
-def _parse_edition(root: str, raw: object, where: str) -> Edition:
+def _parse_edition(
+    root: str, raw: object, where: str, *, distro_unknown: bool = False
+) -> Edition:
     if not isinstance(raw, dict):
         raise PayloadError(f"catalog.json: {where} must be an object")
     extra = set(raw) - {
@@ -449,11 +473,11 @@ def _parse_edition(root: str, raw: object, where: str) -> Edition:
 
     available = edition_is_present(root, file_rel if isinstance(file_rel, str) else None)
     ed_install = raw.get("install")
+    ed_unknown = distro_unknown
     if ed_install is not None:
         if not isinstance(ed_install, str) or not ID_RE.fullmatch(ed_install):
             raise PayloadError(f"catalog.json: {where} invalid install driver")
-        if not install_allowed(ed_install, root):
-            raise PayloadError(f"catalog.json: {where} unknown install driver")
+        ed_unknown = not install_allowed(ed_install, root)
     return Edition(
         id=eid,
         name=raw["name"].strip(),
@@ -465,6 +489,7 @@ def _parse_edition(root: str, raw: object, where: str) -> Edition:
         size_bytes=raw["size_bytes"],
         available=available,
         install=ed_install if isinstance(ed_install, str) else None,
+        unknown_install=ed_unknown,
     )
 
 

@@ -2,7 +2,9 @@
 
 Native drivers (``unpack_kind``) unpack the live filesystem in this
 session, health-check, then drop First Boot. Official catalog is Ubuntu
-26.04 GNOME only (``ubuntu_2604_gnome.py``). Shop packs still use the
+26.04 GNOME (``ubuntu_2604_gnome.py``) and Linux Mint 22.3 Cinnamon,
+MATE, and Xfce (``mint_223_cinnamon.py``, ``mint_223_mate.py``,
+``mint_223_xfce.py``). Shop packs still use the
 legacy ``boot_files`` / ``kernel_args`` / ``seed_files`` API.
 
 See README.md in this directory. kexec is not used (lockdown).
@@ -50,7 +52,7 @@ from firstboot.payload import (
     last_payload_root,
 )
 
-from . import ubuntu_2604_gnome
+from . import mint_223_cinnamon, mint_223_mate, mint_223_xfce, ubuntu_2604_gnome
 from .common import (
     HELPER,
     HOST_RE,
@@ -72,7 +74,12 @@ from .common import (
     run_checked,
 )
 
-_DRIVER_MODULES = (ubuntu_2604_gnome,)
+_DRIVER_MODULES = (
+    ubuntu_2604_gnome,
+    mint_223_cinnamon,
+    mint_223_mate,
+    mint_223_xfce,
+)
 
 
 def _register_drivers() -> dict[str, object]:
@@ -88,6 +95,9 @@ def _register_drivers() -> dict[str, object]:
 DRIVERS = _register_drivers()
 DRIVERS_READY = frozenset(DRIVERS)
 DRIVER_UBUNTU_GNOME = ubuntu_2604_gnome.ID
+DRIVER_MINT_CINNAMON = mint_223_cinnamon.ID
+DRIVER_MINT_MATE = mint_223_mate.ID
+DRIVER_MINT_XFCE = mint_223_xfce.ID
 
 _casper_boot_files = casper_boot_files
 _CUSTOM_DRIVERS: dict[str, object] = {}

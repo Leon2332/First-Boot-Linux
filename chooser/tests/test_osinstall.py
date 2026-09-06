@@ -20,6 +20,9 @@ if CHOOSER_DIR not in sys.path:
 
 from firstboot.disk import Disk, Partition, parse_helper_line, part_path  # noqa: E402
 from firstboot.osinstall import (  # noqa: E402
+    DRIVER_MINT_CINNAMON,
+    DRIVER_MINT_MATE,
+    DRIVER_MINT_XFCE,
     DRIVER_UBUNTU_GNOME,
     canonical_driver_id,
     get_driver,
@@ -128,6 +131,16 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(DRIVER_UBUNTU_GNOME, "ubuntu-2604-gnome")
         self.assertEqual(get_driver("ubuntu-2604-gnome").default_hostname, "ubuntu")
         self.assertTrue(is_native_driver(get_driver("ubuntu-2604-gnome")))
+        self.assertEqual(DRIVER_MINT_CINNAMON, "mint-223-cinnamon")
+        self.assertEqual(get_driver("mint-223-cinnamon").default_hostname, "mint")
+        self.assertTrue(is_native_driver(get_driver("mint-223-cinnamon")))
+        self.assertEqual(get_driver("mint-223-cinnamon").display_manager, "lightdm")
+        self.assertEqual(DRIVER_MINT_MATE, "mint-223-mate")
+        self.assertTrue(is_native_driver(get_driver("mint-223-mate")))
+        self.assertEqual(get_driver("mint-223-mate").display_manager, "lightdm")
+        self.assertEqual(DRIVER_MINT_XFCE, "mint-223-xfce")
+        self.assertTrue(is_native_driver(get_driver("mint-223-xfce")))
+        self.assertEqual(get_driver("mint-223-xfce").display_manager, "lightdm")
         self.assertIsNone(get_driver("ubuntu-2604"))
         self.assertIsNone(get_driver("ubuntu-autoinstall"))
         self.assertIsNone(get_driver("ubuntu-calamares-2604"))

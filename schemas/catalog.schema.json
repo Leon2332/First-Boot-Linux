@@ -56,7 +56,7 @@
         },
         "install": {
           "$ref": "#/$defs/id",
-          "description": "Baked-in driver id (ubuntu-2604-gnome), a reserved id with no driver (ubuntu-2604, ubuntu-autoinstall, ubuntu-calamares-2604, mint-223, mint, fedora-44-plasma, fedora-kickstart, debian-preseed, windows, freebsd), or a shop pack folder payload/custom/<install>/."
+          "description": "Baked-in driver id (ubuntu-2604-gnome, mint-223-cinnamon, mint-223-mate, mint-223-xfce), a reserved id with no driver (ubuntu-2604, ubuntu-autoinstall, ubuntu-calamares-2604, mint-223, mint, fedora-44-plasma, fedora-kickstart, debian-preseed, windows, freebsd), or a shop pack folder payload/custom/<install>/."
         },
         "secure_boot": {
           "type": "boolean",

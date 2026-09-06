@@ -31,10 +31,40 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	if u.SuggestedDefault {
 		t.Fatalf("nothing should be a suggested default")
 	}
-	if len(cat.Distros) != 1 {
-		t.Fatalf("official catalog should be Ubuntu GNOME only, got %d", len(cat.Distros))
+	m := cat.Distro("linux-mint")
+	if m == nil || !m.Redistributable || !m.Stageable() {
+		t.Fatalf("linux-mint should be redistributable and stageable")
 	}
-	for _, id := range []string{"kubuntu", "lubuntu", "ubuntu-budgie", "ubuntu-mate", "xubuntu", "linux-mint", "fedora"} {
+	if m.Install == nil || *m.Install != "mint-223-cinnamon" {
+		t.Fatalf("mint install %v", m.Install)
+	}
+	if !m.SecureBoot {
+		t.Fatal("mint must support Secure Boot")
+	}
+	if m.DefaultEdition() == nil || m.DefaultEdition().ID != "cinnamon" {
+		t.Fatalf("mint default edition %+v", m.DefaultEdition())
+	}
+	if m.DefaultEdition().SHA256 == nil || *m.DefaultEdition().SizeBytes != 3091660800 {
+		t.Fatalf("mint size %v", m.DefaultEdition().SizeBytes)
+	}
+	if len(m.Editions) != 3 {
+		t.Fatalf("mint editions %d", len(m.Editions))
+	}
+	mate := m.Edition("mate")
+	if mate == nil || mate.Install == nil || *mate.Install != "mint-223-mate" || *mate.SizeBytes != 3134275584 {
+		t.Fatalf("mint mate %+v", mate)
+	}
+	xfce := m.Edition("xfce")
+	if xfce == nil || xfce.Install == nil || *xfce.Install != "mint-223-xfce" || *xfce.SizeBytes != 3033710592 {
+		t.Fatalf("mint xfce %+v", xfce)
+	}
+	if m.SuggestedDefault {
+		t.Fatalf("nothing should be a suggested default")
+	}
+	if len(cat.Distros) != 2 {
+		t.Fatalf("official catalog should be Ubuntu GNOME + Linux Mint, got %d", len(cat.Distros))
+	}
+	for _, id := range []string{"kubuntu", "lubuntu", "ubuntu-budgie", "ubuntu-mate", "xubuntu", "fedora"} {
 		if cat.Distro(id) != nil {
 			t.Fatalf("%s should not be official until it has a native installer", id)
 		}
@@ -53,8 +83,11 @@ func TestBuildShop(t *testing.T) {
 	if len(shop.Recommended) != 1 {
 		t.Fatalf("got rec=%d", len(shop.Recommended))
 	}
-	if len(shop.Catalog) != 0 {
-		t.Fatalf("no other official distros, catalog should be empty, got %+v", shopIDs(shop.Catalog))
+	if len(shop.Catalog) != 1 || shop.Catalog[0].ID != "linux-mint" {
+		t.Fatalf("unticked mint should be catalog download, got %+v", shopIDs(shop.Catalog))
+	}
+	if shop.Catalog[0].Editions[0].Local {
+		t.Fatal("unticked mint must not be local")
 	}
 	ub := shop.Recommended[0]
 	if !ub.SecureBoot {
@@ -65,6 +98,40 @@ func TestBuildShop(t *testing.T) {
 	}
 	if ub.Install != "ubuntu-2604-gnome" {
 		t.Fatalf("install %s", ub.Install)
+	}
+	mintShop, err := BuildShop(cat, []string{"linux-mint:cinnamon"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mintShop.Recommended) != 1 || mintShop.Recommended[0].ID != "linux-mint" {
+		t.Fatalf("mint recommended %+v", mintShop.Recommended)
+	}
+	if mintShop.Recommended[0].Install != "mint-223-cinnamon" {
+		t.Fatalf("mint install %s", mintShop.Recommended[0].Install)
+	}
+	ed := mintShop.Recommended[0].Editions[0]
+	if !ed.Local || ed.File != "images/linuxmint-22.3-cinnamon-64bit.iso" {
+		t.Fatalf("mint edition %+v", ed)
+	}
+	if len(mintShop.Recommended[0].Editions) != 3 {
+		t.Fatalf("mint shop editions %d", len(mintShop.Recommended[0].Editions))
+	}
+	mateShop, err := BuildShop(cat, []string{"linux-mint:mate", "linux-mint:xfce"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mateShop.Recommended) != 1 || mateShop.Recommended[0].Install != "mint-223-cinnamon" {
+		t.Fatalf("mint distro install %s", mateShop.Recommended[0].Install)
+	}
+	eds := mateShop.Recommended[0].Editions
+	if len(eds) != 3 || eds[0].ID != "mate" || !eds[0].Local || eds[0].Install != "mint-223-mate" {
+		t.Fatalf("ticked mate %+v", eds)
+	}
+	if eds[1].ID != "xfce" || !eds[1].Local || eds[1].Install != "mint-223-xfce" {
+		t.Fatalf("ticked xfce %+v", eds[1])
+	}
+	if eds[2].ID != "cinnamon" || eds[2].Local || eds[2].Install != "" {
+		t.Fatalf("unticked cinnamon should inherit distro install, got %+v", eds[2])
 	}
 	if _, err := BuildShop(cat, []string{"fedora"}); err == nil {
 		t.Fatal("fedora should not be official")

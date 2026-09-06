@@ -142,6 +142,7 @@ class PoTests(unittest.TestCase):
         self.assertEqual(_("Network"), "Netwerk")
         self.assertEqual(_("Language"), "Taal")
         self.assertEqual(_("Other options"), "Ander opsies")
+        self.assertEqual(_("Unknown"), "Onbekend")
         self.assertEqual(_("Configured by {name}").format(name="Shop"), "Opgestel deur Shop")
         apply_language("en-gb")
         self.assertEqual(current_language(), "en-gb")
@@ -158,6 +159,7 @@ class PoTests(unittest.TestCase):
         apply_language("en-us")
         self.assertEqual(_("Maximize"), "Maximize")
         self.assertEqual(_("Network"), "Network")
+        self.assertEqual(_("Unknown"), "Unknown")
 
     def test_geen_has_no_trailing_nie(self) -> None:
         apply_language("af")

@@ -9,7 +9,7 @@ Two files on every shop USB (`payload/`). One file in this repo for the creator.
 | `official-catalog.json` | This repo / creator | Us | Menu of distros we support |
 | `custom-driver.schema.json` | This repo / pack zip | Distro team | `manifest.json` inside a retailer `.zip` |
 
-The live chooser reads only `/run/payload/retailer.conf` and `/run/payload/catalog.json`. It does not need `official-catalog.json`. That file is how the creator knows what may be ticked (recommended, ISO on disk), left as Other options (download), or hidden until an install driver exists.
+The live chooser reads only `/run/payload/retailer.conf` and `/run/payload/catalog.json`. It does not need `official-catalog.json`. That file is how the creator knows what may be ticked (recommended, ISO on disk), left as Other options (download), or hidden until an install driver exists. A well-formed `install` id that this seed does not know still loads: the chooser shows an **Unknown** card with `unknown.png` instead of emptying recommended.
 
 First Boot’s own version is **not** in `retailer.conf`. In the live session it is `/etc/os-release` inside the squashfs. On the `fbl` partition the file is `fbl/.disk/info`.
 
@@ -57,6 +57,7 @@ Each edition:
 | `id` | `gnome`, `cinnamon`, `plasma`, … |
 | `name` | Display name |
 | `default` | Exactly one `true` per distro. Chooser recommended cards are each local edition; default is the fallback card when none are local |
+| `install` | Optional. Overrides the distro install driver for this edition (Mint MATE is `mint-223-mate`) |
 | `filename` | Basename written to `payload/images/` |
 | `url` | Direct ISO URL, or `null` until pinned |
 | `sha256` | 64 lowercase hex, or `null` until pinned |
@@ -67,7 +68,7 @@ Rules:
 - `can_stage` is true only when `install` is set **and** `redistributable` is true. Do not stage an ISO we cannot install or may not copy.
 - `redistributable: false` forces `can_stage: false`. The shop may still put that distro in `recommended` as download-only once `install` is set. The creator must never write its ISO to `images/`.
 - `suggested_default` requires `install`. The creator GUI does not pre-tick; shops tick desktops under each distro.
-- Official catalog is only distros with a working **FBL-native** install driver. Current row: Ubuntu GNOME (`ubuntu-2604-gnome`). Flavors, Mint, and Fedora stay out until native files exist. The old Subiquity / Calamares / Ubiquity / Anaconda Python drivers are gone. Older sticks may still say `ubuntu-autoinstall` / `ubuntu-2604` / `ubuntu-calamares-2604` / `mint` / `mint-223` / `fedora-kickstart` / `fedora-44-plasma` (reserved ids, no baked-in driver). `windows` and `freebsd` stay reserved in the schema. The mockup in `docs/` is the longer future list. Driver Python lives in `chooser/firstboot/osinstall/`.
+- Official catalog is only distros with a working **FBL-native** install driver. Current rows: Ubuntu GNOME (`ubuntu-2604-gnome`) and Linux Mint Cinnamon / MATE / Xfce (`mint-223-cinnamon`, `mint-223-mate`, `mint-223-xfce`). Flavors and Fedora stay out until native files exist. The old Subiquity / Calamares / Ubiquity / Anaconda Python drivers are gone. Older sticks may still say `ubuntu-autoinstall` / `ubuntu-2604` / `ubuntu-calamares-2604` / `mint` / `mint-223` / `fedora-kickstart` / `fedora-44-plasma` (reserved ids, no baked-in driver). `windows` and `freebsd` stay reserved in the schema. The mockup in `docs/` is the longer future list. Driver Python lives in `chooser/firstboot/osinstall/`.
 - Pin `url`, `sha256`, and `size_bytes` before the creator downloads that edition.
 - Shop-private distros (Pop!_OS, TUXEDO OS, a store’s own image) are **not** official-catalog rows. They are a `.zip` pack the creator copies to `payload/custom/<id>/`. See [Retailer driver packs](#retailer-driver-packs).
 
@@ -92,6 +93,7 @@ Each distro copies display fields from the official catalog (`id`, `name`, `vers
 Official edition → shop edition:
 
 - keep `id`, `name`, `default`
+- copy `install` when it differs from the distro driver
 - `file` = `images/` + official `filename` when `local` is true
 - drop `filename`
 - pin `sha256` and `size_bytes` (never null on the stick)
@@ -104,6 +106,7 @@ Each edition on the stick:
 | `id` | yes | Same kebab-case id as the official edition (`gnome`, `cinnamon`, …) |
 | `name` | yes | Display name |
 | `default` | yes | Featured edition (exactly one `true` per distro) |
+| `install` | no | Overrides the distro `install` driver for this edition |
 | `local` | yes | ISO is on this payload |
 | `file` | if `local` | Path like `images/ubuntu-26.04-desktop-amd64.iso` |
 | `url` | if not `local` | Direct ISO URL |
@@ -142,7 +145,7 @@ locale/af.po       # optional; also locale/en-gb.po, locale/en-za.po, …
 
 `editions[]` is one ISO per desktop (Pop!_OS GNOME and COSMIC are two editions, one driver). Optional `sha256` / `size_bytes` pin the ISO; the creator rejects a file that does not match. ISOs may sit in the zip, next to the zip (same `filename`), in `~/.cache/firstboot/images/`, or be chosen in the USB Creator. They are written to `payload/images/`; they do not stay under `custom/`.
 
-`id` = `install` = folder `payload/custom/<id>/` = `DRIVER.id` in `driver.py`. Must not collide with official catalog ids or baked-in driver ids (`ubuntu`, `kubuntu`, `lubuntu`, `ubuntu-budgie`, `ubuntu-mate`, `xubuntu`, `linux-mint`, `fedora`, `ubuntu-2604-gnome`, `ubuntu-2604`, `ubuntu-calamares-2604`, `mint-223`, `fedora-44-plasma`, aliases, `windows`, `freebsd`).
+`id` = `install` = folder `payload/custom/<id>/` = `DRIVER.id` in `driver.py`. Must not collide with official catalog ids or baked-in driver ids (`ubuntu`, `kubuntu`, `lubuntu`, `ubuntu-budgie`, `ubuntu-mate`, `xubuntu`, `linux-mint`, `fedora`, `ubuntu-2604-gnome`, `ubuntu-2604`, `ubuntu-calamares-2604`, `mint-223-cinnamon`, `mint-223-mate`, `mint-223-xfce`, `mint-223`, `fedora-44-plasma`, aliases, `windows`, `freebsd`).
 
 Optional `locale/<lang>.po` files (GNU gettext, same format as `po/af.po`) translate that pack’s **tagline and description**. `msgid` is the English string in `manifest.json`. Distro and desktop names stay untranslated. Compose copies them to `payload/custom/<id>/locale/`. The live chooser and the USB Creator GUI merge those entries **after** First Boot’s catalogues and never override chrome (`Install`, `Network`, `Back`, …). English (US) is the source; do not ship `en.po` / `en-us.po`. `en-gb.po` and `en-za.po` are spelling catalogues for that pack’s blurb.
 

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-09-02",
+  "updated": "2026-09-06",
   "distros": [
     {
       "id": "ubuntu",
@@ -23,6 +23,50 @@
           "url": "https://releases.ubuntu.com/26.04/ubuntu-26.04-desktop-amd64.iso",
           "sha256": "487f87faaf547ea30e0aba4d5b53346292571256b25333a978db1692bcee9dd2",
           "size_bytes": 6518974464
+        }
+      ]
+    },
+    {
+      "id": "linux-mint",
+      "name": "Linux Mint",
+      "version": "22.3",
+      "tagline": "Familiar and easy",
+      "description": "A stable desktop that feels at home for people coming from Windows. Multimedia and drivers work out of the box.",
+      "family": "mint",
+      "redistributable": true,
+      "install": "mint-223-cinnamon",
+      "can_stage": true,
+      "suggested_default": false,
+      "secure_boot": true,
+      "editions": [
+        {
+          "id": "cinnamon",
+          "name": "Cinnamon",
+          "default": true,
+          "filename": "linuxmint-22.3-cinnamon-64bit.iso",
+          "url": "https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso",
+          "sha256": "a081ab202cfda17f6924128dbd2de8b63518ac0531bcfe3f1a1b88097c459bd4",
+          "size_bytes": 3091660800
+        },
+        {
+          "id": "mate",
+          "name": "MATE",
+          "default": false,
+          "install": "mint-223-mate",
+          "filename": "linuxmint-22.3-mate-64bit.iso",
+          "url": "https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-mate-64bit.iso",
+          "sha256": "7609294da613b75eea89bb918292125e9f06418a368136fb190466e15bf8c373",
+          "size_bytes": 3134275584
+        },
+        {
+          "id": "xfce",
+          "name": "Xfce",
+          "default": false,
+          "install": "mint-223-xfce",
+          "filename": "linuxmint-22.3-xfce-64bit.iso",
+          "url": "https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-xfce-64bit.iso",
+          "sha256": "45a835b5dddaf40e84d776549e0b19b3fbd49673b6cc6434ebddbfcd217df776",
+          "size_bytes": 3033710592
         }
       ]
     }

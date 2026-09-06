@@ -79,6 +79,9 @@
               "type": "string",
               "enum": [
                 "ubuntu-2604-gnome",
+                "mint-223-cinnamon",
+                "mint-223-mate",
+                "mint-223-xfce",
                 "debian-preseed",
                 "windows",
                 "freebsd"

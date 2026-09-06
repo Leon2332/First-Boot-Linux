@@ -13,16 +13,20 @@ Do not reboot into Subiquity, Calamares, Ubiquity, or Anaconda.
 | File | Catalog `"install"` | Kind |
 | --- | --- | --- |
 | `ubuntu_2604_gnome.py` | `ubuntu-2604-gnome` | Native casper-layered (Ubuntu 26.04 GNOME). **Official catalog.** |
+| `mint_223_cinnamon.py` | `mint-223-cinnamon` | Native casper-single (Linux Mint 22.3 Cinnamon). **Official catalog.** |
+| `mint_223_mate.py` | `mint-223-mate` | Native casper-single (Linux Mint 22.3 MATE). **Official catalog.** |
+| `mint_223_xfce.py` | `mint-223-xfce` | Native casper-single (Linux Mint 22.3 Xfce). **Official catalog.** |
 
-Official `official-catalog.json` currently lists **Ubuntu GNOME only**. Do not add flavors / Mint / Fedora back until each has a native file.
+Official `official-catalog.json` currently lists **Ubuntu GNOME** and **Mint Cinnamon / MATE / Xfce**. Do not add flavors / Fedora back until each has a native file.
 
 `__init__.py` is the trampoline. Native drivers (`unpack_kind`) run
 `pipeline.py`. Shop packs still use the legacy `boot_files` /
 `kernel_args` / `seed_files` API.
 
 Older sticks may still say `ubuntu-autoinstall`, `ubuntu-2604`, `mint`,
-or `fedora-kickstart`. Those ids are reserved (no baked-in driver).
-Ubuntu GNOME on a **new** stick is `ubuntu-2604-gnome`.
+`mint-223`, or `fedora-kickstart`. Those ids are reserved (no baked-in
+driver). Ubuntu GNOME on a **new** stick is `ubuntu-2604-gnome`. Mint
+editions are `mint-223-cinnamon`, `mint-223-mate`, and `mint-223-xfce`.
 
 ## Adding an official ISO
 

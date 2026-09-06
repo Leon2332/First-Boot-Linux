@@ -673,6 +673,11 @@ class NvramTests(unittest.TestCase):
             out = ""
             if "--create" in argv:
                 out = "BootCurrent: 0001\nBootOrder: 0003,0001\nBoot0003* Ubuntu\n"
+            elif "-v" in argv:
+                out = (
+                    "Boot0001* ubuntu\tHD(1,GPT,aaa,0x800,0x100000)/"
+                    "File(\\EFI\\ubuntu\\grubx64.efi)RC\n"
+                )
             return mock.Mock(returncode=0, stdout=out, stderr="")
 
         with mock.patch("shutil.which", return_value="/usr/sbin/efibootmgr"), mock.patch(
@@ -683,6 +688,10 @@ class NvramTests(unittest.TestCase):
         self.assertTrue(create)
         self.assertIn(r"\EFI\ubuntu\shimx64.efi", create[0])
         self.assertTrue(any("--bootnext" in a and "0003" in a for a in runs))
+        self.assertTrue(
+            any("--delete-bootnum" in a and "0001" in a for a in runs),
+            "firmware-recovered grubx64.efi NVRAM entry must be deleted",
+        )
 
     def test_register_os_efi_create_failure_raises(self) -> None:
         def fake_run(argv, **_kwargs):
@@ -722,15 +731,26 @@ class CasperBootloaderTests(unittest.TestCase):
                 fh.write(b"SHIM")
             with open(os.path.join(signed, "grubx64.efi"), "wb") as fh:
                 fh.write(b"GRUBX64-INSTALLED")
+            with open(os.path.join(signed, "mmx64.efi"), "wb") as fh:
+                fh.write(b"MOK")
+            boot = os.path.join(efi, "EFI", "BOOT")
+            os.makedirs(boot, exist_ok=True)
+            with open(os.path.join(boot, "grubx64.efi"), "wb") as fh:
+                fh.write(b"LEFTOVER-GRUB")
+            with open(os.path.join(boot, "mmx64.efi"), "wb") as fh:
+                fh.write(b"LEFTOVER-MM")
             with mock.patch("firstboot.osinstall.casper.SIGNED_EFI_DIR", signed):
                 copy_signed_esp_binaries(efi, "ubuntu")
             with open(os.path.join(efi, "EFI", "ubuntu", "grubx64.efi"), "rb") as fh:
                 self.assertEqual(fh.read(), b"GRUBX64-INSTALLED")
             with open(os.path.join(efi, "EFI", "ubuntu", "shimx64.efi"), "rb") as fh:
                 self.assertEqual(fh.read(), b"SHIM")
-            self.assertTrue(
-                os.path.isfile(os.path.join(efi, "EFI", "BOOT", "BOOTX64.EFI"))
-            )
+            with open(os.path.join(efi, "EFI", "ubuntu", "mmx64.efi"), "rb") as fh:
+                self.assertEqual(fh.read(), b"MOK")
+            with open(os.path.join(boot, "BOOTX64.EFI"), "rb") as fh:
+                self.assertEqual(fh.read(), b"SHIM")
+            self.assertFalse(os.path.isfile(os.path.join(boot, "grubx64.efi")))
+            self.assertFalse(os.path.isfile(os.path.join(boot, "mmx64.efi")))
         finally:
             shutil.rmtree(efi, ignore_errors=True)
             shutil.rmtree(signed, ignore_errors=True)

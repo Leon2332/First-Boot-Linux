@@ -126,7 +126,7 @@ func TestLoadZipAndBuildShopTwoEditions(t *testing.T) {
 	if !pop.Editions[0].Default || pop.Editions[1].Default {
 		t.Fatalf("featured should stay pack default (gnome): %+v", pop.Editions)
 	}
-	if got := shopIDs(shop.Catalog); len(got) != 1 || got[0] != "ubuntu" {
+	if got := shopIDs(shop.Catalog); len(got) != 2 || got[0] != "ubuntu" || got[1] != "linux-mint" {
 		t.Fatalf("official distros should stay downloads, catalog %+v", got)
 	}
 
@@ -247,6 +247,9 @@ func TestReservedPackID(t *testing.T) {
 	}
 	if !ReservedPackID("ubuntu", off) || !ReservedPackID("ubuntu-2604", off) || !ReservedPackID("ubuntu-2604-gnome", off) || !ReservedPackID("ubuntu-calamares-2604", off) {
 		t.Fatal("ubuntu is reserved")
+	}
+	if !ReservedPackID("linux-mint", off) || !ReservedPackID("mint-223-cinnamon", off) || !ReservedPackID("mint-223-mate", off) || !ReservedPackID("mint-223-xfce", off) || !ReservedPackID("mint-223", off) {
+		t.Fatal("mint is reserved")
 	}
 	if ReservedPackID("pop-os", off) {
 		t.Fatal("pop-os should be allowed")

@@ -83,7 +83,8 @@ def dump_payload(payload: Payload) -> None:
     offerings = recommended_offerings(payload.recommended)
     print(f"recommended: {len(offerings)}")
     for distro, ed in offerings:
-        print(f"  {distro.id}:{ed.id}  {ed.action}  {ed.file or ed.url}")
+        extra = "  unknown-driver" if ed.unknown_install else ""
+        print(f"  {distro.id}:{ed.id}  {ed.action}  {ed.file or ed.url}{extra}")
     print(f"others: {len(payload.others)}")
     for distro in payload.others:
         print(f"  {distro.id}")
@@ -335,7 +336,7 @@ def run_window(
             self.dimmer.set_wallpaper(self.wallpaper)
             self.dimmer.set_visible(False)
             click = Gtk.GestureClick()
-            click.connect("pressed", lambda *_: self._overlay_back())
+            click.connect("pressed", lambda *_: self._on_dimmer_pressed())
             self.dimmer.add_controller(click)
 
             self.footer = self._build_footer()
@@ -705,10 +706,12 @@ def run_window(
             btn.set_size_request(176, 198)
             inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             inner.set_halign(Gtk.Align.CENTER)
-            logo = self._logo_image(distro.id, 64)
+            logo = self._logo_image(distro.logo_id_for(ed), 64)
             logo.set_halign(Gtk.Align.CENTER)
             inner.append(logo)
-            name = Gtk.Label(label=distro.name)
+            name = Gtk.Label(
+                label=_("Unknown") if distro.unknown_for(ed) else distro.name
+            )
             name.add_css_class("card-name")
             desk = Gtk.Label(label=ed.name)
             desk.add_css_class("card-desktop")
@@ -838,7 +841,17 @@ def run_window(
             self._set_dimmed(False)
             self.detail_host.set_visible(False)
 
+        def _on_dimmer_pressed(self) -> None:
+            # Other options: click the frost to go back. Shop / OS install
+            # uses the same dimmer; do not dismiss it — that drops the blur
+            # while the install overlay stays up.
+            if self._installing:
+                return
+            self._overlay_back()
+
         def _overlay_back(self) -> None:
+            if self._installing:
+                return
             if self.overlay_mode == "detail" and self.detail_from_catalog:
                 self._show_overlay("catalog", slide=True)
                 return
@@ -973,7 +986,7 @@ def run_window(
             logo = row.get_first_child()
             name = logo.get_next_sibling() if logo is not None else None
             meta = name.get_next_sibling() if name is not None else None
-            path = find_logo(distro.id)
+            path = find_logo(distro.logo_id_for())
             if isinstance(logo, Gtk.Image):
                 if path:
                     logo.set_from_file(path)
@@ -1107,9 +1120,12 @@ def run_window(
             card.set_size_request(480, -1)
 
             hero = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
-            hero.append(self._logo_image(distro.id, 80))
+            hero.append(self._logo_image(distro.logo_id_for(edition), 80))
             titles = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-            t = Gtk.Label(label=distro.name, xalign=0)
+            t = Gtk.Label(
+                label=_("Unknown") if distro.unknown_for(edition) else distro.name,
+                xalign=0,
+            )
             t.add_css_class("detail-title")
             titles.append(t)
             show = edition or (None if from_catalog else distro.default_edition)

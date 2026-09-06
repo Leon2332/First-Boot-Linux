@@ -317,6 +317,23 @@ def write_timezone(root: str, minutes: int | None, log: InstallLog | None = None
         log.write(f"timezone offset {minutes} minutes")
 
 
+_LIGHTDM_AUTOLOGIN_RE = re.compile(
+    r"(?im)^(autologin-user|autologin-user-timeout|autologin-guest|"
+    r"autologin-session)\s*=.*\n?"
+)
+
+
+def _strip_lightdm_autologin_file(path: str) -> None:
+    if not os.path.isfile(path):
+        return
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    new = _LIGHTDM_AUTOLOGIN_RE.sub("", text)
+    if new != text:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(new)
+
+
 def strip_live_autologin(root: str) -> None:
     files = [
         os.path.join(root, "etc", "gdm3", "custom.conf"),
@@ -335,6 +352,9 @@ def strip_live_autologin(root: str) -> None:
         text = re.sub(r"(?im)^Session\s*=.*\n?", "", text)
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(text)
+    _strip_lightdm_autologin_file(
+        os.path.join(root, "etc", "lightdm", "lightdm.conf")
+    )
     drop_dirs = [
         os.path.join(root, "etc", "lightdm", "lightdm.conf.d"),
         os.path.join(root, "etc", "sddm.conf.d"),
@@ -347,13 +367,17 @@ def strip_live_autologin(root: str) -> None:
             names = os.listdir(folder)
         except OSError:
             continue
+        lightdm_drop = "lightdm" in folder.replace("\\", "/")
         for name in names:
             lower = name.lower()
+            path = os.path.join(folder, name)
             if "casper" in lower or "autologin" in lower or "live" in lower:
                 try:
-                    os.unlink(os.path.join(folder, name))
+                    os.unlink(path)
                 except OSError:
                     pass
+            elif lightdm_drop:
+                _strip_lightdm_autologin_file(path)
     autostart = os.path.join(root, "etc", "xdg", "autostart")
     if os.path.isdir(autostart):
         for name in LIVE_DESKTOPS:
@@ -507,7 +531,16 @@ def signed_efi_paths() -> tuple[str, str, str]:
 def copy_signed_esp_binaries(
     efi_mp: str, bootloader_id: str, log: InstallLog | None = None
 ) -> None:
-    """Put Secure Boot shim + installed grubx64 on the ESP. Not live gcdx64."""
+    """Put Secure Boot shim + installed grubx64 on the ESP. Not live gcdx64.
+
+    ``EFI/BOOT/`` is the removable fallback. Lenovo firmware launches every
+    ``.efi`` in that folder as a *first-stage* loader. Canonical-signed
+    ``grubx64.efi`` and ``mmx64.efi`` are not in the firmware db — only
+    Microsoft-signed shim is. Putting them next to ``BOOTX64.EFI`` prints
+    ``Error: Prohibited by secure boot policy.`` twice, then the NVRAM
+    shim entry boots. GRUB and MokManager live under ``EFI/<id>/`` so
+    shim loads them.
+    """
     src_shim, src_grub, src_mm = signed_efi_paths()
     if not src_shim or not src_grub:
         raise OsInstallError(_("Could not write the boot partition."))
@@ -517,14 +550,20 @@ def copy_signed_esp_binaries(
     os.makedirs(vendor, exist_ok=True)
     shutil.copy2(src_shim, os.path.join(boot, "BOOTX64.EFI"))
     shutil.copy2(src_shim, os.path.join(vendor, "shimx64.efi"))
-    shutil.copy2(src_grub, os.path.join(boot, "grubx64.efi"))
     shutil.copy2(src_grub, os.path.join(vendor, "grubx64.efi"))
     if src_mm:
         shutil.copy2(src_mm, os.path.join(vendor, "mmx64.efi"))
-        shutil.copy2(src_mm, os.path.join(boot, "mmx64.efi"))
+    for name in list(os.listdir(boot)):
+        if name.lower() == "bootx64.efi":
+            continue
+        if name.lower().endswith(".efi"):
+            try:
+                os.unlink(os.path.join(boot, name))
+            except OSError:
+                pass
     if log:
         log.write(
-            f"copied signed shim+grubx64.efi into EFI/BOOT and EFI/{bootloader_id}"
+            f"copied signed shim to EFI/BOOT and shim+grubx64.efi into EFI/{bootloader_id}"
         )
 
 
