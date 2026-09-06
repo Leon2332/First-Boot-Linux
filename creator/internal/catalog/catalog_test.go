@@ -77,11 +77,18 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	if f.DefaultEdition().SHA256 == nil || *f.DefaultEdition().SizeBytes != 3368683520 {
 		t.Fatalf("fedora size %v", f.DefaultEdition().SizeBytes)
 	}
+	if len(f.Editions) != 2 {
+		t.Fatalf("fedora editions %d", len(f.Editions))
+	}
+	gnome := f.Edition("gnome")
+	if gnome == nil || gnome.Install == nil || *gnome.Install != "fedora-44-gnome" || *gnome.SizeBytes != 2851612672 {
+		t.Fatalf("fedora gnome %+v", gnome)
+	}
 	if f.SuggestedDefault {
 		t.Fatalf("nothing should be a suggested default")
 	}
 	if len(cat.Distros) != 3 {
-		t.Fatalf("official catalog should be Ubuntu GNOME + Linux Mint + Fedora Plasma, got %d", len(cat.Distros))
+		t.Fatalf("official catalog should be Ubuntu GNOME + Linux Mint + Fedora, got %d", len(cat.Distros))
 	}
 	for _, id := range []string{"kubuntu", "lubuntu", "ubuntu-budgie", "ubuntu-mate", "xubuntu"} {
 		if cat.Distro(id) != nil {
@@ -165,6 +172,23 @@ func TestBuildShop(t *testing.T) {
 	fed := fedoraShop.Recommended[0].Editions[0]
 	if !fed.Local || fed.File != "images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso" {
 		t.Fatalf("fedora edition %+v", fed)
+	}
+	if len(fedoraShop.Recommended[0].Editions) != 2 {
+		t.Fatalf("fedora shop editions %d", len(fedoraShop.Recommended[0].Editions))
+	}
+	gnomeShop, err := BuildShop(cat, []string{"fedora:gnome"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(gnomeShop.Recommended) != 1 || gnomeShop.Recommended[0].Install != "fedora-44-plasma" {
+		t.Fatalf("fedora distro install %s", gnomeShop.Recommended[0].Install)
+	}
+	feds := gnomeShop.Recommended[0].Editions
+	if len(feds) != 2 || feds[0].ID != "gnome" || !feds[0].Local || feds[0].Install != "fedora-44-gnome" {
+		t.Fatalf("ticked gnome %+v", feds)
+	}
+	if feds[1].ID != "plasma" || feds[1].Local || feds[1].Install != "" {
+		t.Fatalf("unticked plasma should inherit distro install, got %+v", feds[1])
 	}
 	if _, err := BuildShop(cat, nil); err == nil {
 		t.Fatalf("empty selection must be rejected")

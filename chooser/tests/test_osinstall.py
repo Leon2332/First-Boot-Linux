@@ -20,6 +20,7 @@ if CHOOSER_DIR not in sys.path:
 
 from firstboot.disk import Disk, Partition, parse_helper_line, part_path  # noqa: E402
 from firstboot.osinstall import (  # noqa: E402
+    DRIVER_FEDORA_GNOME,
     DRIVER_FEDORA_PLASMA,
     DRIVER_MINT_CINNAMON,
     DRIVER_MINT_MATE,
@@ -147,6 +148,10 @@ class RegistryTests(unittest.TestCase):
         self.assertTrue(is_native_driver(get_driver("fedora-44-plasma")))
         self.assertEqual(get_driver("fedora-44-plasma").display_manager, "plasmalogin")
         self.assertEqual(get_driver("fedora-44-plasma").unpack_kind, "fedora-erofs")
+        self.assertEqual(DRIVER_FEDORA_GNOME, "fedora-44-gnome")
+        self.assertTrue(is_native_driver(get_driver("fedora-44-gnome")))
+        self.assertEqual(get_driver("fedora-44-gnome").display_manager, "gdm")
+        self.assertEqual(get_driver("fedora-44-gnome").unpack_kind, "fedora-erofs")
         self.assertIsNone(get_driver("ubuntu-2604"))
         self.assertIsNone(get_driver("ubuntu-autoinstall"))
         self.assertIsNone(get_driver("ubuntu-calamares-2604"))

@@ -91,6 +91,16 @@
           "url": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/KDE/x86_64/iso/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso",
           "sha256": "c8295961d4c41adbf785a31a17c21a971d3b7415fda72dcad0c11c49577bf03a",
           "size_bytes": 3368683520
+        },
+        {
+          "id": "gnome",
+          "name": "GNOME",
+          "default": false,
+          "install": "fedora-44-gnome",
+          "filename": "Fedora-Workstation-Live-44-1.7.x86_64.iso",
+          "url": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Workstation/x86_64/iso/Fedora-Workstation-Live-44-1.7.x86_64.iso",
+          "sha256": "1620295f6a00c27c3208f0c00b8ece4eab1ec69b9002152d97488bf26a426ddf",
+          "size_bytes": 2851612672
         }
       ]
     }

@@ -30,6 +30,7 @@ INSTALL_DRIVERS = frozenset(
         "mint-223",
         "mint",
         "fedora-44-plasma",
+        "fedora-44-gnome",
         "fedora-kickstart",
         "debian-preseed",
         "windows",

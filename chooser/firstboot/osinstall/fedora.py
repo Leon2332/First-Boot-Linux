@@ -3,7 +3,7 @@
 Follow Anaconda's live-image path: rsync the EROFS, Fedora's default
 partition layout (ESP + /boot + btrfs), kernel-install + grub2-mkconfig,
 dracut, then ``/.autorelabel``. Copy Fedora's shim, not Canonical GRUB.
-Do not reuse this file for Fedora GNOME.
+GNOME and Plasma each have their own ISO file; they call these steps.
 """
 
 from __future__ import annotations
@@ -55,12 +55,18 @@ LIVE_UNITS = (
     "livesys-late.service",
     "anaconda.service",
     "liveinst.service",
+    "initial-setup.service",
+    "initial-setup-reconfiguration.service",
+    "gnome-initial-setup.service",
 )
 LIVE_DESKTOPS = (
     "liveinst.desktop",
     "anaconda.desktop",
     "plasma-setup.desktop",
     "org.fedoraproject.AnacondaInstaller.desktop",
+    "gnome-initial-setup-first-login.desktop",
+    "gnome-welcome-tour.desktop",
+    "org.gnome.InitialSetup.desktop",
 )
 
 # Anaconda live_image InstallFromImageTask, including the KIWI xattr split.
@@ -512,6 +518,9 @@ def write_timezone(root: str, minutes: int | None, log: InstallLog | None = None
 _SDDM_AUTOLOGIN_RE = re.compile(
     r"(?im)^(User|Session|Relogin)\s*=.*\n?"
 )
+_GDM_AUTOLOGIN_RE = re.compile(
+    r"(?im)^(AutomaticLoginEnable|AutomaticLogin|TimedLoginEnable|TimedLogin)\s*=.*\n?"
+)
 
 
 def _strip_sddm_file(path: str) -> None:
@@ -525,8 +534,22 @@ def _strip_sddm_file(path: str) -> None:
             fh.write(new)
 
 
-def _strip_dm_dropins(root: str, rel_conf: str, rel_drop: str) -> None:
-    _strip_sddm_file(os.path.join(root, rel_conf))
+def _strip_gdm_file(path: str) -> None:
+    if not os.path.isfile(path):
+        return
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    new = _GDM_AUTOLOGIN_RE.sub("", text)
+    if new != text:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(new)
+
+
+def _strip_dm_dropins(
+    root: str, rel_conf: str, rel_drop: str, *, gdm: bool = False
+) -> None:
+    strip = _strip_gdm_file if gdm else _strip_sddm_file
+    strip(os.path.join(root, rel_conf))
     drop = os.path.join(root, rel_drop)
     if not os.path.isdir(drop):
         return
@@ -543,7 +566,36 @@ def _strip_dm_dropins(root: str, rel_conf: str, rel_drop: str) -> None:
             except OSError:
                 pass
         else:
-            _strip_sddm_file(path)
+            strip(path)
+
+
+def skip_gnome_initial_setup(root: str, log: InstallLog | None = None) -> None:
+    """Customer identity is already on the form; do not run GNOME first-login."""
+    homes = os.path.join(root, "home")
+    if os.path.isdir(homes):
+        try:
+            names = os.listdir(homes)
+        except OSError:
+            names = []
+        for name in names:
+            if name.startswith("."):
+                continue
+            home = os.path.join(homes, name)
+            if not os.path.isdir(home):
+                continue
+            cfg = os.path.join(home, ".config")
+            os.makedirs(cfg, exist_ok=True)
+            marker = os.path.join(cfg, "gnome-initial-setup-done")
+            with open(marker, "w", encoding="ascii") as fh:
+                fh.write("yes\n")
+            try:
+                st = os.stat(home)
+                os.chown(cfg, st.st_uid, st.st_gid)
+                os.chown(marker, st.st_uid, st.st_gid)
+            except OSError:
+                pass
+    if log:
+        log.write("skipped gnome-initial-setup")
 
 
 def strip_live_session(root: str, log: InstallLog | None = None) -> None:
@@ -553,6 +605,13 @@ def strip_live_session(root: str, log: InstallLog | None = None) -> None:
         (os.path.join("etc", "plasma-login.conf"), os.path.join("etc", "plasma-login.conf.d")),
     ):
         _strip_dm_dropins(root, conf, drop)
+    _strip_dm_dropins(
+        root,
+        os.path.join("etc", "gdm", "custom.conf"),
+        os.path.join("etc", "gdm", "custom.conf.d"),
+        gdm=True,
+    )
+    skip_gnome_initial_setup(root, log=log)
     autostart = os.path.join(root, "etc", "xdg", "autostart")
     apps = os.path.join(root, "usr", "share", "applications")
     for folder in (autostart, apps):

@@ -251,7 +251,7 @@ func TestReservedPackID(t *testing.T) {
 	if !ReservedPackID("linux-mint", off) || !ReservedPackID("mint-223-cinnamon", off) || !ReservedPackID("mint-223-mate", off) || !ReservedPackID("mint-223-xfce", off) || !ReservedPackID("mint-223", off) {
 		t.Fatal("mint is reserved")
 	}
-	if !ReservedPackID("fedora", off) || !ReservedPackID("fedora-44-plasma", off) || !ReservedPackID("fedora-kickstart", off) {
+	if !ReservedPackID("fedora", off) || !ReservedPackID("fedora-44-plasma", off) || !ReservedPackID("fedora-44-gnome", off) || !ReservedPackID("fedora-kickstart", off) {
 		t.Fatal("fedora is reserved")
 	}
 	if ReservedPackID("pop-os", off) {

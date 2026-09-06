@@ -4,7 +4,8 @@ Native drivers (``unpack_kind``) unpack the live filesystem in this
 session, health-check, then drop First Boot. Official catalog is Ubuntu
 26.04 GNOME (``ubuntu_2604_gnome.py``), Linux Mint 22.3 Cinnamon,
 MATE, and Xfce (``mint_223_cinnamon.py``, ``mint_223_mate.py``,
-``mint_223_xfce.py``), and Fedora 44 Plasma (``fedora_44_plasma.py``).
+``mint_223_xfce.py``), Fedora 44 Plasma (``fedora_44_plasma.py``),
+and Fedora 44 GNOME (``fedora_44_gnome.py``).
 Shop packs still use the legacy ``boot_files`` / ``kernel_args`` /
 ``seed_files`` API.
 
@@ -54,6 +55,7 @@ from firstboot.payload import (
 )
 
 from . import (
+    fedora_44_gnome,
     fedora_44_plasma,
     mint_223_cinnamon,
     mint_223_mate,
@@ -87,6 +89,7 @@ _DRIVER_MODULES = (
     mint_223_mate,
     mint_223_xfce,
     fedora_44_plasma,
+    fedora_44_gnome,
 )
 
 
@@ -107,6 +110,7 @@ DRIVER_MINT_CINNAMON = mint_223_cinnamon.ID
 DRIVER_MINT_MATE = mint_223_mate.ID
 DRIVER_MINT_XFCE = mint_223_xfce.ID
 DRIVER_FEDORA_PLASMA = fedora_44_plasma.ID
+DRIVER_FEDORA_GNOME = fedora_44_gnome.ID
 
 _casper_boot_files = casper_boot_files
 _CUSTOM_DRIVERS: dict[str, object] = {}
