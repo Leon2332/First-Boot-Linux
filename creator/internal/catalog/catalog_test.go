@@ -61,10 +61,29 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	if m.SuggestedDefault {
 		t.Fatalf("nothing should be a suggested default")
 	}
-	if len(cat.Distros) != 2 {
-		t.Fatalf("official catalog should be Ubuntu GNOME + Linux Mint, got %d", len(cat.Distros))
+	f := cat.Distro("fedora")
+	if f == nil || !f.Redistributable || !f.Stageable() {
+		t.Fatalf("fedora should be redistributable and stageable")
 	}
-	for _, id := range []string{"kubuntu", "lubuntu", "ubuntu-budgie", "ubuntu-mate", "xubuntu", "fedora"} {
+	if f.Install == nil || *f.Install != "fedora-44-plasma" {
+		t.Fatalf("fedora install %v", f.Install)
+	}
+	if !f.SecureBoot {
+		t.Fatal("fedora must support Secure Boot")
+	}
+	if f.DefaultEdition() == nil || f.DefaultEdition().ID != "plasma" {
+		t.Fatalf("fedora default edition %+v", f.DefaultEdition())
+	}
+	if f.DefaultEdition().SHA256 == nil || *f.DefaultEdition().SizeBytes != 3368683520 {
+		t.Fatalf("fedora size %v", f.DefaultEdition().SizeBytes)
+	}
+	if f.SuggestedDefault {
+		t.Fatalf("nothing should be a suggested default")
+	}
+	if len(cat.Distros) != 3 {
+		t.Fatalf("official catalog should be Ubuntu GNOME + Linux Mint + Fedora Plasma, got %d", len(cat.Distros))
+	}
+	for _, id := range []string{"kubuntu", "lubuntu", "ubuntu-budgie", "ubuntu-mate", "xubuntu"} {
 		if cat.Distro(id) != nil {
 			t.Fatalf("%s should not be official until it has a native installer", id)
 		}
@@ -83,11 +102,11 @@ func TestBuildShop(t *testing.T) {
 	if len(shop.Recommended) != 1 {
 		t.Fatalf("got rec=%d", len(shop.Recommended))
 	}
-	if len(shop.Catalog) != 1 || shop.Catalog[0].ID != "linux-mint" {
-		t.Fatalf("unticked mint should be catalog download, got %+v", shopIDs(shop.Catalog))
+	if len(shop.Catalog) != 2 || shop.Catalog[0].ID != "linux-mint" || shop.Catalog[1].ID != "fedora" {
+		t.Fatalf("unticked mint and fedora should be catalog downloads, got %+v", shopIDs(shop.Catalog))
 	}
-	if shop.Catalog[0].Editions[0].Local {
-		t.Fatal("unticked mint must not be local")
+	if shop.Catalog[0].Editions[0].Local || shop.Catalog[1].Editions[0].Local {
+		t.Fatal("unticked mint and fedora must not be local")
 	}
 	ub := shop.Recommended[0]
 	if !ub.SecureBoot {
@@ -133,8 +152,19 @@ func TestBuildShop(t *testing.T) {
 	if eds[2].ID != "cinnamon" || eds[2].Local || eds[2].Install != "" {
 		t.Fatalf("unticked cinnamon should inherit distro install, got %+v", eds[2])
 	}
-	if _, err := BuildShop(cat, []string{"fedora"}); err == nil {
-		t.Fatal("fedora should not be official")
+	fedoraShop, err := BuildShop(cat, []string{"fedora:plasma"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fedoraShop.Recommended) != 1 || fedoraShop.Recommended[0].ID != "fedora" {
+		t.Fatalf("fedora recommended %+v", fedoraShop.Recommended)
+	}
+	if fedoraShop.Recommended[0].Install != "fedora-44-plasma" {
+		t.Fatalf("fedora install %s", fedoraShop.Recommended[0].Install)
+	}
+	fed := fedoraShop.Recommended[0].Editions[0]
+	if !fed.Local || fed.File != "images/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso" {
+		t.Fatalf("fedora edition %+v", fed)
 	}
 	if _, err := BuildShop(cat, nil); err == nil {
 		t.Fatalf("empty selection must be rejected")

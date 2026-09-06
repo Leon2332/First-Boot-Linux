@@ -282,11 +282,14 @@ def copy_tree(
     dst: str,
     *,
     fat: bool = False,
+    xattrs: bool = False,
     on_percent: Callable[[int], None] | None = None,
 ) -> None:
     cmd = ["rsync", "-a", "--numeric-ids", "--info=progress2", "--exclude=lost+found"]
     if not fat:
         cmd.append("-H")
+    if xattrs:
+        cmd.append("-X")
     cmd.extend([src.rstrip("/") + "/", dst.rstrip("/") + "/"])
     try:
         proc = subprocess.Popen(
@@ -307,9 +310,15 @@ def copy_tree(
         text = line.strip()
         if text:
             errors.append(text)
-    if proc.wait() != 0:
-        tail = errors[-1] if errors else "copy failed"
-        raise InstallError(tail)
+    rc = proc.wait()
+    if rc == 0:
+        return
+    # 23 = partial transfer. With -X, Ubuntu cannot set Fedora SELinux
+    # xattrs (FBL has no SELinux). The file tree is still copied.
+    if xattrs and rc == 23:
+        return
+    tail = errors[-1] if errors else f"copy failed (rsync {rc})"
+    raise InstallError(tail)
 
 
 def _progress(n: int) -> None:

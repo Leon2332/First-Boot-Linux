@@ -357,18 +357,25 @@ FORBIDDEN_CMDLINE = (
 DM_UNITS = {
     "gdm": ("gdm.service", "gdm3.service"),
     "sddm": ("sddm.service",),
+    "plasmalogin": ("plasmalogin.service",),
     "lightdm": ("lightdm.service",),
 }
 USER_GROUPS = (
     "adm",
     "cdrom",
     "sudo",
+    "wheel",
     "dip",
     "plugdev",
     "lpadmin",
     "lxd",
     "sambashare",
     "users",
+    "video",
+    "render",
+    "audio",
+    "input",
+    "dialout",
 )
 
 
@@ -381,6 +388,11 @@ class InstalledDisk:
     root_uuid: str
     esp_mp: str
     root_mp: str
+    boot_dev: str = ""
+    boot_uuid: str = ""
+    boot_mp: str = ""
+    root_fstype: str = "ext4"
+    root_fsopts: str = ""
 
 
 class InstallLog:
@@ -477,6 +489,7 @@ def cmdline_files(root: str) -> list[str]:
     paths = [
         os.path.join(root, "etc", "default", "grub"),
         os.path.join(root, "boot", "grub", "grub.cfg"),
+        os.path.join(root, "boot", "grub2", "grub.cfg"),
         os.path.join(root, "etc", "kernel", "cmdline"),
         os.path.join(root, "etc", "cmdline"),
     ]
@@ -583,6 +596,8 @@ def fstab_uuid_ok(root: str, disk: InstalledDisk) -> list[str]:
         fails.append("fstab does not mention the root UUID")
     if disk.esp_uuid and disk.esp_uuid not in text:
         fails.append("fstab does not mention the ESP UUID")
+    if disk.boot_uuid and disk.boot_uuid not in text:
+        fails.append("fstab does not mention the boot UUID")
     return fails
 
 
@@ -667,13 +682,25 @@ def health_check(
 def write_fstab(root: str, disk: InstalledDisk) -> None:
     path = os.path.join(root, "etc", "fstab")
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    text = (
-        "# /etc/fstab: static file system information.\n"
-        f"UUID={disk.root_uuid} / ext4 errors=remount-ro 0 1\n"
-        f"UUID={disk.esp_uuid} /boot/efi vfat umask=0077 0 1\n"
+    fstype = disk.root_fstype or "ext4"
+    opts = disk.root_fsopts or (
+        "errors=remount-ro" if fstype == "ext4" else "defaults"
     )
+    passno = "0 0" if fstype == "btrfs" else "0 1"
+    lines = [
+        "# /etc/fstab: static file system information.",
+        f"UUID={disk.root_uuid} / {fstype} {opts} {passno}",
+    ]
+    if disk.boot_uuid:
+        lines.append(f"UUID={disk.boot_uuid} /boot ext4 defaults 1 2")
+    esp_opts = "umask=0077,shortname=winnt" if fstype == "btrfs" else "umask=0077"
+    esp_pass = "0 2" if disk.boot_uuid else "0 1"
+    lines.append(f"UUID={disk.esp_uuid} /boot/efi vfat {esp_opts} {esp_pass}")
+    if fstype == "btrfs" and "subvol=root" in opts:
+        home_opts = opts.replace("subvol=root", "subvol=home")
+        lines.append(f"UUID={disk.root_uuid} /home btrfs {home_opts} 0 0")
     with open(path, "w", encoding="utf-8") as fh:
-        fh.write(text)
+        fh.write("\n".join(lines) + "\n")
 
 
 def write_hostname(root: str, hostname: str) -> None:

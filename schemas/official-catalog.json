@@ -69,6 +69,30 @@
           "size_bytes": 3033710592
         }
       ]
+    },
+    {
+      "id": "fedora",
+      "name": "Fedora",
+      "version": "44",
+      "tagline": "Modern Plasma desktop",
+      "description": "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults.",
+      "family": "fedora",
+      "redistributable": true,
+      "install": "fedora-44-plasma",
+      "can_stage": true,
+      "suggested_default": false,
+      "secure_boot": true,
+      "editions": [
+        {
+          "id": "plasma",
+          "name": "KDE Plasma",
+          "default": true,
+          "filename": "Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso",
+          "url": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/KDE/x86_64/iso/Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso",
+          "sha256": "c8295961d4c41adbf785a31a17c21a971d3b7415fda72dcad0c11c49577bf03a",
+          "size_bytes": 3368683520
+        }
+      ]
     }
   ]
 }

@@ -126,7 +126,7 @@ func TestLoadZipAndBuildShopTwoEditions(t *testing.T) {
 	if !pop.Editions[0].Default || pop.Editions[1].Default {
 		t.Fatalf("featured should stay pack default (gnome): %+v", pop.Editions)
 	}
-	if got := shopIDs(shop.Catalog); len(got) != 2 || got[0] != "ubuntu" || got[1] != "linux-mint" {
+	if got := shopIDs(shop.Catalog); len(got) != 3 || got[0] != "ubuntu" || got[1] != "linux-mint" || got[2] != "fedora" {
 		t.Fatalf("official distros should stay downloads, catalog %+v", got)
 	}
 
@@ -250,6 +250,9 @@ func TestReservedPackID(t *testing.T) {
 	}
 	if !ReservedPackID("linux-mint", off) || !ReservedPackID("mint-223-cinnamon", off) || !ReservedPackID("mint-223-mate", off) || !ReservedPackID("mint-223-xfce", off) || !ReservedPackID("mint-223", off) {
 		t.Fatal("mint is reserved")
+	}
+	if !ReservedPackID("fedora", off) || !ReservedPackID("fedora-44-plasma", off) || !ReservedPackID("fedora-kickstart", off) {
+		t.Fatal("fedora is reserved")
 	}
 	if ReservedPackID("pop-os", off) {
 		t.Fatal("pop-os should be allowed")

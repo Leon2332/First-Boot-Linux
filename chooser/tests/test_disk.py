@@ -32,9 +32,13 @@ from firstboot.disk import (  # noqa: E402
     rsync_percent,
     skip_name,
 )
+from unittest import mock  # noqa: E402
+
 from firstboot.install import (  # noqa: E402
     ESP_GRUB,
     SYS_GRUB,
+    InstallError,
+    copy_tree,
     efi_ids_for_label,
     efi_ids_for_unshimmed_loaders,
     rewrite_grub,
@@ -362,6 +366,22 @@ class ProtocolTests(unittest.TestCase):
         line = "  1,234,567  45%  12.34MB/s    0:00:01"
         self.assertEqual(rsync_percent(line), 45)
         self.assertIsNone(rsync_percent("sending incremental file list"))
+
+    def test_copy_tree_xattr_code_23_is_ok(self) -> None:
+        proc = mock.Mock()
+        proc.stderr = iter(
+            [
+                "rsync: rsync_xal_set: lsetxattr(\"/dst/usr/bin/plasmalogin\",\"security.selinux\") failed: Operation not supported (95)\n",
+                "rsync error: some files/attr were not transferred (see previous errors) (code 23) at main.c(1356) [sender=3.4.1]\n",
+            ]
+        )
+        proc.wait.return_value = 23
+        with mock.patch("firstboot.install.subprocess.Popen", return_value=proc):
+            copy_tree("/src", "/dst", xattrs=True)
+        proc.wait.return_value = 12
+        with mock.patch("firstboot.install.subprocess.Popen", return_value=proc):
+            with self.assertRaises(InstallError):
+                copy_tree("/src", "/dst", xattrs=True)
 
     def test_map_range(self) -> None:
         self.assertEqual(map_range(0, 59, 96), 59)

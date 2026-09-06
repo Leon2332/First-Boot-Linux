@@ -2,10 +2,11 @@
 
 Native drivers (``unpack_kind``) unpack the live filesystem in this
 session, health-check, then drop First Boot. Official catalog is Ubuntu
-26.04 GNOME (``ubuntu_2604_gnome.py``) and Linux Mint 22.3 Cinnamon,
+26.04 GNOME (``ubuntu_2604_gnome.py``), Linux Mint 22.3 Cinnamon,
 MATE, and Xfce (``mint_223_cinnamon.py``, ``mint_223_mate.py``,
-``mint_223_xfce.py``). Shop packs still use the
-legacy ``boot_files`` / ``kernel_args`` / ``seed_files`` API.
+``mint_223_xfce.py``), and Fedora 44 Plasma (``fedora_44_plasma.py``).
+Shop packs still use the legacy ``boot_files`` / ``kernel_args`` /
+``seed_files`` API.
 
 See README.md in this directory. kexec is not used (lockdown).
 """
@@ -52,7 +53,13 @@ from firstboot.payload import (
     last_payload_root,
 )
 
-from . import mint_223_cinnamon, mint_223_mate, mint_223_xfce, ubuntu_2604_gnome
+from . import (
+    fedora_44_plasma,
+    mint_223_cinnamon,
+    mint_223_mate,
+    mint_223_xfce,
+    ubuntu_2604_gnome,
+)
 from .common import (
     HELPER,
     HOST_RE,
@@ -79,6 +86,7 @@ _DRIVER_MODULES = (
     mint_223_cinnamon,
     mint_223_mate,
     mint_223_xfce,
+    fedora_44_plasma,
 )
 
 
@@ -98,6 +106,7 @@ DRIVER_UBUNTU_GNOME = ubuntu_2604_gnome.ID
 DRIVER_MINT_CINNAMON = mint_223_cinnamon.ID
 DRIVER_MINT_MATE = mint_223_mate.ID
 DRIVER_MINT_XFCE = mint_223_xfce.ID
+DRIVER_FEDORA_PLASMA = fedora_44_plasma.ID
 
 _casper_boot_files = casper_boot_files
 _CUSTOM_DRIVERS: dict[str, object] = {}

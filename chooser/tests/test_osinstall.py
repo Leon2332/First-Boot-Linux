@@ -20,6 +20,7 @@ if CHOOSER_DIR not in sys.path:
 
 from firstboot.disk import Disk, Partition, parse_helper_line, part_path  # noqa: E402
 from firstboot.osinstall import (  # noqa: E402
+    DRIVER_FEDORA_PLASMA,
     DRIVER_MINT_CINNAMON,
     DRIVER_MINT_MATE,
     DRIVER_MINT_XFCE,
@@ -141,12 +142,16 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(DRIVER_MINT_XFCE, "mint-223-xfce")
         self.assertTrue(is_native_driver(get_driver("mint-223-xfce")))
         self.assertEqual(get_driver("mint-223-xfce").display_manager, "lightdm")
+        self.assertEqual(DRIVER_FEDORA_PLASMA, "fedora-44-plasma")
+        self.assertEqual(get_driver("fedora-44-plasma").default_hostname, "fedora")
+        self.assertTrue(is_native_driver(get_driver("fedora-44-plasma")))
+        self.assertEqual(get_driver("fedora-44-plasma").display_manager, "plasmalogin")
+        self.assertEqual(get_driver("fedora-44-plasma").unpack_kind, "fedora-erofs")
         self.assertIsNone(get_driver("ubuntu-2604"))
         self.assertIsNone(get_driver("ubuntu-autoinstall"))
         self.assertIsNone(get_driver("ubuntu-calamares-2604"))
         self.assertIsNone(get_driver("mint-223"))
         self.assertIsNone(get_driver("mint"))
-        self.assertIsNone(get_driver("fedora-44-plasma"))
         self.assertIsNone(get_driver("fedora-kickstart"))
         self.assertEqual(canonical_driver_id("ubuntu-autoinstall"), "ubuntu-autoinstall")
         self.assertIsNone(get_driver("deepin-25"))

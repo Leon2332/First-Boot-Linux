@@ -16,8 +16,9 @@ Do not reboot into Subiquity, Calamares, Ubiquity, or Anaconda.
 | `mint_223_cinnamon.py` | `mint-223-cinnamon` | Native casper-single (Linux Mint 22.3 Cinnamon). **Official catalog.** |
 | `mint_223_mate.py` | `mint-223-mate` | Native casper-single (Linux Mint 22.3 MATE). **Official catalog.** |
 | `mint_223_xfce.py` | `mint-223-xfce` | Native casper-single (Linux Mint 22.3 Xfce). **Official catalog.** |
+| `fedora_44_plasma.py` | `fedora-44-plasma` | Native fedora-erofs (Fedora 44 KDE Plasma: Anaconda live copy, ESP+/boot+btrfs, plasmalogin). **Official catalog.** |
 
-Official `official-catalog.json` currently lists **Ubuntu GNOME** and **Mint Cinnamon / MATE / Xfce**. Do not add flavors / Fedora back until each has a native file.
+Official `official-catalog.json` currently lists **Ubuntu GNOME**, **Mint Cinnamon / MATE / Xfce**, and **Fedora Plasma**. Do not add flavors / Fedora GNOME until each has a native file.
 
 `__init__.py` is the trampoline. Native drivers (`unpack_kind`) run
 `pipeline.py`. Shop packs still use the legacy `boot_files` /
@@ -27,6 +28,7 @@ Older sticks may still say `ubuntu-autoinstall`, `ubuntu-2604`, `mint`,
 `mint-223`, or `fedora-kickstart`. Those ids are reserved (no baked-in
 driver). Ubuntu GNOME on a **new** stick is `ubuntu-2604-gnome`. Mint
 editions are `mint-223-cinnamon`, `mint-223-mate`, and `mint-223-xfce`.
+Fedora Plasma is `fedora-44-plasma`.
 
 ## Adding an official ISO
 

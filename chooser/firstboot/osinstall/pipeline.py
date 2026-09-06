@@ -592,6 +592,15 @@ def _iso_extras(iso_mnt: str) -> dict[str, str]:
             path = os.path.join(casper, name)
             if os.path.isfile(path):
                 extra[os.path.join("casper", name)] = path
+    for rel in (
+        os.path.join("boot", "x86_64", "loader", "linux"),
+        os.path.join("boot", "x86_64", "loader", "initrd"),
+        os.path.join("images", "pxeboot", "vmlinuz"),
+        os.path.join("images", "pxeboot", "initrd.img"),
+    ):
+        path = os.path.join(iso_mnt, rel)
+        if os.path.isfile(path):
+            extra[rel] = path
     return extra
 
 
@@ -736,7 +745,11 @@ def install_native(
         unmount_target(plan, log)
         work = os.path.join(RAM_DIR, "mnt")
         os.makedirs(work, exist_ok=True)
-        disk = partition_disk(plan.target.path, work, log=log)
+        part_fn = getattr(drv, "partition", None)
+        if callable(part_fn):
+            disk = part_fn(plan.target.path, work, log=log)
+        else:
+            disk = partition_disk(plan.target.path, work, log=log)
         wiped = True
         emit_tick(3, "done")
         prog(24)
