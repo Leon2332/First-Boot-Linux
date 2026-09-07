@@ -24,9 +24,9 @@ const (
 
 // ReservedInstallIDs are baked-in or reserved catalog install ids. A shop
 // pack must not reuse them. ubuntu-2604-gnome, mint-223-{cinnamon,mate,xfce},
-// fedora-44-plasma, and fedora-44-gnome are live native drivers; the other
-// ubuntu/mint/fedora ids are retired trampolines kept reserved so packs
-// cannot claim them.
+// fedora-44-plasma, fedora-44-gnome, and debian-13-gnome are live native
+// drivers; the other ubuntu/mint/fedora/debian ids are retired trampolines
+// kept reserved so packs cannot claim them.
 var ReservedInstallIDs = map[string]bool{
 	"ubuntu-2604-gnome":     true,
 	"ubuntu-2604":           true,
@@ -40,6 +40,7 @@ var ReservedInstallIDs = map[string]bool{
 	"fedora-44-plasma":      true,
 	"fedora-44-gnome":       true,
 	"fedora-kickstart":      true,
+	"debian-13-gnome":       true,
 	"debian-preseed":        true,
 	"windows":               true,
 	"freebsd":               true,

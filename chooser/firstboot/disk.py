@@ -492,6 +492,9 @@ def parse_helper_line(line: str) -> HelperEvent | None:
     if text.startswith("ERROR"):
         msg = text[5:].lstrip(" :")
         return HelperEvent("error", text=msg or "Install failed.")
+    if text.startswith("WIPED"):
+        disk = text[5:].lstrip(" :")
+        return HelperEvent("wiped", text=disk)
     if text.startswith("STEP"):
         return HelperEvent("step", text=text[4:].lstrip(" :"))
     if text.startswith("PROGRESS"):

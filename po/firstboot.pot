@@ -184,6 +184,18 @@ msgstr ""
 msgid "The computer will shut down."
 msgstr ""
 
+msgid "The computer will restart automatically in {n} seconds."
+msgstr ""
+
+msgid "The computer will restart automatically in 1 second."
+msgstr ""
+
+msgid "The computer will shut down automatically in {n} seconds."
+msgstr ""
+
+msgid "The computer will shut down automatically in 1 second."
+msgstr ""
+
 msgid "Cancel"
 msgstr ""
 
@@ -212,6 +224,21 @@ msgid "Software Information"
 msgstr ""
 
 msgid "Close"
+msgstr ""
+
+msgid "Restore First Boot Linux"
+msgstr ""
+
+msgid "Restoring First Boot Linux"
+msgstr ""
+
+msgid "First Boot Linux is back on this computer. Restart to continue."
+msgstr ""
+
+msgid "Could not restore First Boot Linux."
+msgstr ""
+
+msgid "Copying shop files"
 msgstr ""
 
 msgid "Maximize"
@@ -299,6 +326,12 @@ msgid "Modern Plasma desktop"
 msgstr ""
 
 msgid "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults."
+msgstr ""
+
+msgid "Rock-solid base"
+msgstr ""
+
+msgid "The universal operating system. Extremely stable and free-software focused."
 msgstr ""
 
 msgid "Ubuntu with KDE Plasma"

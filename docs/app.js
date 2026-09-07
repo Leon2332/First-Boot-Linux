@@ -377,6 +377,8 @@
     installTimer: null,
     downloads: {},
     pendingPower: null,
+    powerTimer: null,
+    powerLeft: 30,
     volume: 70,
     muted: false,
     brightness: 100,
@@ -2127,21 +2129,52 @@
 
   function requestPower(action) {
     closeMenus();
+    stopPowerTimer();
     state.pendingPower = action;
+    state.powerLeft = 30;
     if (action === "shutdown") {
       els.powerModalTitle.textContent = "Power Off?";
-      els.powerModalBody.textContent = "The computer will shut down.";
       els.powerModalConfirm.textContent = "Power Off";
     } else {
       els.powerModalTitle.textContent = "Restart?";
-      els.powerModalBody.textContent = "The computer will restart.";
       els.powerModalConfirm.textContent = "Restart";
     }
+    paintPowerCountdown();
     els.powerModal.hidden = false;
+    state.powerTimer = setInterval(() => {
+      state.powerLeft -= 1;
+      if (state.powerLeft <= 0) {
+        confirmPower();
+        return;
+      }
+      paintPowerCountdown();
+    }, 1000);
+  }
+
+  function paintPowerCountdown() {
+    const n = state.powerLeft;
+    const restart = state.pendingPower !== "shutdown";
+    if (n === 1) {
+      els.powerModalBody.textContent = restart
+        ? "The computer will restart automatically in 1 second."
+        : "The computer will shut down automatically in 1 second.";
+      return;
+    }
+    els.powerModalBody.textContent = restart
+      ? "The computer will restart automatically in " + n + " seconds."
+      : "The computer will shut down automatically in " + n + " seconds.";
+  }
+
+  function stopPowerTimer() {
+    if (state.powerTimer) {
+      clearInterval(state.powerTimer);
+      state.powerTimer = null;
+    }
   }
 
   function requestShopInstall() {
     closeMenus();
+    stopPowerTimer();
     state.pendingPower = "shop-install";
     els.powerModalTitle.textContent = "Install to this device?";
     els.powerModalBody.textContent =
@@ -2192,6 +2225,7 @@
   }
 
   function confirmPower() {
+    stopPowerTimer();
     els.powerModal.hidden = true;
     const action = state.pendingPower;
     state.pendingPower = null;
@@ -2286,6 +2320,7 @@
     });
 
     els.powerModalCancel.addEventListener("click", () => {
+      stopPowerTimer();
       els.powerModal.hidden = true;
       state.pendingPower = null;
     });
@@ -2360,6 +2395,7 @@
       if (e.key === "Escape") {
         if (startOverlayOpen()) return;
         if (!els.powerModal.hidden) {
+          stopPowerTimer();
           els.powerModal.hidden = true;
           state.pendingPower = null;
           return;

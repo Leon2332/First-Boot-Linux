@@ -5,7 +5,8 @@ session, health-check, then drop First Boot. Official catalog is Ubuntu
 26.04 GNOME (``ubuntu_2604_gnome.py``), Linux Mint 22.3 Cinnamon,
 MATE, and Xfce (``mint_223_cinnamon.py``, ``mint_223_mate.py``,
 ``mint_223_xfce.py``), Fedora 44 Plasma (``fedora_44_plasma.py``),
-and Fedora 44 GNOME (``fedora_44_gnome.py``).
+Fedora 44 GNOME (``fedora_44_gnome.py``), and Debian 13 GNOME
+(``debian_13_gnome.py``).
 Shop packs still use the legacy ``boot_files`` / ``kernel_args`` /
 ``seed_files`` API.
 
@@ -55,6 +56,7 @@ from firstboot.payload import (
 )
 
 from . import (
+    debian_13_gnome,
     fedora_44_gnome,
     fedora_44_plasma,
     mint_223_cinnamon,
@@ -90,6 +92,7 @@ _DRIVER_MODULES = (
     mint_223_xfce,
     fedora_44_plasma,
     fedora_44_gnome,
+    debian_13_gnome,
 )
 
 
@@ -111,6 +114,7 @@ DRIVER_MINT_MATE = mint_223_mate.ID
 DRIVER_MINT_XFCE = mint_223_xfce.ID
 DRIVER_FEDORA_PLASMA = fedora_44_plasma.ID
 DRIVER_FEDORA_GNOME = fedora_44_gnome.ID
+DRIVER_DEBIAN_GNOME = debian_13_gnome.ID
 
 _casper_boot_files = casper_boot_files
 _CUSTOM_DRIVERS: dict[str, object] = {}
@@ -1029,6 +1033,39 @@ def prepare_ubuntu(
     prepare_os(plan, identity, on_progress=on_progress, payload_root=payload_root)
 
 
+def run_os_restore(
+    target: str,
+    on_event: Callable[..., None] | None = None,
+) -> None:
+    if not target:
+        raise OsInstallError(_("Could not restore First Boot Linux."))
+    cmd = [*privilege_prefix(), helper_path(), "--restore", "--target", target]
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    except OSError as exc:
+        raise OsInstallError(str(exc)) from exc
+    assert proc.stdout is not None
+    err: str | None = None
+    for raw in proc.stdout:
+        event = parse_helper_line(raw)
+        if event is None:
+            continue
+        if event.kind == "error":
+            err = event.text
+        if on_event is not None:
+            on_event(event)
+    status = proc.wait()
+    if err:
+        raise OsInstallError(err)
+    if status != 0:
+        raise OsInstallError(_("Could not restore First Boot Linux."))
+
+
 def run_os_install(
     plan: OsInstallPlan,
     identity: OsIdentity,
@@ -1227,6 +1264,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Install a staged OS onto this computer")
     parser.add_argument("--plan", action="store_true", help="print a JSON stub (privilege probe)")
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--restore", action="store_true")
     parser.add_argument("--fetch", action="store_true")
     parser.add_argument("--url")
     parser.add_argument("--payload", default=PAYLOAD_MOUNT)
@@ -1265,11 +1303,32 @@ def main(argv: list[str] | None = None) -> int:
             emit("ERROR", str(exc) or type(exc).__name__)
             return 1
         return 0
+    if args.restore:
+        if not args.target:
+            emit("ERROR", "missing --target")
+            return 2
+        try:
+            from .restore import restore_fbl
+
+            restore_fbl(args.target)
+        except OsInstallError as exc:
+            emit("ERROR", str(exc))
+            return 1
+        except Exception as exc:
+            try:
+                os.makedirs("/run/firstboot", exist_ok=True)
+                with open("/run/firstboot/osinstall.log", "a", encoding="utf-8") as fh:
+                    fh.write(traceback.format_exc())
+            except OSError:
+                pass
+            emit("ERROR", str(exc) or type(exc).__name__)
+            return 1
+        return 0
     if args.plan and not args.apply:
         print(json.dumps({"available": False, "reason": "pass --apply to install"}))
         return 1
     if not args.apply:
-        parser.error("need --plan, --apply, or --fetch")
+        parser.error("need --plan, --apply, --restore, or --fetch")
     for key in ("iso", "iso_rel", "sha256", "driver", "target", "hostname", "username", "password_hash"):
         if not getattr(args, key.replace("-", "_")):
             emit("ERROR", f"missing --{key.replace('_', '-')}")

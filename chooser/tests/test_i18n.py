@@ -204,6 +204,7 @@ class PoTests(unittest.TestCase):
     def test_distro_description(self) -> None:
         apply_language("af")
         self.assertEqual(_("Popular and well-supported"), "Gewild en goed ondersteun")
+        self.assertEqual(_("Rock-solid base"), "Rotsvaste basis")
         self.assertIn("Afgewerkte werkskerm", _("A polished desktop with excellent hardware support and a large software library. A safe default for most laptops."))
         self.assertEqual(_("Ubuntu with KDE Plasma"), "Ubuntu met KDE Plasma")
         self.assertEqual(_("Very lightweight"), "Baie liggewig")

@@ -360,6 +360,9 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(parse_helper_line("DONE").kind, "done")
         self.assertEqual(parse_helper_line("ERROR disk too small").kind, "error")
         self.assertEqual(parse_helper_line("ERROR disk too small").text, "disk too small")
+        wiped = parse_helper_line("WIPED /dev/nvme0n1")
+        self.assertEqual(wiped.kind, "wiped")
+        self.assertEqual(wiped.text, "/dev/nvme0n1")
         self.assertIsNone(parse_helper_line(""))
 
     def test_rsync_percent(self) -> None:

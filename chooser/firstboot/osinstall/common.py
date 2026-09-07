@@ -1,7 +1,7 @@
 """Shared types and helpers for OS install drivers.
 
 Native unpack/configure steps live here. ISO-specific files call them.
-Do not put Ubuntu GNOME vs Mint vs Fedora branching here.
+Do not put Ubuntu GNOME vs Mint vs Fedora vs Debian branching here.
 """
 
 from __future__ import annotations
@@ -353,6 +353,7 @@ FORBIDDEN_CMDLINE = (
     "systemd.mask=",
     "rd.live.",
     "inst.cmdline",
+    "boot=live",
 )
 DM_UNITS = {
     "gdm": ("gdm.service", "gdm3.service"),

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-09-06",
+  "updated": "2026-09-07",
   "distros": [
     {
       "id": "ubuntu",
@@ -101,6 +101,30 @@
           "url": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Workstation/x86_64/iso/Fedora-Workstation-Live-44-1.7.x86_64.iso",
           "sha256": "1620295f6a00c27c3208f0c00b8ece4eab1ec69b9002152d97488bf26a426ddf",
           "size_bytes": 2851612672
+        }
+      ]
+    },
+    {
+      "id": "debian",
+      "name": "Debian",
+      "version": "13",
+      "tagline": "Rock-solid base",
+      "description": "The universal operating system. Extremely stable and free-software focused.",
+      "family": "debian",
+      "redistributable": true,
+      "install": "debian-13-gnome",
+      "can_stage": true,
+      "suggested_default": false,
+      "secure_boot": true,
+      "editions": [
+        {
+          "id": "gnome",
+          "name": "GNOME",
+          "default": true,
+          "filename": "debian-live-13.6.0-amd64-gnome.iso",
+          "url": "https://cdimage.debian.org/cdimage/release/13.6.0-live/amd64/iso-hybrid/debian-live-13.6.0-amd64-gnome.iso",
+          "sha256": "1aa47465568cfc259b93ea7687a510d7f109df766daabbc69139ed99a25a71c9",
+          "size_bytes": 3800989696
         }
       ]
     }

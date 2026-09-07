@@ -87,8 +87,27 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	if f.SuggestedDefault {
 		t.Fatalf("nothing should be a suggested default")
 	}
-	if len(cat.Distros) != 3 {
-		t.Fatalf("official catalog should be Ubuntu GNOME + Linux Mint + Fedora, got %d", len(cat.Distros))
+	deb := cat.Distro("debian")
+	if deb == nil || !deb.Redistributable || !deb.Stageable() {
+		t.Fatalf("debian should be redistributable and stageable")
+	}
+	if deb.Install == nil || *deb.Install != "debian-13-gnome" {
+		t.Fatalf("debian install %v", deb.Install)
+	}
+	if !deb.SecureBoot {
+		t.Fatal("debian must support Secure Boot")
+	}
+	if deb.DefaultEdition() == nil || deb.DefaultEdition().ID != "gnome" {
+		t.Fatalf("debian default edition %+v", deb.DefaultEdition())
+	}
+	if deb.DefaultEdition().SHA256 == nil || *deb.DefaultEdition().SizeBytes != 3800989696 {
+		t.Fatalf("debian size %v", deb.DefaultEdition().SizeBytes)
+	}
+	if deb.SuggestedDefault {
+		t.Fatalf("nothing should be a suggested default")
+	}
+	if len(cat.Distros) != 4 {
+		t.Fatalf("official catalog should be Ubuntu GNOME + Linux Mint + Fedora + Debian, got %d", len(cat.Distros))
 	}
 	for _, id := range []string{"kubuntu", "lubuntu", "ubuntu-budgie", "ubuntu-mate", "xubuntu"} {
 		if cat.Distro(id) != nil {
@@ -109,11 +128,11 @@ func TestBuildShop(t *testing.T) {
 	if len(shop.Recommended) != 1 {
 		t.Fatalf("got rec=%d", len(shop.Recommended))
 	}
-	if len(shop.Catalog) != 2 || shop.Catalog[0].ID != "linux-mint" || shop.Catalog[1].ID != "fedora" {
-		t.Fatalf("unticked mint and fedora should be catalog downloads, got %+v", shopIDs(shop.Catalog))
+	if len(shop.Catalog) != 3 || shop.Catalog[0].ID != "linux-mint" || shop.Catalog[1].ID != "fedora" || shop.Catalog[2].ID != "debian" {
+		t.Fatalf("unticked mint, fedora, and debian should be catalog downloads, got %+v", shopIDs(shop.Catalog))
 	}
-	if shop.Catalog[0].Editions[0].Local || shop.Catalog[1].Editions[0].Local {
-		t.Fatal("unticked mint and fedora must not be local")
+	if shop.Catalog[0].Editions[0].Local || shop.Catalog[1].Editions[0].Local || shop.Catalog[2].Editions[0].Local {
+		t.Fatal("unticked mint, fedora, and debian must not be local")
 	}
 	ub := shop.Recommended[0]
 	if !ub.SecureBoot {
@@ -189,6 +208,20 @@ func TestBuildShop(t *testing.T) {
 	}
 	if feds[1].ID != "plasma" || feds[1].Local || feds[1].Install != "" {
 		t.Fatalf("unticked plasma should inherit distro install, got %+v", feds[1])
+	}
+	debianShop, err := BuildShop(cat, []string{"debian:gnome"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(debianShop.Recommended) != 1 || debianShop.Recommended[0].ID != "debian" {
+		t.Fatalf("debian recommended %+v", debianShop.Recommended)
+	}
+	if debianShop.Recommended[0].Install != "debian-13-gnome" {
+		t.Fatalf("debian install %s", debianShop.Recommended[0].Install)
+	}
+	debEd := debianShop.Recommended[0].Editions[0]
+	if !debEd.Local || debEd.File != "images/debian-live-13.6.0-amd64-gnome.iso" {
+		t.Fatalf("debian edition %+v", debEd)
 	}
 	if _, err := BuildShop(cat, nil); err == nil {
 		t.Fatalf("empty selection must be rejected")

@@ -84,6 +84,7 @@
                 "mint-223-xfce",
                 "fedora-44-plasma",
                 "fedora-44-gnome",
+                "debian-13-gnome",
                 "debian-preseed",
                 "windows",
                 "freebsd"

@@ -32,6 +32,7 @@ INSTALL_DRIVERS = frozenset(
         "fedora-44-plasma",
         "fedora-44-gnome",
         "fedora-kickstart",
+        "debian-13-gnome",
         "debian-preseed",
         "windows",
         "freebsd",

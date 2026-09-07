@@ -189,9 +189,7 @@ def mount_ram_tmpfs(need_bytes: int, log: InstallLog | None = None) -> None:
 
 
 def _ram_copy_error() -> OsInstallError:
-    return OsInstallError(
-        _("Could not copy First Boot into memory. Plug in a First Boot USB and try again.")
-    )
+    return OsInstallError(_("Could not copy First Boot into memory."))
 
 
 def _make_rprivate(path: str, log: InstallLog | None = None) -> None:
@@ -386,6 +384,9 @@ def _copy_live_to_ram(
         )
     if not os.path.isfile(live_dest):
         raise _ram_copy_error()
+    from firstboot.osinstall.restore import snapshot_rescue
+
+    snapshot_rescue(PAYLOAD_MOUNT, log=log)
     new_rofs = os.path.join(RAM_DIR, "rofs")
     os.makedirs(new_rofs, exist_ok=True)
     run_checked(
@@ -592,6 +593,12 @@ def _iso_extras(iso_mnt: str) -> dict[str, str]:
             path = os.path.join(casper, name)
             if os.path.isfile(path):
                 extra[os.path.join("casper", name)] = path
+    live = os.path.join(iso_mnt, "live")
+    if os.path.isdir(live):
+        for name in ("vmlinuz", "initrd.img", "initrd", "initrd.gz"):
+            path = os.path.join(live, name)
+            if os.path.isfile(path):
+                extra[os.path.join("live", name)] = path
     for rel in (
         os.path.join("boot", "x86_64", "loader", "linux"),
         os.path.join("boot", "x86_64", "loader", "initrd"),
@@ -725,6 +732,9 @@ def install_native(
                         )
                     )
                 extras = _iso_extras(iso_mnt)
+                extra_fn = getattr(drv, "iso_extras", None)
+                if callable(extra_fn):
+                    extras.update(extra_fn(iso_mnt))
                 ram_layers = copy_live_to_ram(
                     src_layers,
                     extras,
@@ -742,6 +752,9 @@ def install_native(
         prog(18)
 
         emit_tick(3, "current", step=True)
+        from firstboot.osinstall.restore import snapshot_rescue
+
+        snapshot_rescue(payload_root, log=log)
         unmount_target(plan, log)
         work = os.path.join(RAM_DIR, "mnt")
         os.makedirs(work, exist_ok=True)
@@ -751,6 +764,7 @@ def install_native(
         else:
             disk = partition_disk(plan.target.path, work, log=log)
         wiped = True
+        emit("WIPED", plan.target.path)
         emit_tick(3, "done")
         prog(24)
 

@@ -184,6 +184,18 @@ msgstr "Die rekenaar sal herbegin."
 msgid "The computer will shut down."
 msgstr "Die rekenaar sal afskakel."
 
+msgid "The computer will restart automatically in {n} seconds."
+msgstr "Die rekenaar sal outomaties oor {n} sekondes herbegin."
+
+msgid "The computer will restart automatically in 1 second."
+msgstr "Die rekenaar sal outomaties oor 1 sekonde herbegin."
+
+msgid "The computer will shut down automatically in {n} seconds."
+msgstr "Die rekenaar sal outomaties oor {n} sekondes afskakel."
+
+msgid "The computer will shut down automatically in 1 second."
+msgstr "Die rekenaar sal outomaties oor 1 sekonde afskakel."
+
 msgid "Cancel"
 msgstr "Kanselleer"
 
@@ -213,6 +225,21 @@ msgstr "Sagteware-inligting"
 
 msgid "Close"
 msgstr "Sluit"
+
+msgid "Restore First Boot Linux"
+msgstr "Herstel First Boot Linux"
+
+msgid "Restoring First Boot Linux"
+msgstr "Herstel tans First Boot Linux"
+
+msgid "First Boot Linux is back on this computer. Restart to continue."
+msgstr "First Boot Linux is weer op hierdie rekenaar. Herbegin om voort te gaan."
+
+msgid "Could not restore First Boot Linux."
+msgstr "First Boot Linux kon nie herstel word nie."
+
+msgid "Copying shop files"
+msgstr "Kopieer tans winkellêers"
 
 msgid "Maximize"
 msgstr "Maksimeer"
@@ -312,6 +339,12 @@ msgstr "Moderne Plasma-werkskerm"
 
 msgid "Current free software with a polished KDE Plasma experience. Good choice if you want recent packages and solid defaults."
 msgstr "Hedendaagse vrye sagteware met ’n afgewerkte KDE Plasma-ervaring. ’n Goeie keuse as jy onlangse pakkette en stewige standaardinstellings wil hê."
+
+msgid "Rock-solid base"
+msgstr "Rotsvaste basis"
+
+msgid "The universal operating system. Extremely stable and free-software focused."
+msgstr "Die universele bedryfstelsel. Uiters stabiel en gerig op vrye sagteware."
 
 msgid "Ubuntu with KDE Plasma"
 msgstr "Ubuntu met KDE Plasma"

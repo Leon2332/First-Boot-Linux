@@ -29,6 +29,7 @@ class AssetTests(unittest.TestCase):
     def test_repo_logos_and_status(self) -> None:
         self.assertTrue(find_logo("ubuntu"))
         self.assertTrue(find_logo("linux-mint"))
+        self.assertTrue(find_logo("debian"))
         unknown = find_logo("unknown")
         self.assertTrue(unknown)
         self.assertTrue(unknown.endswith("unknown.png"))

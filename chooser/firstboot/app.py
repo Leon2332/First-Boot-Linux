@@ -27,12 +27,14 @@ from firstboot.osinstall import (
     live_os_plan,
     run_iso_fetch,
     run_os_install,
+    run_os_restore,
     sha512_crypt,
     suggest_hostname,
     suggest_username,
     validate_identity,
 )
 from firstboot.osinstall.pipeline import PIPELINE_TICKS
+from firstboot.osinstall.restore import RESTORE_TICKS
 from firstboot.catalog_search import (
     DIFFERENT,
     LESS_STRICT,
@@ -162,6 +164,7 @@ def run_window(
             self._install_ed: Edition | None = None
             self._install_step_raw = ""
             self._native_install = False
+            self._wiped_target = ""
             self._tick_labels: list[str] = []
             self._tick_rows: list = []
             self._done_msgid = (
@@ -1368,6 +1371,14 @@ def run_window(
             self.install_error.set_visible(False)
             panel.append(self.install_error)
 
+            self.install_restore = Gtk.Button(label=_("Restore First Boot Linux"))
+            self.install_restore.add_css_class("btn-primary")
+            self.install_restore.set_halign(Gtk.Align.CENTER)
+            self.install_restore.set_margin_top(8)
+            self.install_restore.set_visible(False)
+            self.install_restore.connect("clicked", lambda *_: self._start_fbl_restore())
+            panel.append(self.install_restore)
+
             self.install_close = Gtk.Button(label=_("Close"))
             self.install_close.add_css_class("btn-primary")
             self.install_close.set_halign(Gtk.Align.CENTER)
@@ -1487,10 +1498,15 @@ def run_window(
             close = getattr(self, "install_close", None)
             if close is not None:
                 close.set_visible(False)
+            restore = getattr(self, "install_restore", None)
+            if restore is not None:
+                restore.set_visible(False)
+                restore.set_sensitive(True)
 
         def _set_tick_labels(self, labels: tuple[str, ...] | list[str]) -> None:
             self._clear_ticks()
-            self._tick_labels = [_(lab) if lab in PIPELINE_TICKS else lab for lab in labels]
+            known = set(PIPELINE_TICKS) | set(RESTORE_TICKS)
+            self._tick_labels = [_(lab) if lab in known else lab for lab in labels]
             for i, lab in enumerate(self._tick_labels, 1):
                 row = Gtk.Label(label=f"  {lab}", xalign=0)
                 row.add_css_class("install-tick")
@@ -1527,6 +1543,7 @@ def run_window(
             self._set_dimmed(True)
             self.done_host.set_visible(False)
             self.install_host.set_visible(True)
+            self._wiped_target = ""
             self._clear_ticks()
             self._set_shop_progress(0, "")
 
@@ -1549,6 +1566,7 @@ def run_window(
             self._installing = False
             self._os_logo = False
             self._native_install = False
+            self._wiped_target = ""
             self.shell.locked = False
             self.install_host.set_visible(False)
             self.done_host.set_visible(False)
@@ -1636,6 +1654,8 @@ def run_window(
                     self._set_tick_labels(event.ticks)
                 elif event.kind == "tick" and event.tick is not None and event.tick_status:
                     self._set_tick_status(event.tick, event.tick_status)
+                elif event.kind == "wiped" and event.text:
+                    self._wiped_target = event.text
                 return False
 
             from gi.repository import GLib
@@ -1864,6 +1884,51 @@ def run_window(
 
             threading.Thread(target=work, daemon=True).start()
 
+        def _start_fbl_restore(self) -> None:
+            target = getattr(self, "_wiped_target", "") or ""
+            if not target:
+                self._toast(_("Could not restore First Boot Linux."))
+                return
+            self.install_restore.set_sensitive(False)
+            self.install_close.set_visible(False)
+            self.install_error.set_visible(False)
+            self.shell.locked = True
+            self._installing = True
+            self._set_tick_labels(RESTORE_TICKS)
+            self._set_shop_progress(0, _("Preparing the disk"))
+            self.install_title.set_label(_("Restoring First Boot Linux"))
+            from gi.repository import GLib
+
+            def work() -> None:
+                err: str | None = None
+                try:
+                    run_os_restore(target, on_event=self._shop_event)
+                except (OsInstallError, InstallError) as exc:
+                    err = str(exc)
+                except Exception as exc:
+                    err = str(exc)
+                GLib.idle_add(self._restore_finished, err)
+
+            threading.Thread(target=work, daemon=True).start()
+
+        def _restore_finished(self, err: str | None) -> bool:
+            if err:
+                self.install_error.set_label(err)
+                self.install_error.set_visible(True)
+                self.install_restore.set_visible(True)
+                self.install_restore.set_sensitive(True)
+                self.install_close.set_visible(True)
+                self.shell.locked = False
+                self._installing = False
+                return False
+            self._done_msgid = (
+                "First Boot Linux is back on this computer. Restart to continue."
+            )
+            self._done_name = ""
+            self._paint_done_msg()
+            self._show_shop_done()
+            return False
+
         def _os_finished(
             self, err: str | None, reboot: bool, distro: Distro, ed: Edition
         ) -> bool:
@@ -1871,6 +1936,10 @@ def run_window(
                 if self._native_install:
                     self.install_error.set_label(err)
                     self.install_error.set_visible(True)
+                    wiped = bool(getattr(self, "_wiped_target", ""))
+                    if wiped:
+                        self.install_restore.set_visible(True)
+                        self.install_restore.set_sensitive(True)
                     self.install_close.set_visible(True)
                     self.shell.locked = False
                     self._installing = False
@@ -1904,28 +1973,54 @@ def run_window(
             return False
 
         def _confirm_power(self, action: str) -> None:
+            from firstboot.power import POWER_DELAY_SECONDS, countdown_body
+
             title = _("Restart?") if action == "restart" else _("Power Off?")
-            body = (
-                _("The computer will restart.")
-                if action == "restart"
-                else _("The computer will shut down.")
-            )
             confirm = _("Restart") if action == "restart" else _("Power Off")
-            dialog = Adw.AlertDialog(heading=title, body=body)
+            dialog = Adw.AlertDialog(
+                heading=title, body=countdown_body(action, POWER_DELAY_SECONDS)
+            )
             dialog.add_response("cancel", _("Cancel"))
             dialog.add_response("ok", confirm)
             dialog.set_response_appearance("ok", Adw.ResponseAppearance.DESTRUCTIVE)
             dialog.set_default_response("cancel")
             dialog.set_close_response("cancel")
+            state = {"left": POWER_DELAY_SECONDS, "source": 0, "acted": False}
+
+            def stop_timer() -> None:
+                src = state["source"]
+                if src:
+                    GLib.source_remove(src)
+                    state["source"] = 0
+
+            def act(do: bool) -> None:
+                if state["acted"]:
+                    return
+                state["acted"] = True
+                stop_timer()
+                if do:
+                    _power(action)
+
+            def tick() -> bool:
+                if state["acted"]:
+                    return False
+                state["left"] -= 1
+                if state["left"] <= 0:
+                    act(True)
+                    dialog.close()
+                    return False
+                dialog.set_body(countdown_body(action, state["left"]))
+                return True
 
             def done(_d: Adw.AlertDialog, result: Gio.AsyncResult) -> None:
                 try:
                     resp = dialog.choose_finish(result)
                 except GLib.Error:
+                    act(False)
                     return
-                if resp == "ok":
-                    _power(action)
+                act(resp == "ok")
 
+            state["source"] = GLib.timeout_add_seconds(1, tick)
             dialog.choose(self.win, None, done)
 
         def _write_screenshot(self) -> bool:
