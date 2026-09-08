@@ -52,6 +52,9 @@ LIVE_DESKTOPS = (
     "calamares-install-debian.desktop",
     "debian-installer-launcher.desktop",
     "install-debian.desktop",
+    "plasma-welcome.desktop",
+    "org.kde.plasma-welcome.desktop",
+    "org.kde.welcome.desktop",
 )
 LIVE_UNITS = (
     "live-config.service",
@@ -165,27 +168,49 @@ def _strip_gdm_autologin_file(path: str) -> None:
             fh.write(new)
 
 
+_SDDM_AUTOLOGIN_RE = re.compile(r"(?im)^(User|Session|Relogin)\s*=.*\n?")
+
+
+def _strip_sddm_autologin_file(path: str) -> None:
+    if not os.path.isfile(path):
+        return
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    new = _SDDM_AUTOLOGIN_RE.sub("", text)
+    if new != text:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(new)
+
+
+def _strip_named_dropins(folder: str, strip: Callable[[str], None]) -> None:
+    if not os.path.isdir(folder):
+        return
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return
+    for name in names:
+        path = os.path.join(folder, name)
+        lower = name.lower()
+        if "live" in lower or "autologin" in lower:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+        else:
+            strip(path)
+
+
 def strip_live_autologin(root: str) -> None:
     casper.strip_live_autologin(root)
     gdm3 = os.path.join(root, "etc", "gdm3")
     _strip_gdm_autologin_file(os.path.join(gdm3, "daemon.conf"))
     _strip_gdm_autologin_file(os.path.join(gdm3, "custom.conf"))
-    drop = os.path.join(gdm3, "daemon.conf.d")
-    if os.path.isdir(drop):
-        try:
-            names = os.listdir(drop)
-        except OSError:
-            names = []
-        for name in names:
-            path = os.path.join(drop, name)
-            lower = name.lower()
-            if "live" in lower or "autologin" in lower:
-                try:
-                    os.unlink(path)
-                except OSError:
-                    pass
-            else:
-                _strip_gdm_autologin_file(path)
+    _strip_named_dropins(os.path.join(gdm3, "daemon.conf.d"), _strip_gdm_autologin_file)
+    _strip_sddm_autologin_file(os.path.join(root, "etc", "sddm.conf"))
+    _strip_named_dropins(
+        os.path.join(root, "etc", "sddm.conf.d"), _strip_sddm_autologin_file
+    )
     autostart = os.path.join(root, "etc", "xdg", "autostart")
     apps = os.path.join(root, "usr", "share", "applications")
     for folder in (autostart, apps):

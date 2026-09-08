@@ -103,8 +103,18 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	if deb.DefaultEdition().SHA256 == nil || *deb.DefaultEdition().SizeBytes != 3800989696 {
 		t.Fatalf("debian size %v", deb.DefaultEdition().SizeBytes)
 	}
+	if len(deb.Editions) != 2 {
+		t.Fatalf("debian editions %d", len(deb.Editions))
+	}
+	plasma := deb.Edition("plasma")
+	if plasma == nil || plasma.Install == nil || *plasma.Install != "debian-13-plasma" || *plasma.SizeBytes != 4186112000 {
+		t.Fatalf("debian plasma %+v", plasma)
+	}
 	if deb.SuggestedDefault {
 		t.Fatalf("nothing should be a suggested default")
+	}
+	if cat.Distro("nobara") != nil {
+		t.Fatal("nobara must not be official")
 	}
 	if len(cat.Distros) != 4 {
 		t.Fatalf("official catalog should be Ubuntu GNOME + Linux Mint + Fedora + Debian, got %d", len(cat.Distros))
@@ -222,6 +232,29 @@ func TestBuildShop(t *testing.T) {
 	debEd := debianShop.Recommended[0].Editions[0]
 	if !debEd.Local || debEd.File != "images/debian-live-13.6.0-amd64-gnome.iso" {
 		t.Fatalf("debian edition %+v", debEd)
+	}
+	if len(debianShop.Recommended[0].Editions) != 2 {
+		t.Fatalf("debian shop editions %d", len(debianShop.Recommended[0].Editions))
+	}
+	plasmaShop, err := BuildShop(cat, []string{"debian:plasma"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plasmaShop.Recommended) != 1 || plasmaShop.Recommended[0].Install != "debian-13-gnome" {
+		t.Fatalf("debian distro install %s", plasmaShop.Recommended[0].Install)
+	}
+	debs := plasmaShop.Recommended[0].Editions
+	if len(debs) != 2 || debs[0].ID != "plasma" || !debs[0].Local || debs[0].Install != "debian-13-plasma" {
+		t.Fatalf("ticked plasma %+v", debs)
+	}
+	if debs[0].File != "images/debian-live-13.6.0-amd64-kde.iso" {
+		t.Fatalf("debian plasma file %s", debs[0].File)
+	}
+	if debs[1].ID != "gnome" || debs[1].Local || debs[1].Install != "" {
+		t.Fatalf("unticked gnome should inherit distro install, got %+v", debs[1])
+	}
+	if _, err := BuildShop(cat, []string{"nobara:gnome"}); err == nil {
+		t.Fatal("nobara must not be a creator tick")
 	}
 	if _, err := BuildShop(cat, nil); err == nil {
 		t.Fatalf("empty selection must be rejected")

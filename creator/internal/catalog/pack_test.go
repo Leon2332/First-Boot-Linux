@@ -245,7 +245,7 @@ func TestReservedPackID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ReservedPackID("ubuntu", off) || !ReservedPackID("ubuntu-2604", off) || !ReservedPackID("ubuntu-2604-gnome", off) || !ReservedPackID("ubuntu-calamares-2604", off) {
+	if !ReservedPackID("ubuntu", off) || !ReservedPackID("ubuntu-2604", off) || !ReservedPackID("ubuntu-2604-gnome", off) || !ReservedPackID("ubuntu-autoinstall", off) {
 		t.Fatal("ubuntu is reserved")
 	}
 	if !ReservedPackID("linux-mint", off) || !ReservedPackID("mint-223-cinnamon", off) || !ReservedPackID("mint-223-mate", off) || !ReservedPackID("mint-223-xfce", off) || !ReservedPackID("mint-223", off) {
@@ -254,11 +254,17 @@ func TestReservedPackID(t *testing.T) {
 	if !ReservedPackID("fedora", off) || !ReservedPackID("fedora-44-plasma", off) || !ReservedPackID("fedora-44-gnome", off) || !ReservedPackID("fedora-kickstart", off) {
 		t.Fatal("fedora ids are reserved")
 	}
-	if !ReservedPackID("debian", off) || !ReservedPackID("debian-13-gnome", off) || !ReservedPackID("debian-preseed", off) {
+	if !ReservedPackID("debian", off) || !ReservedPackID("debian-13-gnome", off) || !ReservedPackID("debian-13-plasma", off) {
 		t.Fatal("debian is reserved")
 	}
-	if ReservedPackID("pop-os", off) {
-		t.Fatal("pop-os should be allowed")
+	for _, id := range []string{
+		"nobara", "nobara-44-plasma", "nobara-44-gnome",
+		"windows", "freebsd", "ms-windows",
+		"ubuntu-calamares-2604", "debian-preseed", "pop-os",
+	} {
+		if ReservedPackID(id, off) {
+			t.Fatalf("%s must not be reserved; it is not shipped", id)
+		}
 	}
 }
 

@@ -21,6 +21,7 @@ if CHOOSER_DIR not in sys.path:
 from firstboot.disk import Disk, Partition, parse_helper_line, part_path  # noqa: E402
 from firstboot.osinstall import (  # noqa: E402
     DRIVER_DEBIAN_GNOME,
+    DRIVER_DEBIAN_PLASMA,
     DRIVER_FEDORA_GNOME,
     DRIVER_FEDORA_PLASMA,
     DRIVER_MINT_CINNAMON,
@@ -158,6 +159,13 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(get_driver("debian-13-gnome").display_manager, "gdm")
         self.assertEqual(get_driver("debian-13-gnome").unpack_kind, "live-single")
         self.assertEqual(get_driver("debian-13-gnome").live_usernames, ("user",))
+        self.assertEqual(DRIVER_DEBIAN_PLASMA, "debian-13-plasma")
+        self.assertTrue(is_native_driver(get_driver("debian-13-plasma")))
+        self.assertEqual(get_driver("debian-13-plasma").display_manager, "sddm")
+        self.assertEqual(get_driver("debian-13-plasma").unpack_kind, "live-single")
+        self.assertEqual(get_driver("debian-13-plasma").live_usernames, ("user",))
+        self.assertIsNone(get_driver("nobara-44-gnome"))
+        self.assertIsNone(get_driver("nobara-44-plasma"))
         self.assertIsNone(get_driver("ubuntu-2604"))
         self.assertIsNone(get_driver("ubuntu-autoinstall"))
         self.assertIsNone(get_driver("ubuntu-calamares-2604"))

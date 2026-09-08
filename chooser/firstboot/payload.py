@@ -16,14 +16,13 @@ DEFAULT_PAYLOAD = "/run/payload"
 FAMILIES = frozenset(
     {"ubuntu", "mint", "fedora", "debian", "suse", "windows", "bsd", "other"}
 )
-# Baked-in native driver plus reserved ids (old trampolines, windows/bsd).
-# Reserved ids parse in catalog.json but have no Python driver.
+# Baked-in native drivers plus old trampoline ids of shipped distros
+# (no Python driver). Unshipped ids are not listed; a shop pack may use them.
 INSTALL_DRIVERS = frozenset(
     {
         "ubuntu-2604-gnome",
         "ubuntu-2604",
         "ubuntu-autoinstall",
-        "ubuntu-calamares-2604",
         "mint-223-cinnamon",
         "mint-223-mate",
         "mint-223-xfce",
@@ -33,9 +32,7 @@ INSTALL_DRIVERS = frozenset(
         "fedora-44-gnome",
         "fedora-kickstart",
         "debian-13-gnome",
-        "debian-preseed",
-        "windows",
-        "freebsd",
+        "debian-13-plasma",
     }
 )
 ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")

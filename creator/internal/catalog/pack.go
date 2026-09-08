@@ -22,28 +22,23 @@ const (
 	maxPackLocaleBytes = 512 << 10
 )
 
-// ReservedInstallIDs are baked-in or reserved catalog install ids. A shop
-// pack must not reuse them. ubuntu-2604-gnome, mint-223-{cinnamon,mate,xfce},
-// fedora-44-plasma, fedora-44-gnome, and debian-13-gnome are live native
-// drivers; the other ubuntu/mint/fedora/debian ids are retired trampolines
-// kept reserved so packs cannot claim them.
+// ReservedInstallIDs are install ids we ship, plus old trampoline aliases of
+// those same distros. A shop pack must not reuse them. Do not reserve ids we
+// do not ship (nobara, windows, freebsd, ubuntu-calamares-2604, debian-preseed).
 var ReservedInstallIDs = map[string]bool{
-	"ubuntu-2604-gnome":     true,
-	"ubuntu-2604":           true,
-	"ubuntu-autoinstall":    true,
-	"ubuntu-calamares-2604": true,
-	"mint-223-cinnamon":     true,
-	"mint-223-mate":         true,
-	"mint-223-xfce":         true,
-	"mint-223":              true,
-	"mint":                  true,
-	"fedora-44-plasma":      true,
-	"fedora-44-gnome":       true,
-	"fedora-kickstart":      true,
-	"debian-13-gnome":       true,
-	"debian-preseed":        true,
-	"windows":               true,
-	"freebsd":               true,
+	"ubuntu-2604-gnome":  true,
+	"ubuntu-2604":        true,
+	"ubuntu-autoinstall": true,
+	"mint-223-cinnamon":  true,
+	"mint-223-mate":      true,
+	"mint-223-xfce":      true,
+	"mint-223":           true,
+	"mint":               true,
+	"fedora-44-plasma":   true,
+	"fedora-44-gnome":    true,
+	"fedora-kickstart":   true,
+	"debian-13-gnome":    true,
+	"debian-13-plasma":   true,
 }
 
 type Pack struct {
@@ -165,9 +160,6 @@ func PackByID(packs []*Pack, id string) *Pack {
 func ReservedPackID(id string, off *Official) bool {
 	id = strings.TrimSpace(id)
 	if id == "" || ReservedInstallIDs[id] {
-		return true
-	}
-	if id == "ms-windows" {
 		return true
 	}
 	if off != nil && off.Distro(id) != nil {

@@ -19,8 +19,9 @@ Do not reboot into Subiquity, Calamares, Ubiquity, or Anaconda.
 | `fedora_44_plasma.py` | `fedora-44-plasma` | Native fedora-erofs (Fedora 44 KDE Plasma: Anaconda live copy, ESP+/boot+btrfs, plasmalogin). **Official catalog.** |
 | `fedora_44_gnome.py` | `fedora-44-gnome` | Native fedora-erofs (Fedora 44 Workstation GNOME: same unpack, GDM). **Official catalog.** |
 | `debian_13_gnome.py` | `debian-13-gnome` | Native live-single (Debian 13 GNOME: live-boot `live/filesystem.squashfs`, GDM, live user `user`). **Official catalog.** |
+| `debian_13_plasma.py` | `debian-13-plasma` | Native live-single (Debian 13 KDE Plasma: same unpack, SDDM). **Official catalog.** |
 
-Official `official-catalog.json` currently lists **Ubuntu GNOME**, **Mint Cinnamon / MATE / Xfce**, **Fedora Plasma / GNOME**, and **Debian GNOME**. Do not add flavors until each has a native file.
+Official `official-catalog.json` currently lists **Ubuntu GNOME**, **Mint Cinnamon / MATE / Xfce**, **Fedora Plasma / GNOME**, and **Debian GNOME / Plasma**. Do not add flavors until each has a native file.
 
 `__init__.py` is the trampoline. Native drivers (`unpack_kind`) run
 `pipeline.py`. If the disk was already wiped and the install fails, the
@@ -30,11 +31,14 @@ ISOs). Shop packs still use the legacy `boot_files` /
 `kernel_args` / `seed_files` API.
 
 Older sticks may still say `ubuntu-autoinstall`, `ubuntu-2604`, `mint`,
-`mint-223`, or `fedora-kickstart`. Those ids are reserved (no baked-in
-driver). Ubuntu GNOME on a **new** stick is `ubuntu-2604-gnome`. Mint
-editions are `mint-223-cinnamon`, `mint-223-mate`, and `mint-223-xfce`.
-Fedora Plasma is `fedora-44-plasma`. Fedora GNOME is `fedora-44-gnome`.
-Debian GNOME is `debian-13-gnome`. `debian-preseed` stays reserved (no driver).
+`mint-223`, or `fedora-kickstart`. Those ids belong to shipped distros
+(no baked-in driver). Ubuntu GNOME on a **new** stick is
+`ubuntu-2604-gnome`. Mint editions are `mint-223-cinnamon`,
+`mint-223-mate`, and `mint-223-xfce`. Fedora Plasma is
+`fedora-44-plasma`. Fedora GNOME is `fedora-44-gnome`. Debian GNOME is
+`debian-13-gnome`. Debian Plasma is `debian-13-plasma`. Do not reserve
+ids we do not ship (`nobara`, `windows`, `freebsd`,
+`ubuntu-calamares-2604`, `debian-preseed`); a shop pack may use them.
 
 ## Adding an official ISO
 

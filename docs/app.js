@@ -218,6 +218,17 @@
       ],
     },
     {
+      id: "nobara",
+      name: "Nobara",
+      desktop: "GNOME",
+      tagline: "Gaming-ready GNOME desktop",
+      desc: "Fedora with extra drivers, codecs, and a GNOME desktop. Built for games and everyday use.",
+      version: "44",
+      local: false,
+      logo: LOGO("nobara"),
+      desktops: [{ id: "gnome", name: "GNOME", size: "~6.7 GB", local: false }],
+    },
+    {
       id: "debian",
       name: "Debian",
       desktop: "GNOME",

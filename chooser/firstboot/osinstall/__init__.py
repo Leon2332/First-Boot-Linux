@@ -5,8 +5,8 @@ session, health-check, then drop First Boot. Official catalog is Ubuntu
 26.04 GNOME (``ubuntu_2604_gnome.py``), Linux Mint 22.3 Cinnamon,
 MATE, and Xfce (``mint_223_cinnamon.py``, ``mint_223_mate.py``,
 ``mint_223_xfce.py``), Fedora 44 Plasma (``fedora_44_plasma.py``),
-Fedora 44 GNOME (``fedora_44_gnome.py``), and Debian 13 GNOME
-(``debian_13_gnome.py``).
+Fedora 44 GNOME (``fedora_44_gnome.py``), Debian 13 GNOME
+(``debian_13_gnome.py``), and Debian 13 Plasma (``debian_13_plasma.py``).
 Shop packs still use the legacy ``boot_files`` / ``kernel_args`` /
 ``seed_files`` API.
 
@@ -57,6 +57,7 @@ from firstboot.payload import (
 
 from . import (
     debian_13_gnome,
+    debian_13_plasma,
     fedora_44_gnome,
     fedora_44_plasma,
     mint_223_cinnamon,
@@ -93,6 +94,7 @@ _DRIVER_MODULES = (
     fedora_44_plasma,
     fedora_44_gnome,
     debian_13_gnome,
+    debian_13_plasma,
 )
 
 
@@ -115,6 +117,7 @@ DRIVER_MINT_XFCE = mint_223_xfce.ID
 DRIVER_FEDORA_PLASMA = fedora_44_plasma.ID
 DRIVER_FEDORA_GNOME = fedora_44_gnome.ID
 DRIVER_DEBIAN_GNOME = debian_13_gnome.ID
+DRIVER_DEBIAN_PLASMA = debian_13_plasma.ID
 
 _casper_boot_files = casper_boot_files
 _CUSTOM_DRIVERS: dict[str, object] = {}

@@ -30,6 +30,7 @@ class AssetTests(unittest.TestCase):
         self.assertTrue(find_logo("ubuntu"))
         self.assertTrue(find_logo("linux-mint"))
         self.assertTrue(find_logo("debian"))
+        self.assertTrue(find_logo("nobara"))
         unknown = find_logo("unknown")
         self.assertTrue(unknown)
         self.assertTrue(unknown.endswith("unknown.png"))

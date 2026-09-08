@@ -73,7 +73,7 @@
           "description": "We may copy an official edition onto payload/images/. False for licenses that forbid redistribution (e.g. MS Windows). Independent of install."
         },
         "install": {
-          "description": "Install driver id, or null if we cannot install this distro yet. windows and freebsd are reserved; no driver yet.",
+          "description": "Install driver id, or null if we cannot install this distro yet. Official catalog lists only shipped native drivers.",
           "anyOf": [
             {
               "type": "string",
@@ -85,9 +85,7 @@
                 "fedora-44-plasma",
                 "fedora-44-gnome",
                 "debian-13-gnome",
-                "debian-preseed",
-                "windows",
-                "freebsd"
+                "debian-13-plasma"
               ]
             },
             { "type": "null" }

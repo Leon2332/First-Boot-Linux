@@ -20,19 +20,23 @@ from firstboot.installlocale import InstallLocale  # noqa: E402
 from firstboot.osinstall.common import (  # noqa: E402
     InstalledDisk,
     OsIdentity,
+    OsInstallError,
     is_native_driver,
     write_fstab,
 )
 from firstboot.osinstall.fedora import (  # noqa: E402
     BTRFS_ROOT_OPTS,
+    DRACUT_TIMEOUT,
     EROFS_MAGIC,
     FEDORA_BOOT_MIB,
     FEDORA_ESP_MIB,
     copy_fedora_esp_binaries,
+    fedora_efi_paths,
     fedora_live_relpaths,
     image_fstype,
     initramfs_contains_live,
     partition_fedora_disk,
+    rebuild_initramfs,
     strip_live_dracut_conf,
     write_esp_grub_stub,
 )
@@ -216,6 +220,62 @@ class Fedora44PlasmaTests(unittest.TestCase):
             shutil.rmtree(iso, ignore_errors=True)
             shutil.rmtree(efi, ignore_errors=True)
 
+    def test_iso_boot_only_uses_unpacked_grub_not_gcdx64(self) -> None:
+        iso = tempfile.mkdtemp(prefix="fbl-f44-bootiso-")
+        root = tempfile.mkdtemp(prefix="fbl-f44-tree-")
+        efi = tempfile.mkdtemp(prefix="fbl-f44-esp2-")
+        try:
+            boot = os.path.join(iso, "EFI", "BOOT")
+            os.makedirs(boot)
+            with open(os.path.join(boot, "BOOTX64.EFI"), "wb") as fh:
+                fh.write(b"live-shim")
+            with open(os.path.join(boot, "grubx64.efi"), "wb") as fh:
+                fh.write(b"gcdx64")
+            shim, grub, mm = fedora_efi_paths(iso)
+            self.assertEqual((shim, grub, mm), ("", "", ""))
+
+            packaged = os.path.join(
+                root, "usr", "lib", "efi", "grub2", "1:2.12-63.fc44", "EFI", "fedora"
+            )
+            shim_dir = os.path.join(
+                root, "usr", "lib", "efi", "shim", "16.1-5", "EFI", "fedora"
+            )
+            os.makedirs(packaged)
+            os.makedirs(shim_dir)
+            with open(os.path.join(packaged, "grubx64.efi"), "wb") as fh:
+                fh.write(b"installed-grub")
+            with open(os.path.join(shim_dir, "shimx64.efi"), "wb") as fh:
+                fh.write(b"installed-shim")
+            with open(os.path.join(shim_dir, "mmx64.efi"), "wb") as fh:
+                fh.write(b"installed-mm")
+
+            copy_fedora_esp_binaries(efi, iso, "fedora", target_root=root)
+            with open(os.path.join(efi, "EFI", "BOOT", "BOOTX64.EFI"), "rb") as fh:
+                self.assertEqual(fh.read(), b"installed-shim")
+            with open(os.path.join(efi, "EFI", "fedora", "grubx64.efi"), "rb") as fh:
+                self.assertEqual(fh.read(), b"installed-grub")
+            self.assertFalse(os.path.isfile(os.path.join(efi, "EFI", "BOOT", "grubx64.efi")))
+        finally:
+            shutil.rmtree(iso, ignore_errors=True)
+            shutil.rmtree(root, ignore_errors=True)
+            shutil.rmtree(efi, ignore_errors=True)
+
+    def test_iso_boot_only_without_tree_refuses_gcdx64(self) -> None:
+        iso = tempfile.mkdtemp(prefix="fbl-f44-gcd-")
+        efi = tempfile.mkdtemp(prefix="fbl-f44-gcd-esp-")
+        try:
+            boot = os.path.join(iso, "EFI", "BOOT")
+            os.makedirs(boot)
+            with open(os.path.join(boot, "BOOTX64.EFI"), "wb") as fh:
+                fh.write(b"live-shim")
+            with open(os.path.join(boot, "grubx64.efi"), "wb") as fh:
+                fh.write(b"gcdx64")
+            with self.assertRaises(OsInstallError):
+                copy_fedora_esp_binaries(efi, iso, "fedora")
+        finally:
+            shutil.rmtree(iso, ignore_errors=True)
+            shutil.rmtree(efi, ignore_errors=True)
+
     def test_configure_writes_customer_not_liveuser(self) -> None:
         root = tempfile.mkdtemp(prefix="fbl-f44-root-")
         efi = tempfile.mkdtemp(prefix="fbl-f44-efi-")
@@ -345,7 +405,62 @@ class Fedora44PlasmaTests(unittest.TestCase):
             self.assertIn("omit_dracutmodules", text)
             self.assertIn("dmsquash-live", text)
             self.assertIn('hostonly="no"', text)
+            self.assertIn('dracut_rescue_image="no"', text)
+            self.assertIn("omit_drivers", text)
+            self.assertIn("nvidia", text)
             self.assertNotIn("add_dracutmodules", text)
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_rebuild_initramfs_skips_nested_dracut(self) -> None:
+        root = tempfile.mkdtemp(prefix="fbl-f44-rebuild-")
+        try:
+            boot = os.path.join(root, "boot")
+            os.makedirs(boot)
+            ver = "6.19.10-300.fc44.x86_64"
+            open(os.path.join(boot, f"vmlinuz-{ver}"), "wb").close()
+            open(os.path.join(boot, f"initramfs-{ver}.img"), "wb").close()
+            os.makedirs(os.path.join(root, "usr", "lib", "modules", ver))
+            os.makedirs(os.path.join(root, "etc", "dracut.conf.d"))
+            disk = InstalledDisk(
+                disk="/dev/vda",
+                esp_dev="/dev/vda1",
+                root_dev="/dev/vda3",
+                esp_uuid="ESP",
+                root_uuid="ROOT",
+                esp_mp="/mnt/efi",
+                root_mp=root,
+                boot_uuid="BOOT",
+            )
+            calls: list[tuple[list[str], int]] = []
+
+            def fake_chroot(_root: str, argv: list[str], **kwargs: object) -> tuple[int, str]:
+                calls.append((list(argv), int(kwargs.get("timeout") or 0)))
+                return 0, ""
+
+            with (
+                mock.patch(
+                    "firstboot.osinstall.fedora.chroot_run", side_effect=fake_chroot
+                ),
+                mock.patch(
+                    "firstboot.osinstall.fedora._pin_proc_cmdline", return_value=""
+                ),
+                mock.patch(
+                    "firstboot.osinstall.fedora.initramfs_contains_live",
+                    return_value=False,
+                ),
+                mock.patch("firstboot.osinstall.fedora.os.geteuid", return_value=0),
+            ):
+                rebuild_initramfs(root, disk)
+            self.assertTrue(calls)
+            self.assertEqual(calls[0][0][0], "env")
+            self.assertIn("KERNEL_INSTALL_INITRD_GENERATOR=none", calls[0][0])
+            self.assertIn("kernel-install", calls[0][0])
+            self.assertEqual(calls[0][1], DRACUT_TIMEOUT)
+            dracut = [c for c in calls if c[0] and c[0][0] == "dracut"]
+            self.assertTrue(dracut)
+            self.assertEqual(dracut[0][1], DRACUT_TIMEOUT)
+            self.assertGreaterEqual(DRACUT_TIMEOUT, 3600)
         finally:
             shutil.rmtree(root, ignore_errors=True)
 

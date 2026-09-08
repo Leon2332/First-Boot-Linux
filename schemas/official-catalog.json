@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-09-07",
+  "updated": "2026-09-08",
   "distros": [
     {
       "id": "ubuntu",
@@ -125,6 +125,16 @@
           "url": "https://cdimage.debian.org/cdimage/release/13.6.0-live/amd64/iso-hybrid/debian-live-13.6.0-amd64-gnome.iso",
           "sha256": "1aa47465568cfc259b93ea7687a510d7f109df766daabbc69139ed99a25a71c9",
           "size_bytes": 3800989696
+        },
+        {
+          "id": "plasma",
+          "name": "KDE Plasma",
+          "default": false,
+          "install": "debian-13-plasma",
+          "filename": "debian-live-13.6.0-amd64-kde.iso",
+          "url": "https://cdimage.debian.org/cdimage/release/13.6.0-live/amd64/iso-hybrid/debian-live-13.6.0-amd64-kde.iso",
+          "sha256": "426984f7edf034f4cd49f6218e706a6086588359d34fa0328676451b4a679639",
+          "size_bytes": 4186112000
         }
       ]
     }

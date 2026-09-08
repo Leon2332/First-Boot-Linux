@@ -62,6 +62,7 @@ LIVE_UNITS = (
 LIVE_DESKTOPS = (
     "liveinst.desktop",
     "anaconda.desktop",
+    "calamares.desktop",
     "plasma-setup.desktop",
     "org.fedoraproject.AnacondaInstaller.desktop",
     "gnome-initial-setup-first-login.desktop",
@@ -94,6 +95,19 @@ LIVE_DRACUT_OMIT = (
     "livenet",
 )
 
+# Some Fedora-family live images ship proprietary nvidia.ko plus a large
+# GSP firmware tree. --no-hostonly would pull all of that into the
+# initramfs. Unencrypted root loads nvidia from the real root after
+# switch_root. kernel-install/dracut can take longer than 300s.
+DRACUT_TIMEOUT = 3600
+NVIDIA_DRACUT_OMIT = (
+    "nvidia",
+    "nvidia-drm",
+    "nvidia-modeset",
+    "nvidia-uvm",
+    "nvidia-peermem",
+)
+
 # Anaconda uses hostonly only when dracut runs on the installed OS.
 # We chroot from Ubuntu: /proc is FBL. dracut(8): if chrooted to another
 # root, use --fstab. Image installs use -N --persistent-policy by-uuid.
@@ -101,6 +115,8 @@ DRACUT_CONF = (
     'hostonly="no"\n'
     'persistent_policy="by-uuid"\n'
     'omit_dracutmodules+=" ' + " ".join(LIVE_DRACUT_OMIT) + ' "\n'
+    'omit_drivers+=" ' + " ".join(NVIDIA_DRACUT_OMIT) + ' "\n'
+    'dracut_rescue_image="no"\n'
 )
 
 CLEAR_ENFORCING0 = """#!/bin/bash
@@ -915,11 +931,20 @@ def rebuild_initramfs(
     pinned = _pin_proc_cmdline(root, cmdline, log=log)
     try:
         vmlinuz = _module_vmlinuz(root, ver)
+        # kernel-install's 50-dracut.install would run a second no-hostonly
+        # rebuild. BLS is written above; we run dracut ourselves.
         code, _out = chroot_run(
             root,
-            ["kernel-install", "add", ver, vmlinuz],
+            [
+                "env",
+                "KERNEL_INSTALL_INITRD_GENERATOR=none",
+                "kernel-install",
+                "add",
+                ver,
+                vmlinuz,
+            ],
             log=log,
-            timeout=300,
+            timeout=DRACUT_TIMEOUT,
         )
         if code != 0 and log:
             log.write("kernel-install add failed; keeping written BLS")
@@ -942,11 +967,11 @@ def rebuild_initramfs(
                 dest,
             ],
             log=log,
-            timeout=300,
+            timeout=DRACUT_TIMEOUT,
         )
         if code != 0:
             if log:
-                log.write("dracut failed")
+                log.write("dracut failed" + (f": {_out[-200:]}" if _out else ""))
             if os.geteuid() == 0:
                 raise OsInstallError(_("Could not build the boot files."))
             return
@@ -1065,19 +1090,38 @@ def configure_fedora(
         unbind_chroot(mounted)
 
 
-def fedora_efi_paths(iso_mnt: str) -> tuple[str, str, str]:
-    """Fedora shim + installed grubx64 + MokManager. Never gcdx64."""
-    shim = grub = mm = ""
+def _find_tree_efi(root: str, package: str, name: str) -> str:
+    """Packaged EFI binary under ``/usr/lib/efi/<package>/*/EFI/<vendor>/``."""
+    base = os.path.join(root, "usr", "lib", "efi", package)
+    if not os.path.isdir(base):
+        return ""
+    hits: list[str] = []
+    try:
+        for dirpath, _dirnames, filenames in os.walk(base):
+            if name in filenames:
+                hits.append(os.path.join(dirpath, name))
+    except OSError:
+        return ""
+    if not hits:
+        return ""
+    for path in sorted(hits):
+        lower = path.replace("\\", "/").lower()
+        if "/efi/fedora/" in lower:
+            return path
+    return hits[0]
+
+
+def fedora_efi_paths(iso_mnt: str, target_root: str = "") -> tuple[str, str, str]:
+    """Fedora shim + installed grubx64 + MokManager. Never gcdx64.
+
+    If the ISO has only live ``EFI/BOOT/`` (removable GRUB), the installed
+    grub lives in the unpacked tree under ``/usr/lib/efi/grub2``.
+    """
     pairs = (
         (
             os.path.join(iso_mnt, "EFI", "fedora", "shimx64.efi"),
             os.path.join(iso_mnt, "EFI", "fedora", "grubx64.efi"),
             os.path.join(iso_mnt, "EFI", "fedora", "mmx64.efi"),
-        ),
-        (
-            os.path.join(iso_mnt, "EFI", "BOOT", "BOOTX64.EFI"),
-            os.path.join(iso_mnt, "EFI", "BOOT", "grubx64.efi"),
-            os.path.join(iso_mnt, "EFI", "BOOT", "mmx64.efi"),
         ),
         (
             os.path.join(iso_mnt, "efi", "fedora", "shimx64.efi"),
@@ -1087,11 +1131,21 @@ def fedora_efi_paths(iso_mnt: str) -> tuple[str, str, str]:
     )
     for cand_shim, cand_grub, cand_mm in pairs:
         if os.path.isfile(cand_shim) and os.path.isfile(cand_grub):
-            shim, grub = cand_shim, cand_grub
-            if os.path.isfile(cand_mm):
-                mm = cand_mm
-            break
-    return shim, grub, mm
+            mm = cand_mm if os.path.isfile(cand_mm) else ""
+            return cand_shim, cand_grub, mm
+    if target_root:
+        tree_shim = _find_tree_efi(
+            target_root, "shim", "shimx64.efi"
+        ) or _find_tree_efi(target_root, "shim", "BOOTX64.EFI")
+        tree_grub = _find_tree_efi(target_root, "grub2", "grubx64.efi")
+        tree_mm = _find_tree_efi(target_root, "shim", "mmx64.efi")
+        if not tree_shim:
+            iso_shim = os.path.join(iso_mnt, "EFI", "BOOT", "BOOTX64.EFI")
+            if os.path.isfile(iso_shim):
+                tree_shim = iso_shim
+        if tree_shim and tree_grub:
+            return tree_shim, tree_grub, tree_mm
+    return "", "", ""
 
 
 def write_esp_grub_stub(
@@ -1133,14 +1187,16 @@ def copy_fedora_esp_binaries(
     iso_mnt: str,
     bootloader_id: str,
     log: InstallLog | None = None,
+    target_root: str = "",
 ) -> None:
     """Put Fedora's Microsoft-signed shim + Fedora grubx64 on the ESP.
 
     Canonical GRUB will not load a Fedora kernel with Secure Boot on.
     ``EFI/BOOT/`` is shim only — extra ``.efi`` there is a first-stage
-    loader on Lenovo/Phoenix firmware.
+    loader on Lenovo/Phoenix firmware. Do not copy live ``grubx64.efi``
+    from ``EFI/BOOT/`` (gcdx64, prefix ``/boot/grub``).
     """
-    src_shim, src_grub, src_mm = fedora_efi_paths(iso_mnt)
+    src_shim, src_grub, src_mm = fedora_efi_paths(iso_mnt, target_root=target_root)
     if not src_shim or not src_grub:
         raise OsInstallError(_("Could not write the boot partition."))
     boot = os.path.join(efi_mp, "EFI", "BOOT")
@@ -1223,7 +1279,9 @@ def install_fedora_bootloader(
     write_grub_default(target_root)
     write_bls_entry(target_root, disk, log=log)
     write_grub2_cfg(target_root, disk, log=log)
-    copy_fedora_esp_binaries(efi_mp, iso_mnt, bootloader_id, log=log)
+    copy_fedora_esp_binaries(
+        efi_mp, iso_mnt, bootloader_id, log=log, target_root=target_root
+    )
     write_esp_grub_stub(
         efi_mp,
         bootloader_id,
