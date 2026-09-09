@@ -2,8 +2,8 @@
 
 Debian live images are not casper. Do not reboot into Calamares or
 debian-installer. Copy Debian's signed shim + grub, not Canonical GRUB.
-GNOME and later desktops each have their own ISO file; they call these
-steps.
+GNOME, Plasma, Cinnamon, and MATE each have their own ISO file; they
+call these steps. Cinnamon and MATE use LightDM (stripped via casper).
 """
 
 from __future__ import annotations

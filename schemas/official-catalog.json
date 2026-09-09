@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-09-08",
+  "updated": "2026-09-09",
   "distros": [
     {
       "id": "ubuntu",
@@ -135,6 +135,26 @@
           "url": "https://cdimage.debian.org/cdimage/release/13.6.0-live/amd64/iso-hybrid/debian-live-13.6.0-amd64-kde.iso",
           "sha256": "426984f7edf034f4cd49f6218e706a6086588359d34fa0328676451b4a679639",
           "size_bytes": 4186112000
+        },
+        {
+          "id": "cinnamon",
+          "name": "Cinnamon",
+          "default": false,
+          "install": "debian-13-cinnamon",
+          "filename": "debian-live-13.6.0-amd64-cinnamon.iso",
+          "url": "https://cdimage.debian.org/cdimage/release/13.6.0-live/amd64/iso-hybrid/debian-live-13.6.0-amd64-cinnamon.iso",
+          "sha256": "6427d30a7d12b3e8adab14b2ef16f743bfa4b93980cc8205dab71a69e7ffc139",
+          "size_bytes": 4115103744
+        },
+        {
+          "id": "mate",
+          "name": "MATE",
+          "default": false,
+          "install": "debian-13-mate",
+          "filename": "debian-live-13.6.0-amd64-mate.iso",
+          "url": "https://cdimage.debian.org/cdimage/release/13.6.0-live/amd64/iso-hybrid/debian-live-13.6.0-amd64-mate.iso",
+          "sha256": "ca7bbc36b3afd33c1bcc4b309497a3073e87b10246c7c29e7ef64e6dedb7f537",
+          "size_bytes": 3960668160
         }
       ]
     }

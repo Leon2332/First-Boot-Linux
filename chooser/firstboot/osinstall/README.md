@@ -20,8 +20,10 @@ Do not reboot into Subiquity, Calamares, Ubiquity, or Anaconda.
 | `fedora_44_gnome.py` | `fedora-44-gnome` | Native fedora-erofs (Fedora 44 Workstation GNOME: same unpack, GDM). **Official catalog.** |
 | `debian_13_gnome.py` | `debian-13-gnome` | Native live-single (Debian 13 GNOME: live-boot `live/filesystem.squashfs`, GDM, live user `user`). **Official catalog.** |
 | `debian_13_plasma.py` | `debian-13-plasma` | Native live-single (Debian 13 KDE Plasma: same unpack, SDDM). **Official catalog.** |
+| `debian_13_cinnamon.py` | `debian-13-cinnamon` | Native live-single (Debian 13 Cinnamon: same unpack, LightDM). **Official catalog.** |
+| `debian_13_mate.py` | `debian-13-mate` | Native live-single (Debian 13 MATE: same unpack, LightDM). **Official catalog.** |
 
-Official `official-catalog.json` currently lists **Ubuntu GNOME**, **Mint Cinnamon / MATE / Xfce**, **Fedora Plasma / GNOME**, and **Debian GNOME / Plasma**. Do not add flavors until each has a native file.
+Official `official-catalog.json` currently lists **Ubuntu GNOME**, **Mint Cinnamon / MATE / Xfce**, **Fedora Plasma / GNOME**, and **Debian GNOME / Plasma / Cinnamon / MATE**. Do not add flavors until each has a native file.
 
 `__init__.py` is the trampoline. Native drivers (`unpack_kind`) run
 `pipeline.py`. If the disk was already wiped and the install fails, the
@@ -36,7 +38,8 @@ Older sticks may still say `ubuntu-autoinstall`, `ubuntu-2604`, `mint`,
 `ubuntu-2604-gnome`. Mint editions are `mint-223-cinnamon`,
 `mint-223-mate`, and `mint-223-xfce`. Fedora Plasma is
 `fedora-44-plasma`. Fedora GNOME is `fedora-44-gnome`. Debian GNOME is
-`debian-13-gnome`. Debian Plasma is `debian-13-plasma`. Do not reserve
+`debian-13-gnome`. Debian Plasma is `debian-13-plasma`. Debian Cinnamon
+is `debian-13-cinnamon`. Debian MATE is `debian-13-mate`. Do not reserve
 ids we do not ship (`nobara`, `windows`, `freebsd`,
 `ubuntu-calamares-2604`, `debian-preseed`); a shop pack may use them.
 

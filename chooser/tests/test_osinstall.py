@@ -20,7 +20,9 @@ if CHOOSER_DIR not in sys.path:
 
 from firstboot.disk import Disk, Partition, parse_helper_line, part_path  # noqa: E402
 from firstboot.osinstall import (  # noqa: E402
+    DRIVER_DEBIAN_CINNAMON,
     DRIVER_DEBIAN_GNOME,
+    DRIVER_DEBIAN_MATE,
     DRIVER_DEBIAN_PLASMA,
     DRIVER_FEDORA_GNOME,
     DRIVER_FEDORA_PLASMA,
@@ -164,6 +166,16 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(get_driver("debian-13-plasma").display_manager, "sddm")
         self.assertEqual(get_driver("debian-13-plasma").unpack_kind, "live-single")
         self.assertEqual(get_driver("debian-13-plasma").live_usernames, ("user",))
+        self.assertEqual(DRIVER_DEBIAN_CINNAMON, "debian-13-cinnamon")
+        self.assertTrue(is_native_driver(get_driver("debian-13-cinnamon")))
+        self.assertEqual(get_driver("debian-13-cinnamon").display_manager, "lightdm")
+        self.assertEqual(get_driver("debian-13-cinnamon").unpack_kind, "live-single")
+        self.assertEqual(get_driver("debian-13-cinnamon").live_usernames, ("user",))
+        self.assertEqual(DRIVER_DEBIAN_MATE, "debian-13-mate")
+        self.assertTrue(is_native_driver(get_driver("debian-13-mate")))
+        self.assertEqual(get_driver("debian-13-mate").display_manager, "lightdm")
+        self.assertEqual(get_driver("debian-13-mate").unpack_kind, "live-single")
+        self.assertEqual(get_driver("debian-13-mate").live_usernames, ("user",))
         self.assertIsNone(get_driver("nobara-44-gnome"))
         self.assertIsNone(get_driver("nobara-44-plasma"))
         self.assertIsNone(get_driver("ubuntu-2604"))

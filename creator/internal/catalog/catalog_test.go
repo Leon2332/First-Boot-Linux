@@ -103,12 +103,20 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	if deb.DefaultEdition().SHA256 == nil || *deb.DefaultEdition().SizeBytes != 3800989696 {
 		t.Fatalf("debian size %v", deb.DefaultEdition().SizeBytes)
 	}
-	if len(deb.Editions) != 2 {
+	if len(deb.Editions) != 4 {
 		t.Fatalf("debian editions %d", len(deb.Editions))
 	}
 	plasma := deb.Edition("plasma")
 	if plasma == nil || plasma.Install == nil || *plasma.Install != "debian-13-plasma" || *plasma.SizeBytes != 4186112000 {
 		t.Fatalf("debian plasma %+v", plasma)
+	}
+	debCinnamon := deb.Edition("cinnamon")
+	if debCinnamon == nil || debCinnamon.Install == nil || *debCinnamon.Install != "debian-13-cinnamon" || *debCinnamon.SizeBytes != 4115103744 {
+		t.Fatalf("debian cinnamon %+v", debCinnamon)
+	}
+	debMate := deb.Edition("mate")
+	if debMate == nil || debMate.Install == nil || *debMate.Install != "debian-13-mate" || *debMate.SizeBytes != 3960668160 {
+		t.Fatalf("debian mate %+v", debMate)
 	}
 	if deb.SuggestedDefault {
 		t.Fatalf("nothing should be a suggested default")
@@ -233,7 +241,7 @@ func TestBuildShop(t *testing.T) {
 	if !debEd.Local || debEd.File != "images/debian-live-13.6.0-amd64-gnome.iso" {
 		t.Fatalf("debian edition %+v", debEd)
 	}
-	if len(debianShop.Recommended[0].Editions) != 2 {
+	if len(debianShop.Recommended[0].Editions) != 4 {
 		t.Fatalf("debian shop editions %d", len(debianShop.Recommended[0].Editions))
 	}
 	plasmaShop, err := BuildShop(cat, []string{"debian:plasma"})
@@ -244,7 +252,7 @@ func TestBuildShop(t *testing.T) {
 		t.Fatalf("debian distro install %s", plasmaShop.Recommended[0].Install)
 	}
 	debs := plasmaShop.Recommended[0].Editions
-	if len(debs) != 2 || debs[0].ID != "plasma" || !debs[0].Local || debs[0].Install != "debian-13-plasma" {
+	if len(debs) != 4 || debs[0].ID != "plasma" || !debs[0].Local || debs[0].Install != "debian-13-plasma" {
 		t.Fatalf("ticked plasma %+v", debs)
 	}
 	if debs[0].File != "images/debian-live-13.6.0-amd64-kde.iso" {
@@ -252,6 +260,32 @@ func TestBuildShop(t *testing.T) {
 	}
 	if debs[1].ID != "gnome" || debs[1].Local || debs[1].Install != "" {
 		t.Fatalf("unticked gnome should inherit distro install, got %+v", debs[1])
+	}
+	cinnamonMateShop, err := BuildShop(cat, []string{"debian:cinnamon", "debian:mate"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cinnamonMateShop.Recommended) != 1 || cinnamonMateShop.Recommended[0].Install != "debian-13-gnome" {
+		t.Fatalf("debian distro install %s", cinnamonMateShop.Recommended[0].Install)
+	}
+	cmeds := cinnamonMateShop.Recommended[0].Editions
+	if len(cmeds) != 4 || cmeds[0].ID != "cinnamon" || !cmeds[0].Local || cmeds[0].Install != "debian-13-cinnamon" {
+		t.Fatalf("ticked cinnamon %+v", cmeds)
+	}
+	if cmeds[0].File != "images/debian-live-13.6.0-amd64-cinnamon.iso" {
+		t.Fatalf("debian cinnamon file %s", cmeds[0].File)
+	}
+	if cmeds[1].ID != "mate" || !cmeds[1].Local || cmeds[1].Install != "debian-13-mate" {
+		t.Fatalf("ticked mate %+v", cmeds[1])
+	}
+	if cmeds[1].File != "images/debian-live-13.6.0-amd64-mate.iso" {
+		t.Fatalf("debian mate file %s", cmeds[1].File)
+	}
+	if cmeds[2].ID != "gnome" || cmeds[2].Local || cmeds[2].Install != "" {
+		t.Fatalf("unticked gnome should inherit distro install, got %+v", cmeds[2])
+	}
+	if cmeds[3].ID != "plasma" || cmeds[3].Local || cmeds[3].Install != "debian-13-plasma" {
+		t.Fatalf("unticked plasma %+v", cmeds[3])
 	}
 	if _, err := BuildShop(cat, []string{"nobara:gnome"}); err == nil {
 		t.Fatal("nobara must not be a creator tick")

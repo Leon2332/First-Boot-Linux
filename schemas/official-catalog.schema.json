@@ -85,7 +85,9 @@
                 "fedora-44-plasma",
                 "fedora-44-gnome",
                 "debian-13-gnome",
-                "debian-13-plasma"
+                "debian-13-plasma",
+                "debian-13-cinnamon",
+                "debian-13-mate"
               ]
             },
             { "type": "null" }

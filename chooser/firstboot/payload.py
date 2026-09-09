@@ -33,6 +33,8 @@ INSTALL_DRIVERS = frozenset(
         "fedora-kickstart",
         "debian-13-gnome",
         "debian-13-plasma",
+        "debian-13-cinnamon",
+        "debian-13-mate",
     }
 )
 ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")

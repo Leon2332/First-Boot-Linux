@@ -254,7 +254,7 @@ func TestReservedPackID(t *testing.T) {
 	if !ReservedPackID("fedora", off) || !ReservedPackID("fedora-44-plasma", off) || !ReservedPackID("fedora-44-gnome", off) || !ReservedPackID("fedora-kickstart", off) {
 		t.Fatal("fedora ids are reserved")
 	}
-	if !ReservedPackID("debian", off) || !ReservedPackID("debian-13-gnome", off) || !ReservedPackID("debian-13-plasma", off) {
+	if !ReservedPackID("debian", off) || !ReservedPackID("debian-13-gnome", off) || !ReservedPackID("debian-13-plasma", off) || !ReservedPackID("debian-13-cinnamon", off) || !ReservedPackID("debian-13-mate", off) {
 		t.Fatal("debian is reserved")
 	}
 	for _, id := range []string{

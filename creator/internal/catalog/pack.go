@@ -39,6 +39,8 @@ var ReservedInstallIDs = map[string]bool{
 	"fedora-kickstart":   true,
 	"debian-13-gnome":    true,
 	"debian-13-plasma":   true,
+	"debian-13-cinnamon": true,
+	"debian-13-mate":     true,
 }
 
 type Pack struct {

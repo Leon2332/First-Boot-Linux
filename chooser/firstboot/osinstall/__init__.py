@@ -6,7 +6,9 @@ session, health-check, then drop First Boot. Official catalog is Ubuntu
 MATE, and Xfce (``mint_223_cinnamon.py``, ``mint_223_mate.py``,
 ``mint_223_xfce.py``), Fedora 44 Plasma (``fedora_44_plasma.py``),
 Fedora 44 GNOME (``fedora_44_gnome.py``), Debian 13 GNOME
-(``debian_13_gnome.py``), and Debian 13 Plasma (``debian_13_plasma.py``).
+(``debian_13_gnome.py``), Debian 13 Plasma (``debian_13_plasma.py``),
+Debian 13 Cinnamon (``debian_13_cinnamon.py``), and Debian 13 MATE
+(``debian_13_mate.py``).
 Shop packs still use the legacy ``boot_files`` / ``kernel_args`` /
 ``seed_files`` API.
 
@@ -56,7 +58,9 @@ from firstboot.payload import (
 )
 
 from . import (
+    debian_13_cinnamon,
     debian_13_gnome,
+    debian_13_mate,
     debian_13_plasma,
     fedora_44_gnome,
     fedora_44_plasma,
@@ -95,6 +99,8 @@ _DRIVER_MODULES = (
     fedora_44_gnome,
     debian_13_gnome,
     debian_13_plasma,
+    debian_13_cinnamon,
+    debian_13_mate,
 )
 
 
@@ -118,6 +124,8 @@ DRIVER_FEDORA_PLASMA = fedora_44_plasma.ID
 DRIVER_FEDORA_GNOME = fedora_44_gnome.ID
 DRIVER_DEBIAN_GNOME = debian_13_gnome.ID
 DRIVER_DEBIAN_PLASMA = debian_13_plasma.ID
+DRIVER_DEBIAN_CINNAMON = debian_13_cinnamon.ID
+DRIVER_DEBIAN_MATE = debian_13_mate.ID
 
 _casper_boot_files = casper_boot_files
 _CUSTOM_DRIVERS: dict[str, object] = {}
