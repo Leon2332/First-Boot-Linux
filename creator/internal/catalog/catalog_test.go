@@ -28,6 +28,21 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	if *u.DefaultEdition().SizeBytes != 6518974464 {
 		t.Fatalf("ubuntu size %v", u.DefaultEdition().SizeBytes)
 	}
+	if len(u.Editions) != 4 {
+		t.Fatalf("ubuntu editions %d", len(u.Editions))
+	}
+	uCinnamon := u.Edition("cinnamon")
+	if uCinnamon == nil || uCinnamon.Install == nil || *uCinnamon.Install != "ubuntu-2604-cinnamon" || *uCinnamon.SizeBytes != 5659195392 {
+		t.Fatalf("ubuntu cinnamon %+v", uCinnamon)
+	}
+	uBudgie := u.Edition("budgie")
+	if uBudgie == nil || uBudgie.Install == nil || *uBudgie.Install != "ubuntu-2604-budgie" || *uBudgie.SizeBytes != 4121487360 {
+		t.Fatalf("ubuntu budgie %+v", uBudgie)
+	}
+	uMate := u.Edition("mate")
+	if uMate == nil || uMate.Install == nil || *uMate.Install != "ubuntu-2404-mate" || *uMate.SizeBytes != 4518877184 {
+		t.Fatalf("ubuntu mate %+v", uMate)
+	}
 	if u.SuggestedDefault {
 		t.Fatalf("nothing should be a suggested default")
 	}
@@ -127,9 +142,9 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	if len(cat.Distros) != 4 {
 		t.Fatalf("official catalog should be Ubuntu GNOME + Linux Mint + Fedora + Debian, got %d", len(cat.Distros))
 	}
-	for _, id := range []string{"kubuntu", "lubuntu", "ubuntu-budgie", "ubuntu-mate", "xubuntu"} {
+	for _, id := range []string{"kubuntu", "lubuntu", "ubuntu-budgie", "ubuntu-mate", "ubuntu-cinnamon", "xubuntu"} {
 		if cat.Distro(id) != nil {
-			t.Fatalf("%s should not be official until it has a native installer", id)
+			t.Fatalf("%s must not be an independent official distro; Cinnamon / Budgie / MATE are Ubuntu editions", id)
 		}
 	}
 }
@@ -161,6 +176,50 @@ func TestBuildShop(t *testing.T) {
 	}
 	if ub.Install != "ubuntu-2604-gnome" {
 		t.Fatalf("install %s", ub.Install)
+	}
+	if len(ub.Editions) != 4 {
+		t.Fatalf("ubuntu shop editions %d", len(ub.Editions))
+	}
+	if ub.Editions[0].ID != "gnome" || !ub.Editions[0].Local {
+		t.Fatalf("ticked gnome %+v", ub.Editions[0])
+	}
+	if ub.Editions[1].ID != "cinnamon" || ub.Editions[1].Local || ub.Editions[1].Install != "ubuntu-2604-cinnamon" {
+		t.Fatalf("unticked cinnamon should stay a download, got %+v", ub.Editions[1])
+	}
+	if ub.Editions[2].ID != "budgie" || ub.Editions[2].Local || ub.Editions[2].Install != "ubuntu-2604-budgie" {
+		t.Fatalf("unticked budgie should stay a download, got %+v", ub.Editions[2])
+	}
+	if ub.Editions[3].ID != "mate" || ub.Editions[3].Local || ub.Editions[3].Install != "ubuntu-2404-mate" {
+		t.Fatalf("unticked mate should stay a download, got %+v", ub.Editions[3])
+	}
+	flavorShop, err := BuildShop(cat, []string{"ubuntu:cinnamon", "ubuntu:budgie", "ubuntu:mate"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(flavorShop.Recommended) != 1 || flavorShop.Recommended[0].Install != "ubuntu-2604-gnome" {
+		t.Fatalf("ubuntu distro install %s", flavorShop.Recommended[0].Install)
+	}
+	ueds := flavorShop.Recommended[0].Editions
+	if len(ueds) != 4 || ueds[0].ID != "cinnamon" || !ueds[0].Local || ueds[0].Install != "ubuntu-2604-cinnamon" {
+		t.Fatalf("ticked cinnamon %+v", ueds)
+	}
+	if ueds[0].File != "images/ubuntucinnamon-26.04-desktop-amd64.iso" {
+		t.Fatalf("ubuntu cinnamon file %s", ueds[0].File)
+	}
+	if ueds[1].ID != "budgie" || !ueds[1].Local || ueds[1].Install != "ubuntu-2604-budgie" {
+		t.Fatalf("ticked budgie %+v", ueds[1])
+	}
+	if ueds[1].File != "images/ubuntu-budgie-26.04-desktop-amd64.iso" {
+		t.Fatalf("ubuntu budgie file %s", ueds[1].File)
+	}
+	if ueds[2].ID != "mate" || !ueds[2].Local || ueds[2].Install != "ubuntu-2404-mate" {
+		t.Fatalf("ticked mate %+v", ueds[2])
+	}
+	if ueds[2].File != "images/ubuntu-mate-24.04.4-desktop-amd64.iso" {
+		t.Fatalf("ubuntu mate file %s", ueds[2].File)
+	}
+	if ueds[3].ID != "gnome" || ueds[3].Local || ueds[3].Install != "" {
+		t.Fatalf("unticked gnome should inherit distro install, got %+v", ueds[3])
 	}
 	mintShop, err := BuildShop(cat, []string{"linux-mint:cinnamon"})
 	if err != nil {

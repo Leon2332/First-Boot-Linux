@@ -664,6 +664,7 @@ def _disk() -> InstalledDisk:
 class NvramTests(unittest.TestCase):
     def test_stale_labels_include_anaconda(self) -> None:
         self.assertIn("anaconda", STALE_EFI_LABELS)
+        self.assertIn("Debian", STALE_EFI_LABELS)
 
     def test_register_os_efi_bootnext(self) -> None:
         runs: list[list[str]] = []
@@ -754,6 +755,34 @@ class CasperBootloaderTests(unittest.TestCase):
         finally:
             shutil.rmtree(efi, ignore_errors=True)
             shutil.rmtree(signed, ignore_errors=True)
+
+    def test_signed_esp_prefers_target_grub_over_fbl(self) -> None:
+        efi = tempfile.mkdtemp(prefix="fbl-esp-")
+        signed = tempfile.mkdtemp(prefix="fbl-signed-")
+        root = tempfile.mkdtemp(prefix="fbl-root-")
+        try:
+            with open(os.path.join(signed, "shimx64.efi"), "wb") as fh:
+                fh.write(b"FBL-SHIM")
+            with open(os.path.join(signed, "grubx64.efi"), "wb") as fh:
+                fh.write(b"FBL-GRUB-26")
+            shim_dir = os.path.join(root, "usr", "lib", "shim")
+            grub_dir = os.path.join(root, "usr", "lib", "grub", "x86_64-efi-signed")
+            os.makedirs(shim_dir)
+            os.makedirs(grub_dir)
+            with open(os.path.join(shim_dir, "shimx64.efi.signed"), "wb") as fh:
+                fh.write(b"MATE-SHIM")
+            with open(os.path.join(grub_dir, "grubx64.efi.signed"), "wb") as fh:
+                fh.write(b"MATE-GRUB-24")
+            with mock.patch("firstboot.osinstall.casper.SIGNED_EFI_DIR", signed):
+                copy_signed_esp_binaries(efi, "ubuntu", root=root)
+            with open(os.path.join(efi, "EFI", "ubuntu", "grubx64.efi"), "rb") as fh:
+                self.assertEqual(fh.read(), b"MATE-GRUB-24")
+            with open(os.path.join(efi, "EFI", "ubuntu", "shimx64.efi"), "rb") as fh:
+                self.assertEqual(fh.read(), b"MATE-SHIM")
+        finally:
+            shutil.rmtree(efi, ignore_errors=True)
+            shutil.rmtree(signed, ignore_errors=True)
+            shutil.rmtree(root, ignore_errors=True)
 
     def test_seed_ships_installed_grubx64_not_only_gcdx64(self) -> None:
         path = os.path.join(os.path.dirname(CHOOSER_DIR), "seed", "build-seed.sh")

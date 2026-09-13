@@ -79,6 +79,9 @@
               "type": "string",
               "enum": [
                 "ubuntu-2604-gnome",
+                "ubuntu-2604-cinnamon",
+                "ubuntu-2604-budgie",
+                "ubuntu-2404-mate",
                 "mint-223-cinnamon",
                 "mint-223-mate",
                 "mint-223-xfce",

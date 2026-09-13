@@ -245,7 +245,7 @@ func TestReservedPackID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ReservedPackID("ubuntu", off) || !ReservedPackID("ubuntu-2604", off) || !ReservedPackID("ubuntu-2604-gnome", off) || !ReservedPackID("ubuntu-autoinstall", off) {
+	if !ReservedPackID("ubuntu", off) || !ReservedPackID("ubuntu-2604", off) || !ReservedPackID("ubuntu-2604-gnome", off) || !ReservedPackID("ubuntu-2604-cinnamon", off) || !ReservedPackID("ubuntu-2604-budgie", off) || !ReservedPackID("ubuntu-2404-mate", off) || !ReservedPackID("ubuntu-autoinstall", off) {
 		t.Fatal("ubuntu is reserved")
 	}
 	if !ReservedPackID("linux-mint", off) || !ReservedPackID("mint-223-cinnamon", off) || !ReservedPackID("mint-223-mate", off) || !ReservedPackID("mint-223-xfce", off) || !ReservedPackID("mint-223", off) {

@@ -26,9 +26,12 @@ const (
 // those same distros. A shop pack must not reuse them. Do not reserve ids we
 // do not ship (nobara, windows, freebsd, ubuntu-calamares-2604, debian-preseed).
 var ReservedInstallIDs = map[string]bool{
-	"ubuntu-2604-gnome":  true,
-	"ubuntu-2604":        true,
-	"ubuntu-autoinstall": true,
+	"ubuntu-2604-gnome":    true,
+	"ubuntu-2604-cinnamon": true,
+	"ubuntu-2604-budgie":   true,
+	"ubuntu-2404-mate":     true,
+	"ubuntu-2604":          true,
+	"ubuntu-autoinstall":   true,
 	"mint-223-cinnamon":  true,
 	"mint-223-mate":      true,
 	"mint-223-xfce":      true,

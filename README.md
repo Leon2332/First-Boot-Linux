@@ -74,6 +74,7 @@ However it will come down to some or all of the following:
 - Includes a desktop environment and app center
 - Easy GUI-based installation (outside of FBL)
 - Well maintained
+- Same ISO for GPU support (AMD/Intel/NVIDIA/etc.)
 - Added benefit for consideration:
   - Official support
   - Established community (community support)

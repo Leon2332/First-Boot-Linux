@@ -466,6 +466,7 @@ STALE_EFI_LABELS = (
     "anaconda",
     "Windows Boot Manager",
     "debian",
+    "Debian",
     "Linux Mint",
     "linuxmint",
 )
@@ -480,7 +481,7 @@ def efi_ids_for_label(text: str, label: str) -> list[str]:
         if not match:
             continue
         desc = match.group(2).split("\t", 1)[0].strip()
-        if desc == label:
+        if desc.casefold() == label.casefold():
             found.append(match.group(1).upper())
     return found
 

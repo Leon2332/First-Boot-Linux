@@ -338,6 +338,11 @@ Boot0007* Windows Boot Manager\tHD(1,GPT,eee,0x800,0x100000)/File(\\EFI\\Microso
         self.assertEqual(efi_ids_for_label(self.SAMPLE, "Windows Boot Manager"), ["0007"])
         self.assertEqual(efi_ids_for_label(self.SAMPLE, "missing"), [])
 
+    def test_debian_label_is_case_insensitive(self) -> None:
+        text = self.SAMPLE + "Boot0008* Debian\tHD(1,GPT,fff,0x800,0x100000)/File(\\\\EFI\\\\debian\\\\shimx64.efi)\n"
+        self.assertEqual(efi_ids_for_label(text, "Debian"), ["0008"])
+        self.assertEqual(efi_ids_for_label(text, "debian"), ["0008"])
+
     def test_unshimmed_loaders_not_shim(self) -> None:
         text = (
             "Boot0000* Linux Mint\tHD(1,GPT,aaa,0x800,0x100000)/"

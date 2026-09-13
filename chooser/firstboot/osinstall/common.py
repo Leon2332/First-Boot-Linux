@@ -779,6 +779,14 @@ def delete_users(root: str, names: tuple[str, ...], log: InstallLog | None = Non
     for home in homes:
         if home.startswith("/home/") and home.count("/") == 2:
             shutil.rmtree(os.path.join(root, home.lstrip("/")), ignore_errors=True)
+    acc = os.path.join(root, "var", "lib", "AccountsService")
+    for name in drop:
+        for rel in (os.path.join("users", name), os.path.join("icons", name)):
+            path = os.path.join(acc, rel)
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
     if log:
         log.write("deleted live users: " + ", ".join(sorted(drop)))
 
@@ -916,6 +924,7 @@ def write_grub_default(root: str) -> None:
         "GRUB_CMDLINE_LINUX_DEFAULT": '"quiet splash"',
         "GRUB_CMDLINE_LINUX": '""',
         "GRUB_TIMEOUT": "5",
+        "GRUB_DISABLE_OS_PROBER": '"true"',
     }
     seen: set[str] = set()
     out: list[str] = []

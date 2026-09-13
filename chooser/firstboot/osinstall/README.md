@@ -13,6 +13,9 @@ Do not reboot into Subiquity, Calamares, Ubiquity, or Anaconda.
 | File | Catalog `"install"` | Kind |
 | --- | --- | --- |
 | `ubuntu_2604_gnome.py` | `ubuntu-2604-gnome` | Native casper-layered (Ubuntu 26.04 GNOME). **Official catalog.** |
+| `ubuntu_2604_cinnamon.py` | `ubuntu-2604-cinnamon` | Native casper-layered (Ubuntu 26.04 Cinnamon, LightDM). Unpack is `minimal` + `standard` only. Those layers already have the kernel and **dracut**; build the initrd with `dracut --no-hostonly`. Do not copy the live layer, do not apt-install initramfs-tools (Conflicts with dracut). **Official catalog.** Ubuntu edition, not a separate distro. |
+| `ubuntu_2604_budgie.py` | `ubuntu-2604-budgie` | Native casper-layered (Ubuntu 26.04 Budgie, SDDM). Unpack is `minimal` + `standard` only. Those layers already have the kernel and **dracut**; build the initrd with `dracut --no-hostonly`. Do not copy the live layer (seeds `ubuntu-desktop-bootstrap` rev 589 and a systemd snap mount that dies with `Can't lookup blockdev`). **Official catalog.** Ubuntu edition, not a separate distro. |
+| `ubuntu_2404_mate.py` | `ubuntu-2404-mate` | Native casper-layered (Ubuntu MATE 24.04.4 LTS, LightDM). Unpack is `minimal` + `standard` only. Kernel / firmware / signed GRUB are live-only — `dpkg -i` those pool debs (the ISO is not a working apt repo). Extract 24.04 `grub2-common` / `grub-efi-amd64-bin` / `-signed` with `dpkg-deb -x`; do not apt-install grub (postinst needs a mounted ESP). **Official catalog.** Ubuntu edition; there is no 26.04 ISO. |
 | `mint_223_cinnamon.py` | `mint-223-cinnamon` | Native casper-single (Linux Mint 22.3 Cinnamon). **Official catalog.** |
 | `mint_223_mate.py` | `mint-223-mate` | Native casper-single (Linux Mint 22.3 MATE). **Official catalog.** |
 | `mint_223_xfce.py` | `mint-223-xfce` | Native casper-single (Linux Mint 22.3 Xfce). **Official catalog.** |
@@ -23,7 +26,7 @@ Do not reboot into Subiquity, Calamares, Ubiquity, or Anaconda.
 | `debian_13_cinnamon.py` | `debian-13-cinnamon` | Native live-single (Debian 13 Cinnamon: same unpack, LightDM). **Official catalog.** |
 | `debian_13_mate.py` | `debian-13-mate` | Native live-single (Debian 13 MATE: same unpack, LightDM). **Official catalog.** |
 
-Official `official-catalog.json` currently lists **Ubuntu GNOME**, **Mint Cinnamon / MATE / Xfce**, **Fedora Plasma / GNOME**, and **Debian GNOME / Plasma / Cinnamon / MATE**. Do not add flavors until each has a native file.
+Official `official-catalog.json` currently lists **Ubuntu GNOME / Cinnamon / Budgie / MATE**, **Mint Cinnamon / MATE / Xfce**, **Fedora Plasma / GNOME**, and **Debian GNOME / Plasma / Cinnamon / MATE**. Cinnamon, Budgie, and MATE are Ubuntu editions (Ubuntu logo + DE name), not independent distros. Kubuntu / Lubuntu / Xubuntu stay out until each has a native file.
 
 `__init__.py` is the trampoline. Native drivers (`unpack_kind`) run
 `pipeline.py`. If the disk was already wiped and the install fails, the
@@ -35,13 +38,15 @@ ISOs). Shop packs still use the legacy `boot_files` /
 Older sticks may still say `ubuntu-autoinstall`, `ubuntu-2604`, `mint`,
 `mint-223`, or `fedora-kickstart`. Those ids belong to shipped distros
 (no baked-in driver). Ubuntu GNOME on a **new** stick is
-`ubuntu-2604-gnome`. Mint editions are `mint-223-cinnamon`,
-`mint-223-mate`, and `mint-223-xfce`. Fedora Plasma is
-`fedora-44-plasma`. Fedora GNOME is `fedora-44-gnome`. Debian GNOME is
-`debian-13-gnome`. Debian Plasma is `debian-13-plasma`. Debian Cinnamon
-is `debian-13-cinnamon`. Debian MATE is `debian-13-mate`. Do not reserve
-ids we do not ship (`nobara`, `windows`, `freebsd`,
-`ubuntu-calamares-2604`, `debian-preseed`); a shop pack may use them.
+`ubuntu-2604-gnome`. Ubuntu Cinnamon is `ubuntu-2604-cinnamon`. Ubuntu
+Budgie is `ubuntu-2604-budgie`. Ubuntu MATE is `ubuntu-2404-mate`.
+Mint editions are `mint-223-cinnamon`, `mint-223-mate`, and
+`mint-223-xfce`. Fedora Plasma is `fedora-44-plasma`. Fedora GNOME is
+`fedora-44-gnome`. Debian GNOME is `debian-13-gnome`. Debian Plasma is
+`debian-13-plasma`. Debian Cinnamon is `debian-13-cinnamon`. Debian
+MATE is `debian-13-mate`. Do not reserve ids we do not ship (`nobara`,
+`windows`, `freebsd`, `ubuntu-calamares-2604`, `debian-preseed`); a
+shop pack may use them.
 
 ## Adding an official ISO
 

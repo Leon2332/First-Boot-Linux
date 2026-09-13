@@ -29,7 +29,10 @@ from firstboot.osinstall import (  # noqa: E402
     DRIVER_MINT_CINNAMON,
     DRIVER_MINT_MATE,
     DRIVER_MINT_XFCE,
+    DRIVER_UBUNTU_BUDGIE,
+    DRIVER_UBUNTU_CINNAMON,
     DRIVER_UBUNTU_GNOME,
+    DRIVER_UBUNTU_MATE,
     canonical_driver_id,
     get_driver,
     is_native_driver,
@@ -137,6 +140,19 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(DRIVER_UBUNTU_GNOME, "ubuntu-2604-gnome")
         self.assertEqual(get_driver("ubuntu-2604-gnome").default_hostname, "ubuntu")
         self.assertTrue(is_native_driver(get_driver("ubuntu-2604-gnome")))
+        self.assertEqual(get_driver("ubuntu-2604-gnome").display_manager, "gdm")
+        self.assertEqual(DRIVER_UBUNTU_CINNAMON, "ubuntu-2604-cinnamon")
+        self.assertTrue(is_native_driver(get_driver("ubuntu-2604-cinnamon")))
+        self.assertEqual(get_driver("ubuntu-2604-cinnamon").display_manager, "lightdm")
+        self.assertEqual(get_driver("ubuntu-2604-cinnamon").unpack_kind, "casper-layered")
+        self.assertEqual(DRIVER_UBUNTU_BUDGIE, "ubuntu-2604-budgie")
+        self.assertTrue(is_native_driver(get_driver("ubuntu-2604-budgie")))
+        self.assertEqual(get_driver("ubuntu-2604-budgie").display_manager, "sddm")
+        self.assertEqual(get_driver("ubuntu-2604-budgie").unpack_kind, "casper-layered")
+        self.assertEqual(DRIVER_UBUNTU_MATE, "ubuntu-2404-mate")
+        self.assertTrue(is_native_driver(get_driver("ubuntu-2404-mate")))
+        self.assertEqual(get_driver("ubuntu-2404-mate").display_manager, "lightdm")
+        self.assertEqual(get_driver("ubuntu-2404-mate").unpack_kind, "casper-layered")
         self.assertEqual(DRIVER_MINT_CINNAMON, "mint-223-cinnamon")
         self.assertEqual(get_driver("mint-223-cinnamon").default_hostname, "mint")
         self.assertTrue(is_native_driver(get_driver("mint-223-cinnamon")))

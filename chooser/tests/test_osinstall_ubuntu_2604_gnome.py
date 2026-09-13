@@ -126,6 +126,9 @@ class Ubuntu2604GnomeTests(unittest.TestCase):
             )
             self.assertFalse(any("live" in r for r in rels))
             self.assertFalse(any("enhanced-secureboot" in r for r in rels))
+            with_live = casper_squashfs_relpaths(iso, include_live=True)
+            self.assertIn("casper/minimal.standard.live.squashfs", with_live)
+            self.assertFalse(any("enhanced-secureboot" in r for r in with_live))
         finally:
             shutil.rmtree(iso, ignore_errors=True)
 

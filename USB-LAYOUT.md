@@ -4,7 +4,7 @@ How a First Boot Linux **shop USB** is laid out after the creator writes it.
 
 This is a partitioned disk, not a single ISO9660 image. The UI may still say “write ISO.” On the stick it is GPT + three partitions. The same layout is copied onto the PC’s internal disk when the shop installs First Boot.
 
-The normative v1 example below is a shop that staged Ubuntu GNOME. Official catalog is Ubuntu 26.04 GNOME only (FBL-native). Flavors, Mint, and Fedora stay out until they have native installers. The `docs/` mockup still shows a larger set; that is vision, not the creator menu.
+The normative v1 example below is a shop that staged Ubuntu GNOME. Official catalog is Ubuntu 26.04 GNOME / Cinnamon / Budgie plus Ubuntu MATE 24.04.4 (editions under Ubuntu, not independent distros), Linux Mint, Fedora Plasma / GNOME, and Debian GNOME / Plasma / Cinnamon / MATE. Kubuntu / Lubuntu / Xubuntu stay out until each has a native installer. The `docs/` mockup still shows a larger set; that is vision, not the creator menu.
 
 ## Partitions
 
@@ -86,7 +86,7 @@ USB
         └── linuxmint-22.3-xfce-64bit.iso
 ```
 
-`images/` only contains redistributable ISOs this retailer staged (official downloads, plus shop-pack ISOs). Recommended can include a download-only row (official `redistributable: false`) with nothing under `images/`. Distros the shop did not tick, but that already have an install driver, go in `catalog.json` `catalog` (Other options, Download). Official ticks still require `can_stage`, `redistributable`, and `install` (Ubuntu, Linux Mint, Fedora Plasma / GNOME, Debian GNOME / Plasma / Cinnamon / MATE). Shop packs are extra recommended rows; their driver lives under `custom/<id>/`, not in the squashfs. Basenames for official ISOs come from `schemas/official-catalog.json` `filename` fields; pack ISO basenames come from the pack `manifest.json` `editions[].filename`.
+`images/` only contains redistributable ISOs this retailer staged (official downloads, plus shop-pack ISOs). Recommended can include a download-only row (official `redistributable: false`) with nothing under `images/`. Distros the shop did not tick, but that already have an install driver, go in `catalog.json` `catalog` (Other options, Download). Official ticks still require `can_stage`, `redistributable`, and `install` (Ubuntu GNOME / Cinnamon / Budgie / MATE, Linux Mint, Fedora Plasma / GNOME, Debian GNOME / Plasma / Cinnamon / MATE). Shop packs are extra recommended rows; their driver lives under `custom/<id>/`, not in the squashfs. Basenames for official ISOs come from `schemas/official-catalog.json` `filename` fields; pack ISO basenames come from the pack `manifest.json` `editions[].filename`.
 
 ## What each payload file is
 
