@@ -346,6 +346,12 @@ msgstr "Rotsvaste basis"
 msgid "The universal operating system. Extremely stable and free-software focused."
 msgstr "Die universele bedryfstelsel. Uiters stabiel en gerig op vrye sagteware."
 
+msgid "Arch, tuned for speed"
+msgstr "Arch, afgestem vir spoed"
+
+msgid "CachyOS is an Arch-based distribution optimized for performance. It offers advanced options appealing to power users and gamers."
+msgstr "CachyOS is ’n Arch-gebaseerde distribusie wat vir prestasie geoptimaliseer is. Dit bied gevorderde opsies wat kraggebruikers en speletjiespelers aanspreek."
+
 msgid "Ubuntu with KDE Plasma"
 msgstr "Ubuntu met KDE Plasma"
 
@@ -495,6 +501,12 @@ msgstr "Hierdie skyf is te klein ({have}; {need} word benodig)."
 
 msgid "Could not write the boot partition."
 msgstr "Kon nie die selflaaipartisie skryf nie."
+
+msgid "Could not install extra packages."
+msgstr "Kon nie ekstra pakkette installeer nie."
+
+msgid "Could not set the language."
+msgstr "Kon nie die taal stel nie."
 
 msgid "Could not find the First Boot system partition."
 msgstr "Kon nie die First Boot-stelselpartisie vind nie."

@@ -68,19 +68,30 @@ func (s *Store) Ensure(ctx context.Context, ed catalog.Edition, progress Progres
 	if !ed.Pinned() {
 		return "", fmt.Errorf("%s: pin url, sha256, and size_bytes before download", ed.Filename)
 	}
+	return s.EnsureFile(ctx, ed.Filename, *ed.URL, *ed.SHA256, *ed.SizeBytes, progress)
+}
+
+func (s *Store) EnsureFile(ctx context.Context, filename, url, sha256 string, size int64, progress ProgressFunc) (string, error) {
+	if filename == "" || url == "" || size <= 0 || len(sha256) != 64 {
+		return "", fmt.Errorf("%s: pin url, sha256, and size_bytes before download", filename)
+	}
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return "", err
 	}
-	dest := s.Path(ed.Filename)
-	if ok, err := s.Status(ed); err != nil {
-		return "", err
-	} else if ok {
-		if progress != nil {
-			progress(ed.Filename, *ed.SizeBytes, *ed.SizeBytes)
+	dest := s.Path(filename)
+	if st, err := os.Stat(dest); err == nil && st.Size() == size {
+		sum, err := HashFile(dest)
+		if err != nil {
+			return "", err
 		}
-		return dest, nil
+		if sum == sha256 {
+			if progress != nil {
+				progress(filename, size, size)
+			}
+			return dest, nil
+		}
 	}
-	if err := s.download(ctx, *ed.URL, dest, *ed.SHA256, *ed.SizeBytes, ed.Filename, progress); err != nil {
+	if err := s.download(ctx, url, dest, sha256, size, filename, progress); err != nil {
 		return "", err
 	}
 	return dest, nil

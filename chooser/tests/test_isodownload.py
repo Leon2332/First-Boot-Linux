@@ -95,11 +95,23 @@ class RelpathTests(unittest.TestCase):
         self.assertTrue(
             dest_is_payload_image("/run/payload", "/run/payload/images/a.iso")
         )
+        self.assertTrue(
+            dest_is_payload_image(
+                "/run/payload",
+                "/run/payload/images/a.iso.pkgs/gtk4-1:4.22.5-1-x86_64.pkg.tar.zst",
+            )
+        )
         self.assertFalse(
             dest_is_payload_image("/run/payload", "/run/payload/../etc/a.iso")
         )
         self.assertFalse(
             dest_is_payload_image("/run/payload", "/tmp/a.iso")
+        )
+        self.assertFalse(
+            dest_is_payload_image(
+                "/run/payload",
+                "/run/payload/images/a.iso.pkgs/../passwd",
+            )
         )
 
 

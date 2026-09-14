@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import ctypes
 import errno
+import inspect
 import os
 import shutil
 import subprocess
@@ -129,6 +130,62 @@ def overlay_fields() -> dict[str, str]:
                 out[key] = value
         return out
     return {}
+
+
+def extras_dir_for_iso(iso_path: str) -> str:
+    return iso_path + ".pkgs" if iso_path else ""
+
+
+def extras_bytes(path: str) -> int:
+    if not path or not os.path.isdir(path):
+        return 0
+    total = 0
+    try:
+        names = os.listdir(path)
+    except OSError:
+        return 0
+    for name in names:
+        fp = os.path.join(path, name)
+        try:
+            if os.path.isfile(fp):
+                total += os.path.getsize(fp)
+        except OSError:
+            continue
+    return total
+
+
+def stage_payload_extras(src_dir: str, log: InstallLog | None = None) -> str:
+    """Copy ``images/<iso>.pkgs/`` onto the RAM tmpfs before pivot_root.
+
+    Same-disk install unmounts ``/run/payload`` during the RAM pivot.
+    Rescue skips ``images/`` (the ISO is huge), so extras must be copied
+    while FBL-DATA is still mounted.
+    """
+    ram_pkgs = os.path.join(RAM_DIR, "pkgs")
+    if src_dir and os.path.isdir(src_dir):
+        os.makedirs(ram_pkgs, exist_ok=True)
+        n = 0
+        try:
+            names = os.listdir(src_dir)
+        except OSError:
+            names = []
+        for name in names:
+            src = os.path.join(src_dir, name)
+            dest = os.path.join(ram_pkgs, name)
+            if not os.path.isfile(src):
+                continue
+            if not os.path.isfile(dest):
+                shutil.copy2(src, dest)
+            n += 1
+            if log:
+                log.write(f"ram extra {name}")
+        if log:
+            log.write(f"staged {n} extra packages into RAM")
+    if os.path.isdir(ram_pkgs):
+        return ram_pkgs
+    if src_dir and os.path.isdir(src_dir):
+        return src_dir
+    return ""
 
 
 def _need_ram_bytes(squashfs_paths: list[str]) -> int:
@@ -298,6 +355,7 @@ def copy_live_to_ram(
     on_progress: Callable[[int], None] | None,
     log: InstallLog,
     need_bytes: int = 0,
+    payload_pkgs: str = "",
 ) -> list[str]:
     """Copy the live squashfs + target squashfs onto tmpfs and pivot_root."""
     try:
@@ -307,6 +365,7 @@ def copy_live_to_ram(
             on_progress=on_progress,
             log=log,
             need_bytes=need_bytes,
+            payload_pkgs=payload_pkgs,
         )
     except OsInstallError:
         raise
@@ -346,14 +405,19 @@ def _copy_live_to_ram(
     on_progress: Callable[[int], None] | None,
     log: InstallLog,
     need_bytes: int = 0,
+    payload_pkgs: str = "",
 ) -> list[str]:
     if already_on_ram_overlay():
         dest_layers = _existing_ram_layers(len(squashfs_paths), log)
         log.write("already on RAM overlay; skip copy and pivot")
+        if payload_pkgs:
+            stage_payload_extras(payload_pkgs, log)
         if on_progress:
             on_progress(100)
         return dest_layers
     mount_ram_tmpfs(need_bytes or _need_ram_bytes(squashfs_paths), log=log)
+    if payload_pkgs:
+        stage_payload_extras(payload_pkgs, log)
     dest_layers: list[str] = []
     n = max(1, len(squashfs_paths) + (1 if find_live_squashfs() else 0))
     for i, src in enumerate(squashfs_paths):
@@ -735,12 +799,14 @@ def install_native(
                 extra_fn = getattr(drv, "iso_extras", None)
                 if callable(extra_fn):
                     extras.update(extra_fn(iso_mnt))
+                payload_pkgs = extras_dir_for_iso(plan.iso_path)
                 ram_layers = copy_live_to_ram(
                     src_layers,
                     extras,
                     on_progress=lambda p: prog(map_range(p, 8, 18)),
                     log=log,
-                    need_bytes=need,
+                    need_bytes=need + extras_bytes(payload_pkgs),
+                    payload_pkgs=payload_pkgs,
                 )
                 umount_path(iso_mnt)
                 shutil.rmtree(iso_mnt, ignore_errors=True)
@@ -754,6 +820,11 @@ def install_native(
         emit_tick(3, "current", step=True)
         from firstboot.osinstall.restore import snapshot_rescue
 
+        ram_pkgs = os.path.join(RAM_DIR, "pkgs")
+        if plan.same_disk and os.path.isdir(ram_pkgs):
+            extras_dir = ram_pkgs
+        else:
+            extras_dir = extras_dir_for_iso(plan.iso_path)
         snapshot_rescue(payload_root, log=log)
         unmount_target(plan, log)
         work = os.path.join(RAM_DIR, "mnt")
@@ -797,13 +868,21 @@ def install_native(
         prog(70)
 
         emit_tick(5, "current", step=True)
+        cfg_kw: dict = {"timezone_minutes": tz_minutes, "log": log}
+        try:
+            params = inspect.signature(drv.configure).parameters
+        except (TypeError, ValueError):
+            params = {}
+        if "extras_dir" in params or any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()
+        ):
+            cfg_kw["extras_dir"] = extras_dir if os.path.isdir(extras_dir) else ""
         drv.configure(
             disk.root_mp,
             identity,
             locale,
             disk,
-            timezone_minutes=tz_minutes,
-            log=log,
+            **cfg_kw,
         )
         emit_tick(5, "done")
         prog(82)

@@ -25,7 +25,7 @@ from firstboot.osinstall import (
     get_driver,
     is_native_driver,
     live_os_plan,
-    run_iso_fetch,
+    run_edition_fetch,
     run_os_install,
     run_os_restore,
     sha512_crypt,
@@ -1266,20 +1266,16 @@ def run_window(
             self._set_shop_progress(0, "Downloading…")
             distro_id, ed_id = distro.id, ed.id
             from_catalog = self.detail_from_catalog
-            url = ed.url or ""
-            sha256 = ed.sha256
-            size = ed.size_bytes
             payload_root = self.payload_root
+            edition = ed
 
             def work() -> None:
                 err: str | None = None
                 try:
-                    run_iso_fetch(
-                        url,
-                        dest,
-                        sha256,
-                        size,
+                    run_edition_fetch(
+                        edition,
                         payload_root,
+                        dest,
                         on_event=self._shop_event,
                     )
                 except (OsInstallError, DownloadError, InstallError) as exc:

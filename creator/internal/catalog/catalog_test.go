@@ -139,8 +139,30 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	if cat.Distro("nobara") != nil {
 		t.Fatal("nobara must not be official")
 	}
-	if len(cat.Distros) != 4 {
-		t.Fatalf("official catalog should be Ubuntu GNOME + Linux Mint + Fedora + Debian, got %d", len(cat.Distros))
+	c := cat.Distro("cachyos")
+	if c == nil || !c.Redistributable || !c.Stageable() {
+		t.Fatalf("cachyos should be redistributable and stageable")
+	}
+	if c.Install == nil || *c.Install != "cachyos-260809-plasma" {
+		t.Fatalf("cachyos install %v", c.Install)
+	}
+	if c.SecureBoot {
+		t.Fatal("cachyos must not claim Secure Boot")
+	}
+	if c.DefaultEdition() == nil || c.DefaultEdition().ID != "plasma" {
+		t.Fatalf("cachyos default edition %+v", c.DefaultEdition())
+	}
+	if c.DefaultEdition().SHA256 == nil || *c.DefaultEdition().SizeBytes != 3188850688 {
+		t.Fatalf("cachyos size %v", c.DefaultEdition().SizeBytes)
+	}
+	if len(c.Editions) != 1 {
+		t.Fatalf("cachyos editions %d", len(c.Editions))
+	}
+	if c.SuggestedDefault {
+		t.Fatalf("nothing should be a suggested default")
+	}
+	if len(cat.Distros) != 5 {
+		t.Fatalf("official catalog should be Ubuntu + Mint + Fedora + Debian + CachyOS, got %d", len(cat.Distros))
 	}
 	for _, id := range []string{"kubuntu", "lubuntu", "ubuntu-budgie", "ubuntu-mate", "ubuntu-cinnamon", "xubuntu"} {
 		if cat.Distro(id) != nil {
@@ -161,11 +183,17 @@ func TestBuildShop(t *testing.T) {
 	if len(shop.Recommended) != 1 {
 		t.Fatalf("got rec=%d", len(shop.Recommended))
 	}
-	if len(shop.Catalog) != 3 || shop.Catalog[0].ID != "linux-mint" || shop.Catalog[1].ID != "fedora" || shop.Catalog[2].ID != "debian" {
-		t.Fatalf("unticked mint, fedora, and debian should be catalog downloads, got %+v", shopIDs(shop.Catalog))
+	if len(shop.Catalog) != 4 || shop.Catalog[0].ID != "linux-mint" || shop.Catalog[1].ID != "fedora" || shop.Catalog[2].ID != "debian" || shop.Catalog[3].ID != "cachyos" {
+		t.Fatalf("unticked mint, fedora, debian, and cachyos should be catalog downloads, got %+v", shopIDs(shop.Catalog))
 	}
-	if shop.Catalog[0].Editions[0].Local || shop.Catalog[1].Editions[0].Local || shop.Catalog[2].Editions[0].Local {
-		t.Fatal("unticked mint, fedora, and debian must not be local")
+	if shop.Catalog[0].Editions[0].Local || shop.Catalog[1].Editions[0].Local || shop.Catalog[2].Editions[0].Local || shop.Catalog[3].Editions[0].Local {
+		t.Fatal("unticked mint, fedora, debian, and cachyos must not be local")
+	}
+	if shop.Catalog[3].SecureBoot {
+		t.Fatal("shop cachyos must keep secure_boot false")
+	}
+	if len(shop.Catalog[3].Editions[0].Extras) != 18 {
+		t.Fatalf("download cachyos extras %d", len(shop.Catalog[3].Editions[0].Extras))
 	}
 	ub := shop.Recommended[0]
 	if !ub.SecureBoot {
@@ -345,6 +373,49 @@ func TestBuildShop(t *testing.T) {
 	}
 	if cmeds[3].ID != "plasma" || cmeds[3].Local || cmeds[3].Install != "debian-13-plasma" {
 		t.Fatalf("unticked plasma %+v", cmeds[3])
+	}
+	cachyShop, err := BuildShop(cat, []string{"cachyos:plasma"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cachyShop.Recommended) != 1 || cachyShop.Recommended[0].ID != "cachyos" {
+		t.Fatalf("cachyos recommended %+v", cachyShop.Recommended)
+	}
+	if cachyShop.Recommended[0].Install != "cachyos-260809-plasma" {
+		t.Fatalf("cachyos install %s", cachyShop.Recommended[0].Install)
+	}
+	if cachyShop.Recommended[0].SecureBoot {
+		t.Fatal("recommended cachyos must stay secure_boot false")
+	}
+	ced := cachyShop.Recommended[0].Editions[0]
+	if !ced.Local || ced.File != "images/cachyos-desktop-linux-260809.iso" {
+		t.Fatalf("cachyos edition %+v", ced)
+	}
+	if len(ced.Extras) != 18 {
+		t.Fatalf("cachyos extras %d", len(ced.Extras))
+	}
+	if ced.Extras[0].Filename != "gstreamer-1.28.7-1-x86_64.pkg.tar.zst" {
+		t.Fatalf("gstreamer extra %+v", ced.Extras[0])
+	}
+	var shelly ShopExtra
+	for _, x := range ced.Extras {
+		if x.Filename == "shelly-3.1.3-1-x86_64.pkg.tar.zst" {
+			shelly = x
+			break
+		}
+	}
+	if shelly.Filename == "" {
+		t.Fatal("missing shelly extra")
+	}
+	if ExtraRel(ced.File, shelly.Filename) != "images/cachyos-desktop-linux-260809.iso.pkgs/shelly-3.1.3-1-x86_64.pkg.tar.zst" {
+		t.Fatalf("extra rel %s", ExtraRel(ced.File, shelly.Filename))
+	}
+	if cachyShop.LocalBytes() <= ced.SizeBytes {
+		t.Fatal("local bytes must include extras")
+	}
+	plasma := cat.Distro("cachyos").Edition("plasma")
+	if plasma == nil || !plasma.Pinned() || len(plasma.Extras) != 18 {
+		t.Fatalf("official cachyos extras %+v", plasma)
 	}
 	if _, err := BuildShop(cat, []string{"nobara:gnome"}); err == nil {
 		t.Fatal("nobara must not be a creator tick")

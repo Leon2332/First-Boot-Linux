@@ -40,8 +40,11 @@ from firstboot.osinstall.pipeline import (  # noqa: E402
     PIPELINE_TICKS,
     copy_live_to_ram,
     do_pivot_root,
+    extras_bytes,
+    extras_dir_for_iso,
     mount_ram_tmpfs,
     release_disk_holders,
+    stage_payload_extras,
     umount_in_all_namespaces,
     unmount_target,
 )
@@ -384,6 +387,45 @@ class RamTmpfsTests(unittest.TestCase):
             self.assertTrue(any("already on RAM overlay" in line for line in log.lines))
 
 
+class PayloadExtrasTests(unittest.TestCase):
+    def test_extras_dir_for_iso(self) -> None:
+        self.assertEqual(
+            extras_dir_for_iso("/run/payload/images/cachyos-desktop-linux-260809.iso"),
+            "/run/payload/images/cachyos-desktop-linux-260809.iso.pkgs",
+        )
+        self.assertEqual(extras_dir_for_iso(""), "")
+
+    def test_stage_payload_extras_copies_before_payload_gone(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            src = os.path.join(tmp, "iso.pkgs")
+            ram = os.path.join(tmp, "ram")
+            os.makedirs(src)
+            os.makedirs(ram)
+            pkg = "shelly-3.1.3-1-x86_64.pkg.tar.zst"
+            with open(os.path.join(src, pkg), "wb") as fh:
+                fh.write(b"pkg")
+            with open(os.path.join(src, "readme.txt"), "wb") as fh:
+                fh.write(b"x")
+            log = ListLog()
+            with mock.patch("firstboot.osinstall.pipeline.RAM_DIR", ram):
+                dest = stage_payload_extras(src, log)
+                self.assertEqual(dest, os.path.join(ram, "pkgs"))
+                self.assertTrue(os.path.isfile(os.path.join(ram, "pkgs", pkg)))
+                self.assertEqual(extras_bytes(src), 4)
+                shutil.rmtree(src)
+                dest2 = stage_payload_extras(src, log)
+                self.assertEqual(dest2, os.path.join(ram, "pkgs"))
+                self.assertTrue(os.path.isfile(os.path.join(ram, "pkgs", pkg)))
+            self.assertTrue(any("ram extra " + pkg in line for line in log.lines))
+
+    def test_stage_payload_extras_missing_src(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            ram = os.path.join(tmp, "ram")
+            os.makedirs(ram)
+            with mock.patch("firstboot.osinstall.pipeline.RAM_DIR", ram):
+                self.assertEqual(stage_payload_extras("/no/such/pkgs"), "")
+
+
 class UnmountNamespacesTests(unittest.TestCase):
     def test_umount_in_all_namespaces_uses_nsenter(self) -> None:
         runs: list[list[str]] = []
@@ -665,6 +707,7 @@ class NvramTests(unittest.TestCase):
     def test_stale_labels_include_anaconda(self) -> None:
         self.assertIn("anaconda", STALE_EFI_LABELS)
         self.assertIn("Debian", STALE_EFI_LABELS)
+        self.assertIn("CachyOS", STALE_EFI_LABELS)
 
     def test_register_os_efi_bootnext(self) -> None:
         runs: list[list[str]] = []

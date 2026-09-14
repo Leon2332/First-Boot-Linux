@@ -354,6 +354,9 @@ FORBIDDEN_CMDLINE = (
     "rd.live.",
     "inst.cmdline",
     "boot=live",
+    "archisobasedir",
+    "archisolabel",
+    "cow_spacesize",
 )
 DM_UNITS = {
     "gdm": ("gdm.service", "gdm3.service"),
@@ -493,6 +496,8 @@ def cmdline_files(root: str) -> list[str]:
         os.path.join(root, "boot", "grub2", "grub.cfg"),
         os.path.join(root, "etc", "kernel", "cmdline"),
         os.path.join(root, "etc", "cmdline"),
+        os.path.join(root, "boot", "limine.conf"),
+        os.path.join(root, "limine.conf"),
     ]
     bls = os.path.join(root, "boot", "loader", "entries")
     if os.path.isdir(bls):
@@ -582,7 +587,14 @@ def esp_bootloader_ok(efi_mp: str) -> bool:
         folder = os.path.join(efi, vendor)
         if not os.path.isdir(folder):
             continue
-        for name in ("grubx64.efi", "shimx64.efi", "BOOTX64.EFI", "bootx64.efi"):
+        for name in (
+            "grubx64.efi",
+            "shimx64.efi",
+            "BOOTX64.EFI",
+            "bootx64.efi",
+            "limine_x64.efi",
+            "systemd-bootx64.efi",
+        ):
             if os.path.isfile(os.path.join(folder, name)):
                 return True
     return False
@@ -1393,5 +1405,14 @@ def efi_loader_path(efi_mp: str, bootloader_id: str) -> str:
     vendor_grub = os.path.join(efi_mp, "EFI", bootloader_id, "grubx64.efi")
     if os.path.isfile(vendor_grub):
         return rf"\EFI\{bootloader_id}\grubx64.efi"
+    limine = os.path.join(efi_mp, "EFI", bootloader_id, "limine_x64.efi")
+    if os.path.isfile(limine):
+        return rf"\EFI\{bootloader_id}\limine_x64.efi"
+    sd = os.path.join(efi_mp, "EFI", bootloader_id, "systemd-bootx64.efi")
+    if os.path.isfile(sd):
+        return rf"\EFI\{bootloader_id}\systemd-bootx64.efi"
+    sd_sys = os.path.join(efi_mp, "EFI", "systemd", "systemd-bootx64.efi")
+    if os.path.isfile(sd_sys):
+        return r"\EFI\systemd\systemd-bootx64.efi"
     return r"\EFI\BOOT\BOOTX64.EFI"
 

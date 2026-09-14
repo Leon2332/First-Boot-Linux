@@ -31,6 +31,13 @@ type Distro struct {
 	Editions         []Edition `json:"editions"`
 }
 
+type Extra struct {
+	Filename  string  `json:"filename"`
+	URL       *string `json:"url"`
+	SHA256    *string `json:"sha256"`
+	SizeBytes *int64  `json:"size_bytes"`
+}
+
 type Edition struct {
 	ID        string  `json:"id"`
 	Name      string  `json:"name"`
@@ -40,6 +47,7 @@ type Edition struct {
 	URL       *string `json:"url"`
 	SHA256    *string `json:"sha256"`
 	SizeBytes *int64  `json:"size_bytes"`
+	Extras    []Extra `json:"extras,omitempty"`
 }
 
 type Shop struct {
@@ -60,16 +68,24 @@ type ShopDistro struct {
 	Editions    []ShopEdition `json:"editions"`
 }
 
-type ShopEdition struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Default   bool   `json:"default"`
-	Local     bool   `json:"local"`
-	Install   string `json:"install,omitempty"`
-	File      string `json:"file,omitempty"`
-	URL       string `json:"url,omitempty"`
+type ShopExtra struct {
+	Filename  string `json:"filename"`
+	URL       string `json:"url"`
 	SHA256    string `json:"sha256"`
 	SizeBytes int64  `json:"size_bytes"`
+}
+
+type ShopEdition struct {
+	ID        string      `json:"id"`
+	Name      string      `json:"name"`
+	Default   bool        `json:"default"`
+	Local     bool        `json:"local"`
+	Install   string      `json:"install,omitempty"`
+	File      string      `json:"file,omitempty"`
+	URL       string      `json:"url,omitempty"`
+	SHA256    string      `json:"sha256"`
+	SizeBytes int64       `json:"size_bytes"`
+	Extras    []ShopExtra `json:"extras,omitempty"`
 }
 
 type Language struct {
@@ -251,9 +267,49 @@ func ParseStaged(spec string) (distroID, editionID string, err error) {
 }
 
 func (e *Edition) Pinned() bool {
-	return e.URL != nil && *e.URL != "" &&
-		e.SHA256 != nil && looksSHA256(*e.SHA256) &&
-		e.SizeBytes != nil && *e.SizeBytes > 0
+	if e.URL == nil || *e.URL == "" ||
+		e.SHA256 == nil || !looksSHA256(*e.SHA256) ||
+		e.SizeBytes == nil || *e.SizeBytes <= 0 {
+		return false
+	}
+	for i := range e.Extras {
+		if !e.Extras[i].Pinned() {
+			return false
+		}
+	}
+	return true
+}
+
+func (x Extra) Pinned() bool {
+	return looksExtraName(x.Filename) &&
+		x.URL != nil && *x.URL != "" &&
+		x.SHA256 != nil && looksSHA256(*x.SHA256) &&
+		x.SizeBytes != nil && *x.SizeBytes > 0
+}
+
+func looksExtraName(s string) bool {
+	if s == "" || s == "." || s == ".." || strings.ContainsAny(s, `/\`) {
+		return false
+	}
+	for i, r := range s {
+		ok := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
+			r == '.' || r == '_' || r == '+' || r == ':' || r == '~' || r == '-'
+		if i == 0 {
+			ok = (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
+		}
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func ExtrasDir(isoFile string) string {
+	return isoFile + ".pkgs"
+}
+
+func ExtraRel(isoFile, filename string) string {
+	return ExtrasDir(isoFile) + "/" + filename
 }
 
 func looksSHA256(s string) bool {
@@ -777,6 +833,7 @@ func shopDistro(d *Distro, selected []string) (ShopDistro, error) {
 			se.Local = false
 			se.URL = *ed.URL
 		}
+		se.Extras = shopExtras(ed)
 		if se.Default {
 			haveFeatured = true
 		}
@@ -786,6 +843,28 @@ func shopDistro(d *Distro, selected []string) (ShopDistro, error) {
 		return sd, fmt.Errorf("%s has no pinned default edition", d.Name)
 	}
 	return sd, nil
+}
+
+func shopExtras(ed Edition) []ShopExtra {
+	if len(ed.Extras) == 0 {
+		return nil
+	}
+	out := make([]ShopExtra, 0, len(ed.Extras))
+	for _, x := range ed.Extras {
+		if !x.Pinned() {
+			continue
+		}
+		out = append(out, ShopExtra{
+			Filename:  x.Filename,
+			URL:       *x.URL,
+			SHA256:    *x.SHA256,
+			SizeBytes: *x.SizeBytes,
+		})
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func orderedEditions(d *Distro, selected []string) []Edition {
@@ -837,10 +916,18 @@ func (s *Shop) LocalEditions() []ShopEdition {
 	return out
 }
 
+func (e ShopEdition) LocalPayloadBytes() int64 {
+	n := e.SizeBytes
+	for _, x := range e.Extras {
+		n += x.SizeBytes
+	}
+	return n
+}
+
 func (s *Shop) LocalBytes() int64 {
 	var n int64
 	for _, e := range s.LocalEditions() {
-		n += e.SizeBytes
+		n += e.LocalPayloadBytes()
 	}
 	return n
 }
@@ -848,8 +935,8 @@ func (s *Shop) LocalBytes() int64 {
 func (s *Shop) LargestLocal() int64 {
 	var n int64
 	for _, e := range s.LocalEditions() {
-		if e.SizeBytes > n {
-			n = e.SizeBytes
+		if b := e.LocalPayloadBytes(); b > n {
+			n = b
 		}
 	}
 	return n

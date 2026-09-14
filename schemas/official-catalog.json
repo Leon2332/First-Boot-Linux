@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-09-09",
+  "updated": "2026-09-13",
   "distros": [
     {
       "id": "ubuntu",
@@ -185,6 +185,140 @@
           "url": "https://cdimage.debian.org/cdimage/release/13.6.0-live/amd64/iso-hybrid/debian-live-13.6.0-amd64-mate.iso",
           "sha256": "ca7bbc36b3afd33c1bcc4b309497a3073e87b10246c7c29e7ef64e6dedb7f537",
           "size_bytes": 3960668160
+        }
+      ]
+    },
+    {
+      "id": "cachyos",
+      "name": "CachyOS",
+      "version": "260809",
+      "tagline": "Arch, tuned for speed",
+      "description": "CachyOS is an Arch-based distribution optimized for performance. It offers advanced options appealing to power users and gamers.",
+      "family": "other",
+      "redistributable": true,
+      "install": "cachyos-260809-plasma",
+      "can_stage": true,
+      "suggested_default": false,
+      "secure_boot": false,
+      "editions": [
+        {
+          "id": "plasma",
+          "name": "KDE Plasma",
+          "default": true,
+          "filename": "cachyos-desktop-linux-260809.iso",
+          "url": "https://mirror.cachyos.org/ISO/desktop/260809/cachyos-desktop-linux-260809.iso",
+          "sha256": "959f6577f45e25ee9fd8c220fd221b08e4ea79412c7315c0f922dd6d86d5e33c",
+          "size_bytes": 3188850688,
+          "extras": [
+            {
+              "filename": "gstreamer-1.28.7-1-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/gstreamer-1.28.7-1-x86_64.pkg.tar.zst",
+              "sha256": "dc4ca6f8cc1af174b4e1028cdbbe05c967f8b76e9c790bebbad2656c2ac7b1d8",
+              "size_bytes": 2217333
+            },
+            {
+              "filename": "gst-plugins-base-libs-1.28.7-1-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/gst-plugins-base-libs-1.28.7-1-x86_64.pkg.tar.zst",
+              "sha256": "8b5a33c4a180ed4b5df69f320985c1a8387c877a68a140f8b6be3d8bf82a5727",
+              "size_bytes": 2575000
+            },
+            {
+              "filename": "gst-plugins-base-1.28.7-1-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/gst-plugins-base-1.28.7-1-x86_64.pkg.tar.zst",
+              "sha256": "375677becf1d8871f3876d7723b6b3e4a1cacef512126e76caaded65853ecf2d",
+              "size_bytes": 222900
+            },
+            {
+              "filename": "gst-plugins-good-1.28.7-1-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/gst-plugins-good-1.28.7-1-x86_64.pkg.tar.zst",
+              "sha256": "bb030193e56f2717d9d735bad19685be1ea22b246f479639c02b52058749a6cf",
+              "size_bytes": 2432549
+            },
+            {
+              "filename": "gssdp-1.6.6-1-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/gssdp-1.6.6-1-x86_64.pkg.tar.zst",
+              "sha256": "1b03fff2f98f39e973f91c06773e2bf0c9ad22316b68bf13fa1e9cd8041f39d4",
+              "size_bytes": 62037
+            },
+            {
+              "filename": "gupnp-1:1.6.10-1-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/gupnp-1:1.6.10-1-x86_64.pkg.tar.zst",
+              "sha256": "37e57db6d5731c62e9305b0b5af4f32c51e03c854db90e884b8603ada68dd812",
+              "size_bytes": 132129
+            },
+            {
+              "filename": "gupnp-igd-1.6.0-2-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/gupnp-igd-1.6.0-2-x86_64.pkg.tar.zst",
+              "sha256": "60efc49d5995fdb13d6ce373e6c394f2f87fc2a9568b40ebaec1496616aa2afd",
+              "size_bytes": 29058
+            },
+            {
+              "filename": "libnice-0.1.24-1-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/libnice-0.1.24-1-x86_64.pkg.tar.zst",
+              "sha256": "78883aacdc4e1a0e4eff42cb1bfc9d3746bd3e49d644b0183ac4a1896b8efe2a",
+              "size_bytes": 329988
+            },
+            {
+              "filename": "gst-plugins-bad-libs-1.28.7-1-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/gst-plugins-bad-libs-1.28.7-1-x86_64.pkg.tar.zst",
+              "sha256": "407f28c9c127d1df4bc90701ec386a0af318692dd786c9af1a8de6ada576d4df",
+              "size_bytes": 3339195
+            },
+            {
+              "filename": "gtk4-1:4.22.5-1-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/gtk4-1:4.22.5-1-x86_64.pkg.tar.zst",
+              "sha256": "7386543a425d523b76f08a8269b530dcbebc45a53a68cfdef5251e8238d60dc9",
+              "size_bytes": 9743414
+            },
+            {
+              "filename": "shelly-3.1.3-1-x86_64.pkg.tar.zst",
+              "url": "https://cdn77.cachyos.org/repo/x86_64/cachyos/shelly-3.1.3-1-x86_64.pkg.tar.zst",
+              "sha256": "34f0fe3aa9e9b649fd035949d260508745b76c8d4006426862b1a5e2f2c2777d",
+              "size_bytes": 2277454
+            },
+            {
+              "filename": "libmalcontent-0.14.0-4-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/libmalcontent-0.14.0-4-x86_64.pkg.tar.zst",
+              "sha256": "9c35fcdcade68ff32a0af35f5e80b3c72eb69926069ae0450a2006241109f23c",
+              "size_bytes": 70373
+            },
+            {
+              "filename": "composefs-1.0.8-1-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/composefs-1.0.8-1-x86_64.pkg.tar.zst",
+              "sha256": "f04ba335b4b466dd232e2675bcc711e1794106e6d5bcef46ad19518437d6f616",
+              "size_bytes": 60060
+            },
+            {
+              "filename": "ostree-2026.4-1-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/ostree-2026.4-1-x86_64.pkg.tar.zst",
+              "sha256": "27c234d446851690f5608de768fbf7bbe775e4b1111856acb4ffacf30f1d266a",
+              "size_bytes": 860271
+            },
+            {
+              "filename": "xdg-dbus-proxy-0.1.8-1-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/xdg-dbus-proxy-0.1.8-1-x86_64.pkg.tar.zst",
+              "sha256": "7e20f0325d3f25a9b8e5041c53c51c5be7711719bff8a6ac54c798170040ebcb",
+              "size_bytes": 27252
+            },
+            {
+              "filename": "flatpak-1:1.18.2-1-x86_64.pkg.tar.zst",
+              "url": "https://archlinux.cachyos.org/repo/extra/os/x86_64/flatpak-1:1.18.2-1-x86_64.pkg.tar.zst",
+              "sha256": "a8d3a2c80a292b02aff50d3345a532a96bd454d4c8f58f0ca35c87c3762b579c",
+              "size_bytes": 2046292
+            },
+            {
+              "filename": "shelly-flatpak-backend-3.1.3-1-x86_64.pkg.tar.zst",
+              "url": "https://cdn77.cachyos.org/repo/x86_64/cachyos/shelly-flatpak-backend-3.1.3-1-x86_64.pkg.tar.zst",
+              "sha256": "693c5d5f3a9abe67a6a09588a980ce0b3463c20c27cc668a9986525194902e58",
+              "size_bytes": 356530
+            },
+            {
+              "filename": "cachyos-packageinstaller-1.6.2-1-x86_64.pkg.tar.zst",
+              "url": "https://cdn77.cachyos.org/repo/x86_64/cachyos/cachyos-packageinstaller-1.6.2-1-x86_64.pkg.tar.zst",
+              "sha256": "11d59b1f62ccea51f503b4d267ee4b1adebf9501ecc9a5c41023bcabf4c17fc4",
+              "size_bytes": 845397
+            }
+          ]
         }
       ]
     }

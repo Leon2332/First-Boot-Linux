@@ -62,13 +62,14 @@ Each edition:
 | `url` | Direct ISO URL, or `null` until pinned |
 | `sha256` | 64 lowercase hex, or `null` until pinned |
 | `size_bytes` | ISO size, or `null` until pinned |
+| `extras[]` | Optional extra files staged next to the ISO at `images/<filename>.pkgs/`. Downloaded with the ISO (USB Creator and FBL Other options). Native installers may unpack them offline (`pacman -U`, not `-Syu`). |
 
 Rules:
 
 - `can_stage` is true only when `install` is set **and** `redistributable` is true. Do not stage an ISO we cannot install or may not copy.
 - `redistributable: false` forces `can_stage: false`. The shop may still put that distro in `recommended` as download-only once `install` is set. The creator must never write its ISO to `images/`.
 - `suggested_default` requires `install`. The creator GUI does not pre-tick; shops tick desktops under each distro.
-- Official catalog is only distros with a working **FBL-native** install driver. Current rows: Ubuntu GNOME / Cinnamon / Budgie / MATE (`ubuntu-2604-gnome`, `ubuntu-2604-cinnamon`, `ubuntu-2604-budgie`, `ubuntu-2404-mate`; Cinnamon, Budgie, and MATE are Ubuntu editions, not independent distros; MATE is 24.04.4 LTS because there is no 26.04 ISO), Linux Mint Cinnamon / MATE / Xfce (`mint-223-cinnamon`, `mint-223-mate`, `mint-223-xfce`), Fedora Plasma (`fedora-44-plasma`), Fedora GNOME (`fedora-44-gnome`), Debian GNOME (`debian-13-gnome`), Debian Plasma (`debian-13-plasma`), Debian Cinnamon (`debian-13-cinnamon`), and Debian MATE (`debian-13-mate`). Kubuntu / Lubuntu / Xubuntu stay out until native files exist. The old Subiquity / Calamares / Ubiquity / Anaconda Python drivers are gone. Older sticks may still say `ubuntu-autoinstall` / `ubuntu-2604` / `mint` / `mint-223` / `fedora-kickstart` (old trampoline ids of shipped distros, no baked-in driver). Do not reserve ids we do not ship (`nobara`, `windows`, `freebsd`, `ubuntu-calamares-2604`, `debian-preseed`); a shop pack may use them. The mockup in `docs/` is the longer future list. Driver Python lives in `chooser/firstboot/osinstall/`.
+- Official catalog is only distros with a working **FBL-native** install driver. Current rows: Ubuntu GNOME / Cinnamon / Budgie / MATE (`ubuntu-2604-gnome`, `ubuntu-2604-cinnamon`, `ubuntu-2604-budgie`, `ubuntu-2404-mate`; Cinnamon, Budgie, and MATE are Ubuntu editions, not independent distros; MATE is 24.04.4 LTS because there is no 26.04 ISO), Linux Mint Cinnamon / MATE / Xfce (`mint-223-cinnamon`, `mint-223-mate`, `mint-223-xfce`), Fedora Plasma (`fedora-44-plasma`), Fedora GNOME (`fedora-44-gnome`), Debian GNOME (`debian-13-gnome`), Debian Plasma (`debian-13-plasma`), Debian Cinnamon (`debian-13-cinnamon`), Debian MATE (`debian-13-mate`), and CachyOS Plasma (`cachyos-260809-plasma`; pinned desktop ISO 260809, offline airootfs unpack, Limine + btrfs, `secure_boot: false`). Kubuntu / Lubuntu / Xubuntu stay out until native files exist. The old Subiquity / Calamares / Ubiquity / Anaconda Python drivers are gone. Older sticks may still say `ubuntu-autoinstall` / `ubuntu-2604` / `mint` / `mint-223` / `fedora-kickstart` (old trampoline ids of shipped distros, no baked-in driver). Do not reserve ids we do not ship (`nobara`, `windows`, `freebsd`, `ubuntu-calamares-2604`, `debian-preseed`); a shop pack may use them. The mockup in `docs/` is the longer future list. Driver Python lives in `chooser/firstboot/osinstall/`.
 - Pin `url`, `sha256`, and `size_bytes` before the creator downloads that edition.
 - Shop-private distros (Pop!_OS, TUXEDO OS, a store’s own image) are **not** official-catalog rows. They are a `.zip` pack the creator copies to `payload/custom/<id>/`. See [Retailer driver packs](#retailer-driver-packs).
 
@@ -112,6 +113,7 @@ Each edition on the stick:
 | `url` | if not `local` | Direct ISO URL |
 | `sha256` | yes | 64 lowercase hex |
 | `size_bytes` | yes | ISO size in bytes |
+| `extras[]` | no | Extra files at `images/<iso>.pkgs/<filename>` (same download as the ISO). Each has `filename`, `url`, `sha256`, `size_bytes`. |
 
 The creator sets `local: true` and `file` only after the ISO is copied and verified. Recommended entries may be entirely download-only when the official row is not redistributable. Never set `local: true` on a non-redistributable edition.
 
@@ -126,7 +128,7 @@ Official logos are bundled in the chooser by `id` (`assets/distros/<id>.png` in 
 1. `retailer.conf` has the required keys; wallpapers exist. `language`, `keyboard`, and `timezone` are optional.
 2. `catalog.json` matches `catalog.schema.json`.
 3. Every distro `id` / edition exists in `official-catalog.json`, **or** it is a shop pack under `custom/<install>/` whose `install` equals the pack id and is not a reserved official id.
-4. Every `local` edition file exists under `images/` and matches `sha256`.
+4. Every `local` edition file exists under `images/` and matches `sha256`. If the edition lists `extras[]`, each extra file exists under `images/<iso>.pkgs/` and matches its `sha256`.
 5. No `local` edition unless official `can_stage`, `redistributable`, and `install` are set, **or** the row is a shop pack with a staged ISO. Recommended may list a non-redistributable official distro with every edition `local: false`. Custom editions have no download URL; only ticked desktops are written.
 6. No `..` or absolute paths.
 
@@ -145,7 +147,7 @@ locale/af.po       # optional; also locale/en-gb.po, locale/en-za.po, …
 
 `editions[]` is one ISO per desktop (Pop!_OS GNOME and COSMIC are two editions, one driver). Optional `sha256` / `size_bytes` pin the ISO; the creator rejects a file that does not match. ISOs may sit in the zip, next to the zip (same `filename`), in `~/.cache/firstboot/images/`, or be chosen in the USB Creator. They are written to `payload/images/`; they do not stay under `custom/`.
 
-`id` = `install` = folder `payload/custom/<id>/` = `DRIVER.id` in `driver.py`. Must not collide with official catalog ids or baked-in driver ids (`ubuntu`, `linux-mint`, `fedora`, `debian`, `ubuntu-2604-gnome`, `ubuntu-2604-cinnamon`, `ubuntu-2604-budgie`, `ubuntu-2404-mate`, `ubuntu-2604`, `ubuntu-autoinstall`, `mint-223-cinnamon`, `mint-223-mate`, `mint-223-xfce`, `mint-223`, `mint`, `fedora-44-plasma`, `fedora-44-gnome`, `fedora-kickstart`, `debian-13-gnome`, `debian-13-plasma`, `debian-13-cinnamon`, `debian-13-mate`). Unshipped ids (`nobara`, `windows`, `freebsd`, `kubuntu`, `lubuntu`, `xubuntu`, `debian-preseed`) are not reserved.
+`id` = `install` = folder `payload/custom/<id>/` = `DRIVER.id` in `driver.py`. Must not collide with official catalog ids or baked-in driver ids (`ubuntu`, `linux-mint`, `fedora`, `debian`, `cachyos`, `ubuntu-2604-gnome`, `ubuntu-2604-cinnamon`, `ubuntu-2604-budgie`, `ubuntu-2404-mate`, `ubuntu-2604`, `ubuntu-autoinstall`, `mint-223-cinnamon`, `mint-223-mate`, `mint-223-xfce`, `mint-223`, `mint`, `fedora-44-plasma`, `fedora-44-gnome`, `fedora-kickstart`, `debian-13-gnome`, `debian-13-plasma`, `debian-13-cinnamon`, `debian-13-mate`, `cachyos-260809-plasma`). Unshipped ids (`nobara`, `windows`, `freebsd`, `kubuntu`, `lubuntu`, `xubuntu`, `debian-preseed`) are not reserved.
 
 Optional `locale/<lang>.po` files (GNU gettext, same format as `po/af.po`) translate that pack’s **tagline and description**. `msgid` is the English string in `manifest.json`. Distro and desktop names stay untranslated. Compose copies them to `payload/custom/<id>/locale/`. The live chooser and the USB Creator GUI merge those entries **after** First Boot’s catalogues and never override chrome (`Install`, `Network`, `Back`, …). English (US) is the source; do not ship `en.po` / `en-us.po`. `en-gb.po` and `en-za.po` are spelling catalogues for that pack’s blurb.
 

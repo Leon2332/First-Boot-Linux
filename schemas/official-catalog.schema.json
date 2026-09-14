@@ -90,7 +90,8 @@
                 "debian-13-gnome",
                 "debian-13-plasma",
                 "debian-13-cinnamon",
-                "debian-13-mate"
+                "debian-13-mate",
+                "cachyos-260809-plasma"
               ]
             },
             { "type": "null" }
@@ -173,6 +174,35 @@
         "sha256": { "$ref": "#/$defs/sha256" },
         "size_bytes": {
           "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "extras": {
+          "type": "array",
+          "description": "Optional extra files staged next to the ISO (images/<filename>.pkgs/). Downloaded with the ISO. Native installers may unpack them offline.",
+          "items": { "$ref": "#/$defs/extra" }
+        }
+      }
+    },
+    "extra": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filename", "url", "sha256", "size_bytes"],
+      "properties": {
+        "filename": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+:~-]*$",
+          "description": "Basename only; written to payload/images/<iso>.pkgs/. Colons are allowed (Arch epoch)."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
           "minimum": 1
         }
       }

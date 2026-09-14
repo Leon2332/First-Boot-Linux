@@ -16,11 +16,13 @@ if CHOOSER_DIR not in sys.path:
     sys.path.insert(0, CHOOSER_DIR)
 
 from firstboot.payload import (  # noqa: E402
+    ExtraFile,
     load_payload,
     parse_retailer_conf,
     PayloadError,
     UNKNOWN_LOGO_ID,
     edition_is_present,
+    extra_relpath,
     other_options,
     recommended_offerings,
 )
@@ -563,6 +565,67 @@ class LoadPayloadTests(unittest.TestCase):
         self.assertFalse(edition_is_present(self.tmp, "../catalog.json"))
         self.assertFalse(edition_is_present(self.tmp, "/etc/passwd"))
         self.assertFalse(edition_is_present(self.tmp, None))
+
+    def test_extras_required_for_available(self) -> None:
+        extra = ExtraFile(
+            filename="shelly-3.1.3-1-x86_64.pkg.tar.zst",
+            sha256=ZERO,
+            size_bytes=1,
+            url="https://example.invalid/shelly-3.1.3-1-x86_64.pkg.tar.zst",
+        )
+        iso_rel = "images/cachyos-desktop-linux-260809.iso"
+        _write(self.tmp, iso_rel, b"iso")
+        self.assertTrue(edition_is_present(self.tmp, iso_rel))
+        self.assertFalse(edition_is_present(self.tmp, iso_rel, (extra,)))
+        extra_rel = extra_relpath(iso_rel, extra.filename)
+        self.assertEqual(
+            extra_rel,
+            "images/cachyos-desktop-linux-260809.iso.pkgs/shelly-3.1.3-1-x86_64.pkg.tar.zst",
+        )
+        _write(self.tmp, extra_rel, b"pkg")
+        self.assertTrue(edition_is_present(self.tmp, iso_rel, (extra,)))
+        cachy = {
+            "id": "cachyos",
+            "name": "CachyOS",
+            "version": "260809",
+            "tagline": "Arch, tuned for speed",
+            "description": "CachyOS is an Arch-based distribution optimized for performance. It offers advanced options appealing to power users and gamers.",
+            "family": "other",
+            "install": "cachyos-260809-plasma",
+            "secure_boot": False,
+            "editions": [
+                {
+                    "id": "plasma",
+                    "name": "KDE Plasma",
+                    "default": True,
+                    "local": True,
+                    "file": iso_rel,
+                    "sha256": ZERO,
+                    "size_bytes": 1,
+                    "extras": [
+                        {
+                            "filename": extra.filename,
+                            "url": extra.url,
+                            "sha256": ZERO,
+                            "size_bytes": 1,
+                        }
+                    ],
+                }
+            ],
+        }
+        _write(
+            self.tmp,
+            "catalog.json",
+            json.dumps({"schema_version": 1, "recommended": [cachy], "catalog": []}),
+        )
+        p = load_payload(self.tmp)
+        ed = p.recommended[0].editions[0]
+        self.assertTrue(ed.available)
+        self.assertEqual(len(ed.extras), 1)
+        self.assertEqual(ed.extras[0].filename, extra.filename)
+        os.remove(os.path.join(self.tmp, extra_rel))
+        p = load_payload(self.tmp)
+        self.assertFalse(p.recommended[0].editions[0].available)
 
     def test_custom_install_needs_pack(self) -> None:
         pop = {

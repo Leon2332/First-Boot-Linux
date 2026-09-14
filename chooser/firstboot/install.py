@@ -469,6 +469,8 @@ STALE_EFI_LABELS = (
     "Debian",
     "Linux Mint",
     "linuxmint",
+    "CachyOS",
+    "Limine",
 )
 EFI_BOOT_RE = re.compile(r"^Boot([0-9A-Fa-f]{4})\*?\s+(.*)$")
 

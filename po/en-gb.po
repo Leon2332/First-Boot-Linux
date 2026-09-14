@@ -346,6 +346,12 @@ msgstr "Rock-solid base"
 msgid "The universal operating system. Extremely stable and free-software focused."
 msgstr "The universal operating system. Extremely stable and free-software focused."
 
+msgid "Arch, tuned for speed"
+msgstr "Arch, tuned for speed"
+
+msgid "CachyOS is an Arch-based distribution optimized for performance. It offers advanced options appealing to power users and gamers."
+msgstr "CachyOS is an Arch-based distribution optimised for performance. It offers advanced options appealing to power users and gamers."
+
 msgid "Ubuntu with KDE Plasma"
 msgstr "Ubuntu with KDE Plasma"
 
@@ -495,6 +501,12 @@ msgstr "This disk is too small ({have}; need {need})."
 
 msgid "Could not write the boot partition."
 msgstr "Could not write the boot partition."
+
+msgid "Could not install extra packages."
+msgstr "Could not install extra packages."
+
+msgid "Could not set the language."
+msgstr "Could not set the language."
 
 msgid "Could not find the First Boot system partition."
 msgstr "Could not find the First Boot system partition."

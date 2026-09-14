@@ -20,6 +20,7 @@ if CHOOSER_DIR not in sys.path:
 
 from firstboot.disk import Disk, Partition, parse_helper_line, part_path  # noqa: E402
 from firstboot.osinstall import (  # noqa: E402
+    DRIVER_CACHYOS_PLASMA,
     DRIVER_DEBIAN_CINNAMON,
     DRIVER_DEBIAN_GNOME,
     DRIVER_DEBIAN_MATE,
@@ -192,6 +193,11 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(get_driver("debian-13-mate").display_manager, "lightdm")
         self.assertEqual(get_driver("debian-13-mate").unpack_kind, "live-single")
         self.assertEqual(get_driver("debian-13-mate").live_usernames, ("user",))
+        self.assertEqual(DRIVER_CACHYOS_PLASMA, "cachyos-260809-plasma")
+        self.assertTrue(is_native_driver(get_driver("cachyos-260809-plasma")))
+        self.assertEqual(get_driver("cachyos-260809-plasma").display_manager, "plasmalogin")
+        self.assertEqual(get_driver("cachyos-260809-plasma").unpack_kind, "archiso-airootfs")
+        self.assertEqual(get_driver("cachyos-260809-plasma").live_usernames, ("liveuser", "cachyos"))
         self.assertIsNone(get_driver("nobara-44-gnome"))
         self.assertIsNone(get_driver("nobara-44-plasma"))
         self.assertIsNone(get_driver("ubuntu-2604"))

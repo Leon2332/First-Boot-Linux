@@ -119,6 +119,7 @@ func Write(ctx context.Context, req Request) error {
 	}
 
 	isoPaths := map[string]string{}
+	extraPaths := map[string]string{}
 	for _, ed := range locals {
 		base := filepath.Base(ed.File)
 		report(req, "download "+base, 0, ed.SizeBytes)
@@ -129,6 +130,17 @@ func Write(ctx context.Context, req Request) error {
 			return err
 		}
 		isoPaths[ed.File] = p
+		for _, x := range ed.Extras {
+			rel := catalog.ExtraRel(ed.File, x.Filename)
+			report(req, "download "+x.Filename, 0, x.SizeBytes)
+			ep, err := localExtra(ctx, req, x, func(name string, got, total int64) {
+				report(req, "download "+name, got, total)
+			})
+			if err != nil {
+				return err
+			}
+			extraPaths[rel] = ep
+		}
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -157,7 +169,7 @@ func Write(ctx context.Context, req Request) error {
 	if err := buildSYS(req, sysTree, sysUUID); err != nil {
 		return err
 	}
-	if err := buildDATA(req, dataTree, isoPaths); err != nil {
+	if err := buildDATA(req, dataTree, isoPaths, extraPaths); err != nil {
 		return err
 	}
 
@@ -226,6 +238,13 @@ func packEdition(packs []*catalog.Pack, file string) *catalog.PackEdition {
 		}
 	}
 	return nil
+}
+
+func localExtra(ctx context.Context, req Request, x catalog.ShopExtra, progress cache.ProgressFunc) (string, error) {
+	if req.Cache == nil {
+		return "", fmt.Errorf("compose: no ISO cache")
+	}
+	return req.Cache.EnsureFile(ctx, x.Filename, x.URL, x.SHA256, x.SizeBytes, progress)
 }
 
 func localISO(ctx context.Context, req Request, ed catalog.ShopEdition, progress cache.ProgressFunc) (string, error) {
@@ -333,7 +352,7 @@ func buildSYS(req Request, root, sysUUID string) error {
 	return writeSums(root, "md5sum.txt", md5sum)
 }
 
-func buildDATA(req Request, root string, isos map[string]string) error {
+func buildDATA(req Request, root string, isos, extras map[string]string) error {
 	for _, d := range []string{
 		filepath.Join(root, "wallpapers"),
 		filepath.Join(root, "images"),
@@ -396,6 +415,33 @@ func buildDATA(req Request, root string, isos map[string]string) error {
 		}
 		if sum != ed.SHA256 {
 			return fmt.Errorf("%s: sha256 mismatch after copy", ed.File)
+		}
+	}
+	for rel, src := range extras {
+		if src == "" {
+			return fmt.Errorf("missing cached %s", rel)
+		}
+		dest := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+			return err
+		}
+		if err := linkOrCopy(src, dest); err != nil {
+			return err
+		}
+		sum, err := cache.HashFile(dest)
+		if err != nil {
+			return err
+		}
+		want := ""
+		for _, ed := range req.Shop.LocalEditions() {
+			for _, x := range ed.Extras {
+				if catalog.ExtraRel(ed.File, x.Filename) == rel {
+					want = x.SHA256
+				}
+			}
+		}
+		if want == "" || sum != want {
+			return fmt.Errorf("%s: sha256 mismatch after copy", rel)
 		}
 	}
 	for _, p := range packsOnStick(req) {

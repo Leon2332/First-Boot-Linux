@@ -126,7 +126,7 @@ func TestLoadZipAndBuildShopTwoEditions(t *testing.T) {
 	if !pop.Editions[0].Default || pop.Editions[1].Default {
 		t.Fatalf("featured should stay pack default (gnome): %+v", pop.Editions)
 	}
-	if got := shopIDs(shop.Catalog); len(got) != 4 || got[0] != "ubuntu" || got[1] != "linux-mint" || got[2] != "fedora" || got[3] != "debian" {
+	if got := shopIDs(shop.Catalog); len(got) != 5 || got[0] != "ubuntu" || got[1] != "linux-mint" || got[2] != "fedora" || got[3] != "debian" || got[4] != "cachyos" {
 		t.Fatalf("official distros should stay downloads, catalog %+v", got)
 	}
 
@@ -256,6 +256,9 @@ func TestReservedPackID(t *testing.T) {
 	}
 	if !ReservedPackID("debian", off) || !ReservedPackID("debian-13-gnome", off) || !ReservedPackID("debian-13-plasma", off) || !ReservedPackID("debian-13-cinnamon", off) || !ReservedPackID("debian-13-mate", off) {
 		t.Fatal("debian is reserved")
+	}
+	if !ReservedPackID("cachyos", off) || !ReservedPackID("cachyos-260809-plasma", off) {
+		t.Fatal("cachyos is reserved")
 	}
 	for _, id := range []string{
 		"nobara", "nobara-44-plasma", "nobara-44-gnome",

@@ -25,8 +25,9 @@ Do not reboot into Subiquity, Calamares, Ubiquity, or Anaconda.
 | `debian_13_plasma.py` | `debian-13-plasma` | Native live-single (Debian 13 KDE Plasma: same unpack, SDDM). **Official catalog.** |
 | `debian_13_cinnamon.py` | `debian-13-cinnamon` | Native live-single (Debian 13 Cinnamon: same unpack, LightDM). **Official catalog.** |
 | `debian_13_mate.py` | `debian-13-mate` | Native live-single (Debian 13 MATE: same unpack, LightDM). **Official catalog.** |
+| `cachyos_260809_plasma.py` | `cachyos-260809-plasma` | Native archiso-airootfs (CachyOS desktop 260809 Plasma: unpack `arch/x86_64/airootfs.sfs`, ESP at `/boot`, systemd-boot, btrfs `@`/`@home`/…, plasmalogin). Offline Calamares path; do not pacstrap. Drop the live `linux.preset` (archiso) before mkinitcpio. Limine is not on that ISO. After deleting live `g_wheel`, write `/etc/sudoers.d/10-installer` (`%wheel ALL=(ALL) ALL`). If no NVIDIA GPU, drop live ISO nvidia-open/`nvidia-utils` (Calamares `removeun`). Stage Shelly + `cachyos-packageinstaller` (and deps) from `images/<iso>.pkgs/` with `pacman -U`. **Official catalog.** `secure_boot: false`. |
 
-Official `official-catalog.json` currently lists **Ubuntu GNOME / Cinnamon / Budgie / MATE**, **Mint Cinnamon / MATE / Xfce**, **Fedora Plasma / GNOME**, and **Debian GNOME / Plasma / Cinnamon / MATE**. Cinnamon, Budgie, and MATE are Ubuntu editions (Ubuntu logo + DE name), not independent distros. Kubuntu / Lubuntu / Xubuntu stay out until each has a native file.
+Official `official-catalog.json` currently lists **Ubuntu GNOME / Cinnamon / Budgie / MATE**, **Mint Cinnamon / MATE / Xfce**, **Fedora Plasma / GNOME**, **Debian GNOME / Plasma / Cinnamon / MATE**, and **CachyOS Plasma**. Cinnamon, Budgie, and MATE are Ubuntu editions (Ubuntu logo + DE name), not independent distros. Kubuntu / Lubuntu / Xubuntu stay out until each has a native file.
 
 `__init__.py` is the trampoline. Native drivers (`unpack_kind`) run
 `pipeline.py`. If the disk was already wiped and the install fails, the
@@ -44,9 +45,9 @@ Mint editions are `mint-223-cinnamon`, `mint-223-mate`, and
 `mint-223-xfce`. Fedora Plasma is `fedora-44-plasma`. Fedora GNOME is
 `fedora-44-gnome`. Debian GNOME is `debian-13-gnome`. Debian Plasma is
 `debian-13-plasma`. Debian Cinnamon is `debian-13-cinnamon`. Debian
-MATE is `debian-13-mate`. Do not reserve ids we do not ship (`nobara`,
-`windows`, `freebsd`, `ubuntu-calamares-2604`, `debian-preseed`); a
-shop pack may use them.
+MATE is `debian-13-mate`. CachyOS Plasma is `cachyos-260809-plasma`.
+Do not reserve ids we do not ship (`nobara`, `windows`, `freebsd`,
+`ubuntu-calamares-2604`, `debian-preseed`); a shop pack may use them.
 
 ## Adding an official ISO
 

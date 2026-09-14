@@ -10,9 +10,11 @@ Cinnamon, MATE, and Xfce (``mint_223_cinnamon.py``,
 (``fedora_44_plasma.py``), Fedora 44 GNOME (``fedora_44_gnome.py``),
 Debian 13 GNOME (``debian_13_gnome.py``), Debian 13 Plasma
 (``debian_13_plasma.py``), Debian 13 Cinnamon
-(``debian_13_cinnamon.py``), and Debian 13 MATE
-(``debian_13_mate.py``). Ubuntu Cinnamon, Budgie, and MATE are
-editions under Ubuntu, not independent distros.
+(``debian_13_cinnamon.py``), Debian 13 MATE
+(``debian_13_mate.py``), and CachyOS Plasma
+(``cachyos_260809_plasma.py``; pinned desktop ISO 260809, Limine,
+btrfs). Ubuntu Cinnamon, Budgie, and MATE are editions under Ubuntu,
+not independent distros.
 Shop packs still use the legacy ``boot_files`` / ``kernel_args`` /
 ``seed_files`` API.
 
@@ -48,7 +50,12 @@ from firstboot.disk import (
     live_mounts,
     parse_helper_line,
 )
-from firstboot.isodownload import DownloadError, dest_is_payload_image, download_iso
+from firstboot.isodownload import (
+    DownloadError,
+    dest_is_payload_image,
+    download_iso,
+    extra_dest,
+)
 from firstboot.install import blkid_uuid
 from firstboot.i18n import _, apply_payload_language
 from firstboot.installlocale import payload_install_locale
@@ -62,6 +69,7 @@ from firstboot.payload import (
 )
 
 from . import (
+    cachyos_260809_plasma,
     debian_13_cinnamon,
     debian_13_gnome,
     debian_13_mate,
@@ -111,6 +119,7 @@ _DRIVER_MODULES = (
     debian_13_plasma,
     debian_13_cinnamon,
     debian_13_mate,
+    cachyos_260809_plasma,
 )
 
 
@@ -139,6 +148,7 @@ DRIVER_DEBIAN_GNOME = debian_13_gnome.ID
 DRIVER_DEBIAN_PLASMA = debian_13_plasma.ID
 DRIVER_DEBIAN_CINNAMON = debian_13_cinnamon.ID
 DRIVER_DEBIAN_MATE = debian_13_mate.ID
+DRIVER_CACHYOS_PLASMA = cachyos_260809_plasma.ID
 
 _casper_boot_files = casper_boot_files
 _CUSTOM_DRIVERS: dict[str, object] = {}
@@ -1282,6 +1292,76 @@ def run_iso_fetch(
         raise OsInstallError(err)
     if status != 0:
         raise OsInstallError(f"Download failed ({status}).")
+
+
+def _scale_fetch_event(
+    on_event: Callable[..., None] | None,
+    lo: int,
+    hi: int,
+    *,
+    done: bool,
+) -> Callable[..., None] | None:
+    if on_event is None:
+        return None
+
+    def inner(event: HelperEvent) -> None:
+        if event.kind == "progress" and event.progress is not None:
+            n = lo + (hi - lo) * int(event.progress) // 100
+            on_event(HelperEvent("progress", progress=n))
+        elif event.kind == "done":
+            if done:
+                on_event(HelperEvent("done", progress=hi))
+            else:
+                on_event(HelperEvent("progress", progress=hi))
+        else:
+            on_event(event)
+
+    return inner
+
+
+def run_edition_fetch(
+    edition: Edition,
+    payload_root: str,
+    dest: str,
+    on_event: Callable[..., None] | None = None,
+) -> None:
+    extras = edition.extras
+    iso_hi = 100 if not extras else 95
+    if edition.url:
+        run_iso_fetch(
+            edition.url,
+            dest,
+            edition.sha256,
+            edition.size_bytes,
+            payload_root,
+            on_event=_scale_fetch_event(on_event, 0, iso_hi, done=not extras),
+        )
+    elif os.path.isfile(dest):
+        if on_event is not None:
+            on_event(HelperEvent("progress", progress=iso_hi))
+            if not extras:
+                on_event(HelperEvent("done", progress=100))
+    else:
+        raise OsInstallError(_("The download address is not valid."))
+    if not extras:
+        return
+    n = len(extras)
+    for i, extra in enumerate(extras):
+        lo = 95 + i * 5 // n
+        hi = 95 + (i + 1) * 5 // n
+        last = i == n - 1
+        if last:
+            hi = 100
+        if not extra.url:
+            raise OsInstallError(_("The download address is not valid."))
+        run_iso_fetch(
+            extra.url,
+            extra_dest(payload_root, edition, extra),
+            extra.sha256,
+            extra.size_bytes,
+            payload_root,
+            on_event=_scale_fetch_event(on_event, lo, hi, done=last),
+        )
 
 
 def main(argv: list[str] | None = None) -> int:

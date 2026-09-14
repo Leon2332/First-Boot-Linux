@@ -208,8 +208,22 @@ class PoTests(unittest.TestCase):
         self.assertIn("Afgewerkte werkskerm", _("A polished desktop with excellent hardware support and a large software library. A safe default for most laptops."))
         self.assertEqual(_("Ubuntu with KDE Plasma"), "Ubuntu met KDE Plasma")
         self.assertEqual(_("Very lightweight"), "Baie liggewig")
+        self.assertEqual(_("Arch, tuned for speed"), "Arch, afgestem vir spoed")
+        self.assertIn(
+            "geoptimaliseer",
+            _("CachyOS is an Arch-based distribution optimized for performance. It offers advanced options appealing to power users and gamers."),
+        )
+        apply_language("en-gb")
+        self.assertIn(
+            "optimised",
+            _("CachyOS is an Arch-based distribution optimized for performance. It offers advanced options appealing to power users and gamers."),
+        )
         apply_language("en-us")
         self.assertEqual(_("Popular and well-supported"), "Popular and well-supported")
+        self.assertIn(
+            "optimized",
+            _("CachyOS is an Arch-based distribution optimized for performance. It offers advanced options appealing to power users and gamers."),
+        )
 
     def test_creator_strings(self) -> None:
         apply_language("af")

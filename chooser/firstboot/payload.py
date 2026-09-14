@@ -38,6 +38,7 @@ INSTALL_DRIVERS = frozenset(
         "debian-13-plasma",
         "debian-13-cinnamon",
         "debian-13-mate",
+        "cachyos-260809-plasma",
     }
 )
 ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -65,6 +66,10 @@ def install_allowed(install: str, root: str) -> bool:
     return custom_driver_path(root, install) is not None
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 FILE_RE = re.compile(r"^images/[^/\\]+\.(iso|img)$")
+EXTRA_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+:~-]*$")
+EXTRA_REL_RE = re.compile(
+    r"^images/[^/\\]+\.(iso|img)\.pkgs/[A-Za-z0-9][A-Za-z0-9._+:~-]*$"
+)
 
 
 class PayloadError(Exception):
@@ -83,6 +88,14 @@ class Retailer:
 
 
 @dataclass(frozen=True)
+class ExtraFile:
+    filename: str
+    sha256: str
+    size_bytes: int
+    url: str | None = None
+
+
+@dataclass(frozen=True)
 class Edition:
     id: str
     name: str
@@ -95,6 +108,7 @@ class Edition:
     available: bool
     install: str | None = None
     unknown_install: bool = False
+    extras: tuple[ExtraFile, ...] = ()
 
     @property
     def on_disk(self) -> bool:
@@ -251,12 +265,52 @@ def format_size(size_bytes: int) -> str:
     ).size_label()
 
 
-def edition_is_present(root: str, file_rel: str | None) -> bool:
-    if not file_rel:
+def extras_dir_rel(file_rel: str) -> str:
+    return file_rel + ".pkgs"
+
+
+def extra_relpath(file_rel: str, filename: str) -> str:
+    return extras_dir_rel(file_rel) + "/" + filename
+
+
+def image_rel_from_url(url: str | None) -> str | None:
+    if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+        return None
+    from urllib.parse import unquote, urlparse
+
+    base = os.path.basename(unquote(urlparse(url).path))
+    rel = f"images/{base}"
+    if FILE_RE.fullmatch(rel):
+        return rel
+    return None
+
+
+def edition_image_rel(file_rel: str | None, url: str | None) -> str | None:
+    if isinstance(file_rel, str) and FILE_RE.fullmatch(file_rel):
+        return file_rel
+    return image_rel_from_url(url)
+
+
+def edition_is_present(
+    root: str,
+    file_rel: str | None,
+    extras: tuple[ExtraFile, ...] | list[ExtraFile] = (),
+    url: str | None = None,
+) -> bool:
+    rel = edition_image_rel(file_rel, url)
+    if not rel:
         return False
-    if _unsafe_relpath(file_rel):
+    if _unsafe_relpath(rel):
         return False
-    return os.path.isfile(os.path.join(root, file_rel))
+    if not os.path.isfile(os.path.join(root, rel)):
+        return False
+    for extra in extras:
+        extra_rel = extra_relpath(rel, extra.filename)
+        if _unsafe_relpath(extra_rel) or not EXTRA_REL_RE.fullmatch(extra_rel):
+            return False
+        if not os.path.isfile(os.path.join(root, extra_rel)):
+            return False
+    return True
 
 
 def _load_retailer(root: str) -> Retailer:
@@ -442,6 +496,7 @@ def _parse_edition(
         "sha256",
         "size_bytes",
         "install",
+        "extras",
     }
     if extra:
         raise PayloadError(f"catalog.json: {where} unknown keys: {', '.join(sorted(extra))}")
@@ -475,7 +530,13 @@ def _parse_edition(
         ):
             raise PayloadError(f"catalog.json: {where} file must look like images/name.iso")
 
-    available = edition_is_present(root, file_rel if isinstance(file_rel, str) else None)
+    extras = _parse_extras(raw.get("extras"), f"{where}.extras")
+    available = edition_is_present(
+        root,
+        file_rel if isinstance(file_rel, str) else None,
+        extras,
+        url=url if isinstance(url, str) else None,
+    )
     ed_install = raw.get("install")
     ed_unknown = distro_unknown
     if ed_install is not None:
@@ -494,7 +555,55 @@ def _parse_edition(
         available=available,
         install=ed_install if isinstance(ed_install, str) else None,
         unknown_install=ed_unknown,
+        extras=extras,
     )
+
+
+def _parse_extras(raw: object, where: str) -> tuple[ExtraFile, ...]:
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise PayloadError(f"catalog.json: {where} must be an array")
+    out: list[ExtraFile] = []
+    seen: set[str] = set()
+    for i, item in enumerate(raw):
+        loc = f"{where}[{i}]"
+        if not isinstance(item, dict):
+            raise PayloadError(f"catalog.json: {loc} must be an object")
+        unknown = set(item) - {"filename", "url", "sha256", "size_bytes"}
+        if unknown:
+            raise PayloadError(
+                f"catalog.json: {loc} unknown keys: {', '.join(sorted(unknown))}"
+            )
+        for key in ("filename", "url", "sha256", "size_bytes"):
+            if key not in item:
+                raise PayloadError(f"catalog.json: {loc} missing {key}")
+        name = item["filename"]
+        if not isinstance(name, str) or not EXTRA_NAME_RE.fullmatch(name):
+            raise PayloadError(f"catalog.json: {loc} invalid filename")
+        if name in seen:
+            raise PayloadError(f"catalog.json: {loc} duplicate filename")
+        seen.add(name)
+        extra_url = item["url"]
+        if not isinstance(extra_url, str) or not extra_url.startswith(
+            ("http://", "https://")
+        ):
+            raise PayloadError(f"catalog.json: {loc} needs a url")
+        if not isinstance(item["sha256"], str) or not SHA256_RE.fullmatch(item["sha256"]):
+            raise PayloadError(f"catalog.json: {loc} sha256 must be 64 lowercase hex")
+        if not isinstance(item["size_bytes"], int) or isinstance(item["size_bytes"], bool):
+            raise PayloadError(f"catalog.json: {loc} size_bytes must be an integer")
+        if item["size_bytes"] < 1:
+            raise PayloadError(f"catalog.json: {loc} size_bytes must be >= 1")
+        out.append(
+            ExtraFile(
+                filename=name,
+                sha256=item["sha256"],
+                size_bytes=item["size_bytes"],
+                url=extra_url,
+            )
+        )
+    return tuple(out)
 
 
 def recommended_offerings(distros: list[Distro]) -> list[tuple[Distro, Edition]]:

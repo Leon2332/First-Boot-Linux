@@ -16,7 +16,7 @@ from collections.abc import Callable
 from urllib.parse import unquote, urlparse
 
 from firstboot.i18n import _
-from firstboot.payload import FILE_RE, Edition
+from firstboot.payload import EXTRA_REL_RE, FILE_RE, Edition, ExtraFile, extra_relpath
 
 USER_AGENT = "FirstBootLinux/1.0"
 CHUNK = 256 * 1024
@@ -42,6 +42,13 @@ def edition_dest(payload_root: str, edition: Edition) -> str:
     return os.path.abspath(os.path.join(payload_root, edition_relpath(edition)))
 
 
+def extra_dest(payload_root: str, edition: Edition, extra: ExtraFile) -> str:
+    iso_rel = edition_relpath(edition)
+    return os.path.abspath(
+        os.path.join(payload_root, extra_relpath(iso_rel, extra.filename))
+    )
+
+
 def free_bytes(path: str) -> int:
     st = os.statvfs(path)
     return st.f_bavail * st.f_frsize
@@ -54,7 +61,8 @@ def dest_is_payload_image(payload_root: str, dest: str) -> bool:
         rel = os.path.relpath(path, root)
     except ValueError:
         return False
-    return FILE_RE.fullmatch(rel.replace("\\", "/")) is not None
+    rel = rel.replace("\\", "/")
+    return FILE_RE.fullmatch(rel) is not None or EXTRA_REL_RE.fullmatch(rel) is not None
 
 
 def _sha256_file(path: str, size: int = 0) -> str:
