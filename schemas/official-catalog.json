@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-09-13",
+  "updated": "2026-09-14",
   "distros": [
     {
       "id": "ubuntu",
@@ -53,6 +53,16 @@
           "url": "https://cdimage.ubuntu.com/ubuntu-mate/releases/24.04.4/release/ubuntu-mate-24.04.4-desktop-amd64.iso",
           "sha256": "8b7c08c056ba9312fe83e5bf13751216236e6382584861c3b64701ae039c4009",
           "size_bytes": 4518877184
+        },
+        {
+          "id": "plasma",
+          "name": "Plasma",
+          "default": false,
+          "install": "ubuntu-2604-plasma",
+          "filename": "kubuntu-26.04-desktop-amd64.iso",
+          "url": "https://cdimage.ubuntu.com/kubuntu/releases/26.04/release/kubuntu-26.04-desktop-amd64.iso",
+          "sha256": "95ce9cf68f13015b9a88bd1ef86fcf7eda77c99979fda48c69e28aa0a84f88ac",
+          "size_bytes": 5068847104
         }
       ]
     },

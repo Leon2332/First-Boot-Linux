@@ -24,6 +24,7 @@ INSTALL_DRIVERS = frozenset(
         "ubuntu-2604-cinnamon",
         "ubuntu-2604-budgie",
         "ubuntu-2404-mate",
+        "ubuntu-2604-plasma",
         "ubuntu-2604",
         "ubuntu-autoinstall",
         "mint-223-cinnamon",

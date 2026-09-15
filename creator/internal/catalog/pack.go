@@ -30,6 +30,7 @@ var ReservedInstallIDs = map[string]bool{
 	"ubuntu-2604-cinnamon":  true,
 	"ubuntu-2604-budgie":    true,
 	"ubuntu-2404-mate":      true,
+	"ubuntu-2604-plasma":    true,
 	"ubuntu-2604":           true,
 	"ubuntu-autoinstall":    true,
 	"mint-223-cinnamon":     true,

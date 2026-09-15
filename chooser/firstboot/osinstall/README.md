@@ -16,6 +16,7 @@ Do not reboot into Subiquity, Calamares, Ubiquity, or Anaconda.
 | `ubuntu_2604_cinnamon.py` | `ubuntu-2604-cinnamon` | Native casper-layered (Ubuntu 26.04 Cinnamon, LightDM). Unpack is `minimal` + `standard` only. Those layers already have the kernel and **dracut**; build the initrd with `dracut --no-hostonly`. Do not copy the live layer, do not apt-install initramfs-tools (Conflicts with dracut). **Official catalog.** Ubuntu edition, not a separate distro. |
 | `ubuntu_2604_budgie.py` | `ubuntu-2604-budgie` | Native casper-layered (Ubuntu 26.04 Budgie, SDDM). Unpack is `minimal` + `standard` only. Those layers already have the kernel and **dracut**; build the initrd with `dracut --no-hostonly`. Do not copy the live layer (seeds `ubuntu-desktop-bootstrap` rev 589 and a systemd snap mount that dies with `Can't lookup blockdev`). **Official catalog.** Ubuntu edition, not a separate distro. |
 | `ubuntu_2404_mate.py` | `ubuntu-2404-mate` | Native casper-layered (Ubuntu MATE 24.04.4 LTS, LightDM). Unpack is `minimal` + `standard` only. Kernel / firmware / signed GRUB are live-only — `dpkg -i` those pool debs (the ISO is not a working apt repo). Extract 24.04 `grub2-common` / `grub-efi-amd64-bin` / `-signed` with `dpkg-deb -x`; do not apt-install grub (postinst needs a mounted ESP). **Official catalog.** Ubuntu edition; there is no 26.04 ISO. |
+| `ubuntu_2604_plasma.py` | `ubuntu-2604-plasma` | Native casper-single (Ubuntu 26.04 Plasma, SDDM). ISO is Canonical's `kubuntu-26.04-desktop-amd64.iso`. Unpack `casper/filesystem.squashfs`. That squashfs is the Try/Install session (`kubuntu-installer-prompt` + `kubuntu-live-environment.desktop`); Calamares `packages.conf` removes those plus `calamares*` / `cifs-utils`. Purge them, write SDDM `Session=plasma` without autologin User, never reboot into Calamares. Live user is `kubuntu`. **Official catalog.** Ubuntu edition, not a separate Kubuntu distro. |
 | `mint_223_cinnamon.py` | `mint-223-cinnamon` | Native casper-single (Linux Mint 22.3 Cinnamon). **Official catalog.** |
 | `mint_223_mate.py` | `mint-223-mate` | Native casper-single (Linux Mint 22.3 MATE). **Official catalog.** |
 | `mint_223_xfce.py` | `mint-223-xfce` | Native casper-single (Linux Mint 22.3 Xfce). **Official catalog.** |
@@ -27,7 +28,7 @@ Do not reboot into Subiquity, Calamares, Ubiquity, or Anaconda.
 | `debian_13_mate.py` | `debian-13-mate` | Native live-single (Debian 13 MATE: same unpack, LightDM). **Official catalog.** |
 | `cachyos_260809_plasma.py` | `cachyos-260809-plasma` | Native archiso-airootfs (CachyOS desktop 260809 Plasma: unpack `arch/x86_64/airootfs.sfs`, ESP at `/boot`, systemd-boot, btrfs `@`/`@home`/…, plasmalogin). Offline Calamares path; do not pacstrap. Drop the live `linux.preset` (archiso) before mkinitcpio. Limine is not on that ISO. After deleting live `g_wheel`, write `/etc/sudoers.d/10-installer` (`%wheel ALL=(ALL) ALL`). If no NVIDIA GPU, drop live ISO nvidia-open/`nvidia-utils` (Calamares `removeun`). Stage Shelly + `cachyos-packageinstaller` (and deps) from `images/<iso>.pkgs/` with `pacman -U`. **Official catalog.** `secure_boot: false`. |
 
-Official `official-catalog.json` currently lists **Ubuntu GNOME / Cinnamon / Budgie / MATE**, **Mint Cinnamon / MATE / Xfce**, **Fedora Plasma / GNOME**, **Debian GNOME / Plasma / Cinnamon / MATE**, and **CachyOS Plasma**. Cinnamon, Budgie, and MATE are Ubuntu editions (Ubuntu logo + DE name), not independent distros. Kubuntu / Lubuntu / Xubuntu stay out until each has a native file.
+Official `official-catalog.json` currently lists **Ubuntu GNOME / Cinnamon / Budgie / MATE / Plasma**, **Mint Cinnamon / MATE / Xfce**, **Fedora Plasma / GNOME**, **Debian GNOME / Plasma / Cinnamon / MATE**, and **CachyOS Plasma**. Cinnamon, Budgie, MATE, and Plasma are Ubuntu editions (Ubuntu logo + DE name), not independent distros. Plasma uses the Kubuntu ISO. Lubuntu / Xubuntu stay out until each has a native file.
 
 `__init__.py` is the trampoline. Native drivers (`unpack_kind`) run
 `pipeline.py`. If the disk was already wiped and the install fails, the
@@ -41,6 +42,7 @@ Older sticks may still say `ubuntu-autoinstall`, `ubuntu-2604`, `mint`,
 (no baked-in driver). Ubuntu GNOME on a **new** stick is
 `ubuntu-2604-gnome`. Ubuntu Cinnamon is `ubuntu-2604-cinnamon`. Ubuntu
 Budgie is `ubuntu-2604-budgie`. Ubuntu MATE is `ubuntu-2404-mate`.
+Ubuntu Plasma is `ubuntu-2604-plasma`.
 Mint editions are `mint-223-cinnamon`, `mint-223-mate`, and
 `mint-223-xfce`. Fedora Plasma is `fedora-44-plasma`. Fedora GNOME is
 `fedora-44-gnome`. Debian GNOME is `debian-13-gnome`. Debian Plasma is

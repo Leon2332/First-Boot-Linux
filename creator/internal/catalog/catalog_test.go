@@ -28,7 +28,7 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	if *u.DefaultEdition().SizeBytes != 6518974464 {
 		t.Fatalf("ubuntu size %v", u.DefaultEdition().SizeBytes)
 	}
-	if len(u.Editions) != 4 {
+	if len(u.Editions) != 5 {
 		t.Fatalf("ubuntu editions %d", len(u.Editions))
 	}
 	uCinnamon := u.Edition("cinnamon")
@@ -42,6 +42,13 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	uMate := u.Edition("mate")
 	if uMate == nil || uMate.Install == nil || *uMate.Install != "ubuntu-2404-mate" || *uMate.SizeBytes != 4518877184 {
 		t.Fatalf("ubuntu mate %+v", uMate)
+	}
+	uPlasma := u.Edition("plasma")
+	if uPlasma == nil || uPlasma.Install == nil || *uPlasma.Install != "ubuntu-2604-plasma" || *uPlasma.SizeBytes != 5068847104 {
+		t.Fatalf("ubuntu plasma %+v", uPlasma)
+	}
+	if uPlasma.Name != "Plasma" || uPlasma.Filename != "kubuntu-26.04-desktop-amd64.iso" {
+		t.Fatalf("ubuntu plasma is an Ubuntu edition, got %+v", uPlasma)
 	}
 	if u.SuggestedDefault {
 		t.Fatalf("nothing should be a suggested default")
@@ -166,7 +173,7 @@ func TestLoadOfficialAndStageable(t *testing.T) {
 	}
 	for _, id := range []string{"kubuntu", "lubuntu", "ubuntu-budgie", "ubuntu-mate", "ubuntu-cinnamon", "xubuntu"} {
 		if cat.Distro(id) != nil {
-			t.Fatalf("%s must not be an independent official distro; Cinnamon / Budgie / MATE are Ubuntu editions", id)
+			t.Fatalf("%s must not be an independent official distro; Cinnamon / Budgie / MATE / Plasma are Ubuntu editions", id)
 		}
 	}
 }
@@ -205,7 +212,7 @@ func TestBuildShop(t *testing.T) {
 	if ub.Install != "ubuntu-2604-gnome" {
 		t.Fatalf("install %s", ub.Install)
 	}
-	if len(ub.Editions) != 4 {
+	if len(ub.Editions) != 5 {
 		t.Fatalf("ubuntu shop editions %d", len(ub.Editions))
 	}
 	if ub.Editions[0].ID != "gnome" || !ub.Editions[0].Local {
@@ -220,6 +227,9 @@ func TestBuildShop(t *testing.T) {
 	if ub.Editions[3].ID != "mate" || ub.Editions[3].Local || ub.Editions[3].Install != "ubuntu-2404-mate" {
 		t.Fatalf("unticked mate should stay a download, got %+v", ub.Editions[3])
 	}
+	if ub.Editions[4].ID != "plasma" || ub.Editions[4].Local || ub.Editions[4].Install != "ubuntu-2604-plasma" {
+		t.Fatalf("unticked plasma should stay a download, got %+v", ub.Editions[4])
+	}
 	flavorShop, err := BuildShop(cat, []string{"ubuntu:cinnamon", "ubuntu:budgie", "ubuntu:mate"})
 	if err != nil {
 		t.Fatal(err)
@@ -228,7 +238,7 @@ func TestBuildShop(t *testing.T) {
 		t.Fatalf("ubuntu distro install %s", flavorShop.Recommended[0].Install)
 	}
 	ueds := flavorShop.Recommended[0].Editions
-	if len(ueds) != 4 || ueds[0].ID != "cinnamon" || !ueds[0].Local || ueds[0].Install != "ubuntu-2604-cinnamon" {
+	if len(ueds) != 5 || ueds[0].ID != "cinnamon" || !ueds[0].Local || ueds[0].Install != "ubuntu-2604-cinnamon" {
 		t.Fatalf("ticked cinnamon %+v", ueds)
 	}
 	if ueds[0].File != "images/ubuntucinnamon-26.04-desktop-amd64.iso" {
@@ -248,6 +258,20 @@ func TestBuildShop(t *testing.T) {
 	}
 	if ueds[3].ID != "gnome" || ueds[3].Local || ueds[3].Install != "" {
 		t.Fatalf("unticked gnome should inherit distro install, got %+v", ueds[3])
+	}
+	if ueds[4].ID != "plasma" || ueds[4].Local || ueds[4].Install != "ubuntu-2604-plasma" {
+		t.Fatalf("unticked plasma should stay a download, got %+v", ueds[4])
+	}
+	uPlasmaShop, err := BuildShop(cat, []string{"ubuntu:plasma"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	peds := uPlasmaShop.Recommended[0].Editions
+	if len(peds) != 5 || peds[0].ID != "plasma" || !peds[0].Local || peds[0].Install != "ubuntu-2604-plasma" {
+		t.Fatalf("ticked plasma %+v", peds)
+	}
+	if peds[0].File != "images/kubuntu-26.04-desktop-amd64.iso" {
+		t.Fatalf("ubuntu plasma file %s", peds[0].File)
 	}
 	mintShop, err := BuildShop(cat, []string{"linux-mint:cinnamon"})
 	if err != nil {

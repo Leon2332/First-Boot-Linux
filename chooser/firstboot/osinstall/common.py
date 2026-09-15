@@ -860,7 +860,18 @@ def add_user(root: str, identity: OsIdentity, log: InstallLog | None = None) -> 
     skel = os.path.join(root, "etc", "skel")
     if not os.path.isdir(dest_home):
         if os.path.isdir(skel):
-            shutil.copytree(skel, dest_home, dirs_exist_ok=True)
+            # Preserve skel symlinks. Kubuntu 26.04 Desktop/*.desktop are
+            # absolute links into /usr/share/applications; following them
+            # from the live FBL tree is ENOENT and aborted configure
+            # (org.kubuntu.web.home.desktop, org.kfocus.web.howtos.desktop).
+            try:
+                shutil.copytree(
+                    skel, dest_home, symlinks=True, dirs_exist_ok=True
+                )
+            except shutil.Error as exc:
+                if log:
+                    log.write(f"skel copy skipped some files: {exc}")
+                os.makedirs(dest_home, exist_ok=True)
         else:
             os.makedirs(dest_home, exist_ok=True)
     try:

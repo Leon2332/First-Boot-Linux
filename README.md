@@ -86,3 +86,34 @@ However it will come down to some or all of the following:
 
 > [!Note]
 > First Boot Linux checks whether the device has Secure Boot enabled. If enabled, only OS/distribution options that support Secure Boot will be displayed.
+
+
+# Maintainers
+
+## Base
+- First Boot Linux - [Leon de Klerk](https://github.com/Leon2332)
+- First Boot USB Creator - [Leon de Klerk](https://github.com/Leon2332)
+
+## Installers
+#### Ubuntu:
+  - GNOME - [Leon de Klerk](https://github.com/Leon2332)
+  - Plasma - [Leon de Klerk](https://github.com/Leon2332)
+  - Budgie - [Leon de Klerk](https://github.com/Leon2332)
+  - Cinnamon - [Leon de Klerk](https://github.com/Leon2332)
+  - MATE - [Leon de Klerk](https://github.com/Leon2332)
+#### Linux Mint:
+  - Cinnamon - [Leon de Klerk](https://github.com/Leon2332)
+  - MATE - [Leon de Klerk](https://github.com/Leon2332)
+  - Xfce - [Leon de Klerk](https://github.com/Leon2332)
+#### Fedora:
+  - Plasma - [Leon de Klerk](https://github.com/Leon2332)
+  - GNOME - [Leon de Klerk](https://github.com/Leon2332)
+#### Debian:
+  - GNOME - [Leon de Klerk](https://github.com/Leon2332)
+  - Plasma - [Leon de Klerk](https://github.com/Leon2332)
+  - Cinnamon - [Leon de Klerk](https://github.com/Leon2332)
+  - MATE - [Leon de Klerk](https://github.com/Leon2332)
+#### CachyOS:
+  - Plasma - [Leon de Klerk](https://github.com/Leon2332)
+#### Microsoft Windows:
+  - Windows 11 (coming next) - [Leon de Klerk](https://github.com/Leon2332)

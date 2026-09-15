@@ -34,6 +34,7 @@ from firstboot.osinstall import (  # noqa: E402
     DRIVER_UBUNTU_CINNAMON,
     DRIVER_UBUNTU_GNOME,
     DRIVER_UBUNTU_MATE,
+    DRIVER_UBUNTU_PLASMA,
     canonical_driver_id,
     get_driver,
     is_native_driver,
@@ -154,6 +155,13 @@ class RegistryTests(unittest.TestCase):
         self.assertTrue(is_native_driver(get_driver("ubuntu-2404-mate")))
         self.assertEqual(get_driver("ubuntu-2404-mate").display_manager, "lightdm")
         self.assertEqual(get_driver("ubuntu-2404-mate").unpack_kind, "casper-layered")
+        self.assertEqual(DRIVER_UBUNTU_PLASMA, "ubuntu-2604-plasma")
+        self.assertTrue(is_native_driver(get_driver("ubuntu-2604-plasma")))
+        self.assertEqual(get_driver("ubuntu-2604-plasma").display_manager, "sddm")
+        self.assertEqual(get_driver("ubuntu-2604-plasma").unpack_kind, "casper-single")
+        self.assertEqual(get_driver("ubuntu-2604-plasma").live_usernames, ("kubuntu",))
+        self.assertIsNone(get_driver("kubuntu-2604-plasma"))
+        self.assertIsNone(get_driver("kubuntu"))
         self.assertEqual(DRIVER_MINT_CINNAMON, "mint-223-cinnamon")
         self.assertEqual(get_driver("mint-223-cinnamon").default_hostname, "mint")
         self.assertTrue(is_native_driver(get_driver("mint-223-cinnamon")))

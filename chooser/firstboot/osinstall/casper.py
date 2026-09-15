@@ -24,6 +24,13 @@ The live layer also seeds ``ubuntu-desktop-bootstrap`` rev 589 and a
 systemd mount unit (``snap-ubuntu\\x2ddesktop\\x2dbootstrap-589.mount``).
 First boot then dies with ``Can't lookup blockdev`` on that snap file.
 
+Kubuntu 26.04 is casper-single: one ``filesystem.squashfs`` and no
+``install-sources.yaml``. That squashfs *is* the live session. Casper
+15autologin points SDDM at ``kubuntu-live-environment.desktop``, which
+runs ``kubuntu-installer-prompt`` (Try Kubuntu / Install Kubuntu).
+Official Calamares ``packages.conf`` removes that greeter after unpack.
+Copying the squashfs without that purge first-boots Try/Install.
+
 Ubuntu MATE 24.04.4 is the same *layers* (curtin never copies live) but
 the kernel, ``linux-firmware``, and ``grub-efi-amd64-signed`` live only
 in the live overlay — LP: #2026225, older ISO. After unpack, apt-install
@@ -78,12 +85,38 @@ LIVE_PACKAGES = (
     "subiquity-tools",
     "live-installer",
     "calamares",
+    "calamares-data",
     "calamares-settings-ubuntu",
     "calamares-settings-lubuntu",
     "calamares-settings-kubuntu",
+    "calamares-settings-ubuntu-common",
+    "calamares-settings-ubuntu-common-data",
+    "libcalamares3.3",
+    "libcalamaresui3.3",
+    # Kubuntu/Lubuntu live greeter. Calamares packages.conf removes this;
+    # leaving it first-boots Try/Install instead of SDDM.
+    "kubuntu-installer-prompt",
+    "lubuntu-installer-prompt",
     "ubuntucinnamon-live-settings",
     "budgie-live-settings",
     "ubuntu-mate-live-settings",
+)
+
+# Kubuntu packages.conf also removes cifs-utils (casper CIFS boot). Not a
+# shared live package: Mint/GNOME keep it for desktop shares.
+KUBUNTU_EXTRA_LIVE_PACKAGES = ("cifs-utils",)
+
+# Files the live greeter owns. dpkg --purge should take them; delete them
+# anyway so a failed purge cannot ship Try/Install as the installed OS.
+LIVE_INSTALLER_PATHS = (
+    "usr/bin/kubuntu-installer-prompt",
+    "usr/bin/lubuntu-installer-prompt",
+    "usr/libexec/start-kubuntu-live-env",
+    "usr/libexec/start-lubuntu-live-env",
+    "usr/bin/calamares",
+    "usr/bin/calamares-launch-normal",
+    "usr/bin/calamares-launch-oem",
+    "etc/calamares",
 )
 
 # Live overlay seeds the Subiquity/desktop-bootstrap snap. First boot then
@@ -419,6 +452,24 @@ def casper_leftovers(root: str) -> list[str]:
     overlay = os.path.join(root, "etc", "overlayroot.local.conf")
     if os.path.isfile(overlay):
         fails.append("overlayroot is still enabled.")
+    for rel in LIVE_INSTALLER_PATHS:
+        path = os.path.join(root, rel)
+        if os.path.isfile(path) or os.path.isdir(path):
+            fails.append("Live installer is still present.")
+            break
+    for folder in (
+        os.path.join(root, "usr", "share", "wayland-sessions"),
+        os.path.join(root, "usr", "share", "xsessions"),
+    ):
+        if not os.path.isdir(folder):
+            continue
+        try:
+            names = os.listdir(folder)
+        except OSError:
+            names = []
+        if any("live" in n.lower() for n in names):
+            fails.append("Live session is still present.")
+            break
     snaps_dir = os.path.join(root, "var", "lib", "snapd", "snaps")
     if os.path.isdir(snaps_dir):
         try:
@@ -1223,16 +1274,179 @@ def ensure_user_icon(
         log.write(f"user icon {username} {icon}")
 
 
-def purge_live_packages(root: str, log: InstallLog | None = None) -> None:
+def _dpkg_status_text(root: str) -> str:
+    st = os.path.join(root, "var", "lib", "dpkg", "status")
+    if not os.path.isfile(st):
+        return ""
+    with open(st, encoding="utf-8", errors="replace") as fh:
+        return fh.read()
+
+
+def packages_to_purge(
+    root: str, extra: tuple[str, ...] = ()
+) -> list[str]:
+    """LIVE_PACKAGES plus *extra* plus any ``live-*`` row in dpkg status.
+
+    Kubuntu Calamares ``packages.conf`` also matches ``^live-*``. Include
+    reverse-deps such as ``kubuntu-installer-prompt`` in the same dpkg
+    transaction or purging ``calamares-settings-kubuntu`` fails and the
+    live greeter stays.
+    """
+    text = _dpkg_status_text(root)
+    if not text:
+        return []
     present: list[str] = []
-    for pkg in LIVE_PACKAGES:
-        st = os.path.join(root, "var", "lib", "dpkg", "status")
-        text = ""
-        if os.path.isfile(st):
-            with open(st, encoding="utf-8", errors="replace") as fh:
-                text = fh.read()
-        if f"Package: {pkg}\n" in text:
+    for pkg in (*LIVE_PACKAGES, *extra):
+        if pkg and f"Package: {pkg}\n" in text and pkg not in present:
             present.append(pkg)
+    for match in re.finditer(r"(?m)^Package: (live-\S+)$", text):
+        name = match.group(1)
+        if name not in present:
+            present.append(name)
+    return present
+
+
+def strip_live_sessions(root: str, log: InstallLog | None = None) -> None:
+    """Remove Try/Install greeter files even if dpkg --purge failed."""
+    for rel in LIVE_INSTALLER_PATHS:
+        path = os.path.join(root, rel)
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+        elif os.path.lexists(path):
+            try:
+                os.unlink(path)
+            except OSError:
+                continue
+        else:
+            continue
+        if log:
+            log.write(f"removed {rel}")
+    for folder in (
+        os.path.join(root, "usr", "share", "wayland-sessions"),
+        os.path.join(root, "usr", "share", "xsessions"),
+    ):
+        if not os.path.isdir(folder):
+            continue
+        try:
+            names = os.listdir(folder)
+        except OSError:
+            continue
+        for name in names:
+            lower = name.lower()
+            if "live" not in lower and "installer-prompt" not in lower:
+                continue
+            path = os.path.join(folder, name)
+            try:
+                os.unlink(path)
+            except OSError:
+                continue
+            if log:
+                log.write(f"removed {os.path.relpath(path, root)}")
+    for wants in (
+        os.path.join(root, "etc", "systemd", "system", "final.target.wants"),
+        os.path.join(root, "etc", "systemd", "system", "multi-user.target.wants"),
+    ):
+        if not os.path.isdir(wants):
+            continue
+        try:
+            names = os.listdir(wants)
+        except OSError:
+            continue
+        for name in names:
+            if "casper" not in name.lower():
+                continue
+            path = os.path.join(wants, name)
+            try:
+                os.unlink(path)
+            except OSError:
+                continue
+            if log:
+                log.write(f"removed {os.path.relpath(path, root)}")
+
+
+def _set_sddm_autologin_session(path: str, session: str) -> None:
+    """Write [Autologin] Session= and drop User= (Calamares doAutologin=false)."""
+    text = ""
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+    lines = text.splitlines()
+    out: list[str] = []
+    in_autologin = False
+    seen_section = False
+    wrote_session = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            if in_autologin and not wrote_session:
+                out.append(f"Session={session}")
+                wrote_session = True
+            in_autologin = stripped.lower() == "[autologin]"
+            if in_autologin:
+                seen_section = True
+            out.append(line)
+            continue
+        if in_autologin:
+            key = stripped.split("=", 1)[0].strip().lower()
+            if key == "user":
+                continue
+            if key == "session":
+                out.append(f"Session={session}")
+                wrote_session = True
+                continue
+        out.append(line)
+    if in_autologin and not wrote_session:
+        out.append(f"Session={session}")
+        wrote_session = True
+    if not seen_section:
+        if out and out[-1] != "":
+            out.append("")
+        out.append("[Autologin]")
+        out.append(f"Session={session}")
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(out).rstrip() + "\n")
+
+
+def write_sddm_session(
+    root: str, session: str, log: InstallLog | None = None
+) -> None:
+    """Calamares displaymanager for SDDM: Session= without an autologin User.
+
+    Kubuntu ``20-kubuntu.conf`` already names plasma; casper 15autologin
+    writes ``/etc/sddm.conf`` with the live session. After stripping
+    autologin, put the installed session back so SDDM does not fall
+    through to leftover ``kubuntu-live-environment``.
+    """
+    if not session:
+        return
+    _set_sddm_autologin_session(
+        os.path.join(root, "etc", "sddm.conf"), session
+    )
+    drop = os.path.join(root, "etc", "sddm.conf.d")
+    if os.path.isdir(drop):
+        try:
+            names = os.listdir(drop)
+        except OSError:
+            names = []
+        for name in names:
+            path = os.path.join(drop, name)
+            if not os.path.isfile(path):
+                continue
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
+            if re.search(r"(?im)^\[Autologin\]", text):
+                _set_sddm_autologin_session(path, session)
+    if log:
+        log.write(f"sddm session {session}")
+
+
+def purge_live_packages(
+    root: str,
+    log: InstallLog | None = None,
+    extra: tuple[str, ...] = (),
+) -> None:
+    present = packages_to_purge(root, extra=extra)
     if not present:
         return
     code, out = chroot_run(
@@ -1241,10 +1455,21 @@ def purge_live_packages(root: str, log: InstallLog | None = None) -> None:
         log=log,
         timeout=300,
     )
-    if code != 0 and log:
-        log.write(f"dpkg --purge failed ({code}); continuing")
-        if out:
-            log.write(out[-2000:])
+    if code != 0:
+        if log:
+            log.write(f"dpkg --purge failed ({code}); retrying --force-depends")
+            if out:
+                log.write(out[-2000:])
+        code, out = chroot_run(
+            root,
+            ["dpkg", "--purge", "--force-depends", *present],
+            log=log,
+            timeout=300,
+        )
+        if code != 0 and log:
+            log.write(f"dpkg --purge --force-depends failed ({code}); continuing")
+            if out:
+                log.write(out[-2000:])
 
 
 def configure_casper(
@@ -1260,6 +1485,7 @@ def configure_casper(
     iso_mnt: str = "",
     kernel_from_iso: bool = False,
     iso_packages: tuple[str, ...] = (),
+    extra_live_packages: tuple[str, ...] = (),
 ) -> None:
     write_fstab(target_root, disk)
     write_hostname(target_root, identity.hostname)
@@ -1275,6 +1501,7 @@ def configure_casper(
     strip_live_autologin(target_root)
     strip_installer_snaps(target_root, log=log)
     strip_casper_initramfs(target_root, log=log)
+    strip_live_sessions(target_root, log=log)
     mounted = bind_chroot(target_root)
     try:
         if kernel_from_iso:
@@ -1283,8 +1510,9 @@ def configure_casper(
             )
         elif iso_packages:
             apt_install_from_iso(target_root, iso_mnt, iso_packages, log=log)
-        purge_live_packages(target_root, log=log)
+        purge_live_packages(target_root, log=log, extra=extra_live_packages)
         strip_casper_initramfs(target_root, log=log)
+        strip_live_sessions(target_root, log=log)
         chroot_run(target_root, ["locale-gen"], log=log, timeout=180)
         if locale.langpack and locale.langpack != "en":
             chroot_run(
